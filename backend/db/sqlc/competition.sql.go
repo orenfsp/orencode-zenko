@@ -11,6 +11,188 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createCompetition = `-- name: CreateCompetition :one
+WITH created AS (
+    INSERT INTO competition (
+        name,
+        description,
+        discipline_id,
+        competition_type_id,
+        competition_level_id,
+        format,
+        start_at,
+        end_at,
+        registration_starts_at,
+        registration_ends_at,
+        venue_address,
+        online_url,
+        created_by,
+        status,
+        calendar_plan_id,
+        calendar_plan_number,
+        regulation_url
+    ) VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        $11,
+        $12,
+        $13,
+        'draft',
+        $14,
+        $15,
+        $16
+    )
+    RETURNING
+        id,
+        name,
+        description,
+        discipline_id,
+        competition_type_id,
+        competition_level_id,
+        format,
+        start_at,
+        end_at,
+        registration_starts_at,
+        registration_ends_at,
+        venue_address,
+        online_url,
+        status,
+        calendar_plan_id,
+        calendar_plan_number,
+        regulation_url
+)
+SELECT
+    c.id,
+    c.name,
+    c.description,
+    c.discipline_id,
+    d.name AS discipline_name,
+    c.competition_type_id,
+    ct.name AS competition_type_name,
+    c.competition_level_id,
+    cl.code AS competition_level_code,
+    cl.name AS competition_level_name,
+    c.format,
+    c.start_at,
+    c.end_at,
+    c.registration_starts_at,
+    c.registration_ends_at,
+    c.venue_address,
+    c.online_url,
+    c.status,
+    c.calendar_plan_id,
+    cp.name AS calendar_plan_name,
+    cp.year AS calendar_plan_year,
+    c.calendar_plan_number,
+    c.regulation_url
+FROM created AS c
+JOIN discipline AS d ON d.id = c.discipline_id
+JOIN competition_type AS ct ON ct.id = c.competition_type_id
+JOIN competition_level AS cl ON cl.id = c.competition_level_id
+LEFT JOIN calendar_plan AS cp ON cp.id = c.calendar_plan_id
+`
+
+type CreateCompetitionParams struct {
+	Name                 string
+	Description          pgtype.Text
+	DisciplineID         int64
+	CompetitionTypeID    int64
+	CompetitionLevelID   int64
+	Format               string
+	StartAt              pgtype.Timestamptz
+	EndAt                pgtype.Timestamptz
+	RegistrationStartsAt pgtype.Timestamptz
+	RegistrationEndsAt   pgtype.Timestamptz
+	VenueAddress         pgtype.Text
+	OnlineUrl            pgtype.Text
+	CreatedBy            int64
+	CalendarPlanID       pgtype.Int8
+	CalendarPlanNumber   pgtype.Text
+	RegulationUrl        pgtype.Text
+}
+
+type CreateCompetitionRow struct {
+	ID                   int64
+	Name                 string
+	Description          pgtype.Text
+	DisciplineID         int64
+	DisciplineName       string
+	CompetitionTypeID    int64
+	CompetitionTypeName  string
+	CompetitionLevelID   int64
+	CompetitionLevelCode pgtype.Text
+	CompetitionLevelName pgtype.Text
+	Format               string
+	StartAt              pgtype.Timestamptz
+	EndAt                pgtype.Timestamptz
+	RegistrationStartsAt pgtype.Timestamptz
+	RegistrationEndsAt   pgtype.Timestamptz
+	VenueAddress         pgtype.Text
+	OnlineUrl            pgtype.Text
+	Status               string
+	CalendarPlanID       pgtype.Int8
+	CalendarPlanName     pgtype.Text
+	CalendarPlanYear     pgtype.Int2
+	CalendarPlanNumber   pgtype.Text
+	RegulationUrl        pgtype.Text
+}
+
+func (q *Queries) CreateCompetition(ctx context.Context, arg CreateCompetitionParams) (CreateCompetitionRow, error) {
+	row := q.db.QueryRow(ctx, createCompetition,
+		arg.Name,
+		arg.Description,
+		arg.DisciplineID,
+		arg.CompetitionTypeID,
+		arg.CompetitionLevelID,
+		arg.Format,
+		arg.StartAt,
+		arg.EndAt,
+		arg.RegistrationStartsAt,
+		arg.RegistrationEndsAt,
+		arg.VenueAddress,
+		arg.OnlineUrl,
+		arg.CreatedBy,
+		arg.CalendarPlanID,
+		arg.CalendarPlanNumber,
+		arg.RegulationUrl,
+	)
+	var i CreateCompetitionRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.DisciplineID,
+		&i.DisciplineName,
+		&i.CompetitionTypeID,
+		&i.CompetitionTypeName,
+		&i.CompetitionLevelID,
+		&i.CompetitionLevelCode,
+		&i.CompetitionLevelName,
+		&i.Format,
+		&i.StartAt,
+		&i.EndAt,
+		&i.RegistrationStartsAt,
+		&i.RegistrationEndsAt,
+		&i.VenueAddress,
+		&i.OnlineUrl,
+		&i.Status,
+		&i.CalendarPlanID,
+		&i.CalendarPlanName,
+		&i.CalendarPlanYear,
+		&i.CalendarPlanNumber,
+		&i.RegulationUrl,
+	)
+	return i, err
+}
+
 const getPublishedCompetition = `-- name: GetPublishedCompetition :one
 SELECT
     c.id,
@@ -209,4 +391,46 @@ func (q *Queries) ListPublishedCompetitions(ctx context.Context, arg ListPublish
 		return nil, err
 	}
 	return items, nil
+}
+
+const validateCompetitionReferences = `-- name: ValidateCompetitionReferences :one
+SELECT
+    EXISTS(SELECT 1 FROM discipline WHERE discipline.id = $1) AS discipline_exists,
+    EXISTS(SELECT 1 FROM competition_type WHERE competition_type.id = $2) AS competition_type_exists,
+    EXISTS(SELECT 1 FROM competition_level WHERE competition_level.id = $3) AS competition_level_exists,
+    (
+        $4::bigint IS NULL
+        OR EXISTS(SELECT 1 FROM calendar_plan WHERE calendar_plan.id = $4)
+    ) AS calendar_plan_exists
+`
+
+type ValidateCompetitionReferencesParams struct {
+	PDisciplineID       int64
+	PCompetitionTypeID  int64
+	PCompetitionLevelID int64
+	PCalendarPlanID     pgtype.Int8
+}
+
+type ValidateCompetitionReferencesRow struct {
+	DisciplineExists       bool
+	CompetitionTypeExists  bool
+	CompetitionLevelExists bool
+	CalendarPlanExists     pgtype.Bool
+}
+
+func (q *Queries) ValidateCompetitionReferences(ctx context.Context, arg ValidateCompetitionReferencesParams) (ValidateCompetitionReferencesRow, error) {
+	row := q.db.QueryRow(ctx, validateCompetitionReferences,
+		arg.PDisciplineID,
+		arg.PCompetitionTypeID,
+		arg.PCompetitionLevelID,
+		arg.PCalendarPlanID,
+	)
+	var i ValidateCompetitionReferencesRow
+	err := row.Scan(
+		&i.DisciplineExists,
+		&i.CompetitionTypeExists,
+		&i.CompetitionLevelExists,
+		&i.CalendarPlanExists,
+	)
+	return i, err
 }

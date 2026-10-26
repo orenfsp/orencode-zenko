@@ -10,13 +10,18 @@ import (
 )
 
 type repositoryStub struct {
-	items      []Competition
-	item       Competition
-	listErr    error
-	getErr     error
-	seenLimit  int32
-	seenOffset int32
-	seenID     int64
+	items          []Competition
+	item           Competition
+	created        Competition
+	listErr        error
+	getErr         error
+	referenceErr   error
+	createErr      error
+	seenLimit      int32
+	seenOffset     int32
+	seenID         int64
+	seenReferences CompetitionReferences
+	seenCreate     CreateCompetition
 }
 
 func (s *repositoryStub) ListPublished(_ context.Context, limit, offset int32) ([]Competition, error) {
@@ -28,6 +33,16 @@ func (s *repositoryStub) ListPublished(_ context.Context, limit, offset int32) (
 func (s *repositoryStub) GetPublished(_ context.Context, id int64) (Competition, error) {
 	s.seenID = id
 	return s.item, s.getErr
+}
+
+func (s *repositoryStub) ValidateReferences(_ context.Context, references CompetitionReferences) error {
+	s.seenReferences = references
+	return s.referenceErr
+}
+
+func (s *repositoryStub) Create(_ context.Context, input CreateCompetition) (Competition, error) {
+	s.seenCreate = input
+	return s.created, s.createErr
 }
 
 func testCompetition() Competition {
@@ -42,6 +57,21 @@ func testCompetition() Competition {
 		RegistrationEndsAt:   time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC),
 	}
 }
+
+func validCreateRequest() CreateRequest {
+	venue := " Оренбург, ул. Советская, 1 "
+	return CreateRequest{
+		Name: " Кубок Оренбуржья ", DisciplineID: 2, CompetitionTypeID: 3,
+		CompetitionLevelID: 4, Format: " MIXED ",
+		StartAt:              time.Date(2026, time.November, 10, 8, 0, 0, 0, time.UTC),
+		EndAt:                time.Date(2026, time.November, 11, 16, 0, 0, 0, time.UTC),
+		RegistrationStartsAt: time.Date(2026, time.October, 1, 0, 0, 0, 0, time.UTC),
+		RegistrationEndsAt:   time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC),
+		VenueAddress:         &venue, OnlineURL: stringPointer("https://contest.example.org"),
+	}
+}
+
+func stringPointer(value string) *string { return &value }
 
 func TestServiceListPublishedCompetitions(t *testing.T) {
 	repo := &repositoryStub{items: []Competition{testCompetition()}}
@@ -127,5 +157,82 @@ func TestServiceGetRejectsInvalidID(t *testing.T) {
 	_, err := NewService(&repositoryStub{}).Get(context.Background(), 0)
 	if !errors.Is(err, competitionerrs.ErrInvalidID) {
 		t.Fatalf("Get() error = %v, want ErrInvalidID", err)
+	}
+}
+
+func TestServiceCreatesDraftCompetition(t *testing.T) {
+	created := testCompetition()
+	created.Status = "draft"
+	repo := &repositoryStub{created: created}
+
+	result, err := NewService(repo).Create(context.Background(), 42, validCreateRequest())
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if result.Status != "draft" || result.ID != created.ID {
+		t.Fatalf("Create() result = %#v", result)
+	}
+	if repo.seenCreate.CreatedBy != 42 || repo.seenCreate.Name != "Кубок Оренбуржья" ||
+		repo.seenCreate.Format != "mixed" || repo.seenCreate.VenueAddress == nil ||
+		*repo.seenCreate.VenueAddress != "Оренбург, ул. Советская, 1" {
+		t.Fatalf("Create() repository input = %#v", repo.seenCreate)
+	}
+	if repo.seenReferences.DisciplineID != 2 || repo.seenReferences.CompetitionLevelID != 4 {
+		t.Fatalf("validated references = %#v", repo.seenReferences)
+	}
+}
+
+func TestServiceCreateRejectsInvalidInput(t *testing.T) {
+	tests := []struct {
+		name   string
+		change func(*CreateRequest)
+	}{
+		{name: "missing name", change: func(req *CreateRequest) { req.Name = " " }},
+		{name: "unknown format", change: func(req *CreateRequest) { req.Format = "hybrid" }},
+		{name: "end before start", change: func(req *CreateRequest) { req.EndAt = req.StartAt }},
+		{name: "registration after start", change: func(req *CreateRequest) { req.RegistrationEndsAt = req.StartAt.Add(time.Hour) }},
+		{name: "mixed without venue", change: func(req *CreateRequest) { req.VenueAddress = nil }},
+		{name: "invalid online URL", change: func(req *CreateRequest) { req.OnlineURL = stringPointer("javascript:alert(1)") }},
+		{name: "calendar number without plan", change: func(req *CreateRequest) { req.CalendarPlanNumber = stringPointer("15") }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := validCreateRequest()
+			tt.change(&req)
+			repo := &repositoryStub{}
+			_, err := NewService(repo).Create(context.Background(), 42, req)
+			if !errors.Is(err, competitionerrs.ErrInvalidCreate) {
+				t.Fatalf("Create() error = %v, want ErrInvalidCreate", err)
+			}
+			if repo.seenCreate.Name != "" {
+				t.Fatal("repository Create() called for invalid input")
+			}
+		})
+	}
+}
+
+func TestServiceCreateRejectsMissingAuthorizedEmployee(t *testing.T) {
+	_, err := NewService(&repositoryStub{}).Create(context.Background(), 0, validCreateRequest())
+	if !errors.Is(err, competitionerrs.ErrForbidden) {
+		t.Fatalf("Create() error = %v, want ErrForbidden", err)
+	}
+}
+
+func TestServiceCreateRejectsInvalidReferences(t *testing.T) {
+	repo := &repositoryStub{referenceErr: competitionerrs.ErrInvalidReference}
+	_, err := NewService(repo).Create(context.Background(), 42, validCreateRequest())
+	if !errors.Is(err, competitionerrs.ErrInvalidReference) {
+		t.Fatalf("Create() error = %v, want ErrInvalidReference", err)
+	}
+	if repo.seenCreate.Name != "" {
+		t.Fatal("repository Create() called after invalid references")
+	}
+}
+
+func TestServiceCreatePropagatesRepositoryError(t *testing.T) {
+	wantErr := errors.New("database unavailable")
+	_, err := NewService(&repositoryStub{createErr: wantErr}).Create(context.Background(), 42, validCreateRequest())
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Create() error = %v, want %v", err, wantErr)
 	}
 }
