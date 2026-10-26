@@ -31,7 +31,35 @@ type Competition struct {
 	RegulationURL        *string
 }
 
+type CompetitionReferences struct {
+	DisciplineID       int64
+	CompetitionTypeID  int64
+	CompetitionLevelID int64
+	CalendarPlanID     *int64
+}
+
+type CreateCompetition struct {
+	Name                 string
+	Description          *string
+	DisciplineID         int64
+	CompetitionTypeID    int64
+	CompetitionLevelID   int64
+	Format               string
+	StartAt              time.Time
+	EndAt                time.Time
+	RegistrationStartsAt time.Time
+	RegistrationEndsAt   time.Time
+	VenueAddress         *string
+	OnlineURL            *string
+	CreatedBy            int64
+	CalendarPlanID       *int64
+	CalendarPlanNumber   *string
+	RegulationURL        *string
+}
+
 type Repository interface {
 	ListPublished(ctx context.Context, limit, offset int32) ([]Competition, error)
 	GetPublished(ctx context.Context, id int64) (Competition, error)
+	ValidateReferences(ctx context.Context, references CompetitionReferences) error
+	Create(ctx context.Context, input CreateCompetition) (Competition, error)
 }

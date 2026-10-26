@@ -1,8 +1,10 @@
 package competition
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -13,6 +15,14 @@ import (
 
 type Handler struct {
 	service *Service
+}
+
+type authorizedEmployeeKey struct{}
+
+// WithAuthorizedEmployee records the user ID only after authentication and
+// the federation employee role have been verified by integration middleware.
+func WithAuthorizedEmployee(ctx context.Context, userID int64) context.Context {
+	return context.WithValue(ctx, authorizedEmployeeKey{}, userID)
 }
 
 func NewHandler(service *Service) *Handler {
@@ -49,6 +59,26 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, item)
 }
 
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	createdBy, ok := r.Context().Value(authorizedEmployeeKey{}).(int64)
+	if !ok || createdBy <= 0 {
+		writeError(w, http.StatusForbidden, "создание соревнования доступно только сотруднику федерации")
+		return
+	}
+
+	var req CreateRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "некорректный JSON")
+		return
+	}
+	created, err := h.service.Create(r.Context(), createdBy, req)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, created)
+}
+
 func parsePagination(r *http.Request) (int32, int32, error) {
 	limit, offset := int64(DefaultLimit), int64(0)
 	var err error
@@ -67,6 +97,19 @@ func parsePagination(r *http.Request) (int32, int32, error) {
 	return int32(limit), int32(offset), nil
 }
 
+func decodeJSON(w http.ResponseWriter, r *http.Request, destination any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(destination); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return errors.New("request body must contain one JSON object")
+	}
+	return nil
+}
+
 func handleServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, competitionerrs.ErrInvalidPagination):
@@ -75,6 +118,12 @@ func handleServiceError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "некорректный ID соревнования")
 	case errors.Is(err, competitionerrs.ErrNotFound):
 		writeError(w, http.StatusNotFound, "соревнование не найдено")
+	case errors.Is(err, competitionerrs.ErrInvalidCreate), errors.Is(err, competitionerrs.ErrInvalidReference):
+		writeError(w, http.StatusBadRequest, "некорректные данные соревнования")
+	case errors.Is(err, competitionerrs.ErrNameConflict):
+		writeError(w, http.StatusConflict, "соревнование с таким названием уже существует")
+	case errors.Is(err, competitionerrs.ErrForbidden):
+		writeError(w, http.StatusForbidden, "создание соревнования доступно только сотруднику федерации")
 	default:
 		if logger.Log != nil {
 			logger.Log.Error("competition request failed", zap.Error(err))
