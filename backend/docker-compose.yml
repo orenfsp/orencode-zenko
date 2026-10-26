@@ -27,21 +27,6 @@ services:
       - "up"
     restart: "no"
 
-  rbac-seed:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: vera-backend:local
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: ${DATABASE_URL_DOCKER}
-    entrypoint: ["/seed-rbac"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    restart: "no"
-
   server:
     build:
       context: .
@@ -53,9 +38,6 @@ services:
       DATABASE_URL: ${DATABASE_URL_DOCKER}
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
-    depends_on:
-      rbac-seed:
-        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
