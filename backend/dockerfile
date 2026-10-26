@@ -1,0 +1,40 @@
+FROM golang:1.27.1-bookworm AS build
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build \
+	-trimpath \
+	-ldflags="-s -w" \
+	-o /out/api \
+	./cmd/api \
+	&& CGO_ENABLED=0 GOOS=linux go build \
+	-trimpath \
+	-ldflags="-s -w" \
+	-o /out/seed-rbac \
+	./cmd/seed-rbac \
+	&& CGO_ENABLED=0 GOOS=linux go build \
+	-trimpath \
+	-ldflags="-s -w" \
+	-o /out/bootstrap-admin \
+	./cmd/bootstrap-admin \
+	&& CGO_ENABLED=0 GOOS=linux go build \
+	-trimpath \
+	-ldflags="-s -w" \
+	-o /out/seed-demo \
+	./cmd/seed-demo
+
+FROM scratch
+
+COPY --from=build /out/api /api
+COPY --from=build /out/seed-rbac /seed-rbac
+COPY --from=build /out/bootstrap-admin /bootstrap-admin
+COPY --from=build /out/seed-demo /seed-demo
+
+USER 65532:65532
+EXPOSE 8080
+
+ENTRYPOINT ["/api"]
