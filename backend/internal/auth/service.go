@@ -3,180 +3,269 @@ package auth
 import (
 	"context"
 	"errors"
+	"net/mail"
+	"regexp"
+	"strings"
 	"time"
+	"unicode/utf8"
 
-	"github.com/Mccalin/vera-backend/internal/auth/errs"
-	"github.com/Mccalin/vera-backend/internal/session"
-	"github.com/Mccalin/vera-backend/pkg/logger"
-	"github.com/Mccalin/vera-backend/pkg/password"
-	"github.com/Mccalin/vera-backend/pkg/token"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"go.uber.org/zap"
+	autherrs "github.com/orenfsp/orencode-zenko.git/internal/auth/errs"
+	"github.com/orenfsp/orencode-zenko.git/pkg/password"
+	"github.com/orenfsp/orencode-zenko.git/pkg/token"
 )
 
+const consentPolicyVersion = "1.0"
+
+var telegramUsernamePattern = regexp.MustCompile(`^[A-Za-z0-9_]{5,32}$`)
+
 type Service struct {
-	users   UserProvider
-	token   *token.Manager
-	session SessionProvider
+	users    UserProvider
+	tokens   *token.Manager
+	sessions SessionProvider
+	now      func() time.Time
 }
 
-// NewService accepts an optional session provider for backwards compatibility
-// with callers that only exercise password/token generation (for example unit
-// tests). Login, refresh and logout require a configured session provider.
-func NewService(users UserProvider, token *token.Manager, sessions ...SessionProvider) *Service {
-	var sessionProvider SessionProvider
-	if len(sessions) > 0 {
-		sessionProvider = sessions[0]
-	}
+func NewService(users UserProvider, tokens *token.Manager, sessions SessionProvider) *Service {
 	return &Service{
-		users:   users,
-		token:   token,
-		session: sessionProvider,
+		users:    users,
+		tokens:   tokens,
+		sessions: sessions,
+		now:      time.Now,
 	}
 }
 
-func (s *Service) Login(ctx context.Context, r LoginRequest) (LoginResponse, error) {
-	user, err := s.users.GetUserByUsername(ctx, r.Username)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return LoginResponse{}, errs.ErrInvalidCredentials
-		}
-		return LoginResponse{}, err
+func (s *Service) Register(ctx context.Context, req RegisterRequest) (TokenResponse, error) {
+	firstName := strings.TrimSpace(req.FirstName)
+	lastName := strings.TrimSpace(req.LastName)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	deviceID := strings.TrimSpace(req.DeviceID)
+
+	if firstName == "" || utf8.RuneCountInString(firstName) > 100 ||
+		lastName == "" || utf8.RuneCountInString(lastName) > 100 ||
+		utf8.RuneCountInString(strings.TrimSpace(req.MiddleName)) > 100 ||
+		deviceID == "" || len(deviceID) > 255 ||
+		len(req.Password) < 8 || len(req.Password) > 72 ||
+		len(email) > 255 || !validEmail(email) {
+		return TokenResponse{}, autherrs.ErrInvalidRegistrationData
 	}
-	err = password.Compare(r.Password, user.PasswordHash)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return LoginResponse{}, errs.ErrInvalidPassword
-		}
-		return LoginResponse{}, err
-	}
-	if user.AccesStatus != true {
-		return LoginResponse{}, errs.ErrAccessStatus
-	}
-	payload := token.TokenPayload{
-		UserID: user.ID,
-		RoleID: user.RoleID,
+	if !req.PersonalDataConsent {
+		return TokenResponse{}, autherrs.ErrConsentRequired
 	}
 
-	accessToken, err := s.token.GenerateAccessToken(payload)
+	birthDate, err := time.Parse("2006-01-02", req.BirthDate)
 	if err != nil {
-		return LoginResponse{}, err
+		return TokenResponse{}, autherrs.ErrInvalidRegistrationData
 	}
-	refreshToken, err := s.token.GenerateRefreshToken(payload)
+	today := dateOnly(s.now())
+	if birthDate.After(today) || birthDate.Before(today.AddDate(-120, 0, 0)) {
+		return TokenResponse{}, autherrs.ErrInvalidRegistrationData
+	}
 
-	if err != nil {
-		return LoginResponse{}, err
+	minor := birthDate.AddDate(18, 0, 0).After(today)
+	parentalDocument := strings.TrimSpace(req.ParentalConsentDocumentURL)
+	if minor && (parentalDocument == "" || len(parentalDocument) > 2048) {
+		return TokenResponse{}, autherrs.ErrParentalConsentRequired
 	}
-	refreshHash := token.HashRefresh(refreshToken)
-	_, err = s.session.CreateSession(ctx, session.Create{
-		UserID:           user.ID,
-		RefreshTokenHash: refreshHash,
-		DeviceID:         r.DeviceID,
-		ExpiresAt:        time.Now().Add(s.token.RefreshTTL()),
+
+	passwordHash, err := password.Hash(req.Password)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+
+	var middleName *string
+	if value := strings.TrimSpace(req.MiddleName); value != "" {
+		middleName = &value
+	}
+	var parentalDocumentPtr *string
+	if minor {
+		parentalDocumentPtr = &parentalDocument
+	}
+
+	createdUser, err := s.users.CreateUser(ctx, CreateUser{
+		FirstName:                  firstName,
+		LastName:                   lastName,
+		MiddleName:                 middleName,
+		BirthDate:                  birthDate,
+		Email:                      email,
+		PasswordHash:               passwordHash,
+		ConsentPolicyVersion:       consentPolicyVersion,
+		ParentalConsentDocumentURL: parentalDocumentPtr,
 	})
-
 	if err != nil {
-		return LoginResponse{}, err
+		return TokenResponse{}, err
 	}
 
-	return LoginResponse{AccessToken: accessToken, RefreshToken: refreshToken}, nil
+	return s.createSession(ctx, createdUser, deviceID)
 }
 
-func (s *Service) Refresh(ctx context.Context, dto RefreshTokenDTO) (RefreshResponseDTO, error) {
-	// паршу токен
-	claims, err := s.token.Parse(dto.RefreshToken)
-	if err != nil {
-		return RefreshResponseDTO{}, err
+func (s *Service) Login(ctx context.Context, req LoginRequest) (TokenResponse, error) {
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	deviceID := strings.TrimSpace(req.DeviceID)
+	if !validEmail(email) || req.Password == "" || deviceID == "" {
+		return TokenResponse{}, autherrs.ErrInvalidCredentials
 	}
 
-	if claims.Type != "refresh" {
-		return RefreshResponseDTO{}, errors.New("invalid token type")
-	}
-	// получаю рефреш, точнее его хеш
-	hash := token.HashRefresh(dto.RefreshToken)
-	userSessions, err := s.session.GetSessionByRefreshHash(ctx, hash)
+	user, err := s.users.GetUserByEmail(ctx, email)
 	if err != nil {
-		return RefreshResponseDTO{}, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return TokenResponse{}, autherrs.ErrInvalidCredentials
+		}
+		return TokenResponse{}, err
 	}
-	// не сдохла ли сессия
-	if userSessions.ExpiresAt.Before(time.Now()) {
-		return RefreshResponseDTO{}, errors.New("expired session")
+	if err := password.Compare(req.Password, user.PasswordHash); err != nil {
+		return TokenResponse{}, autherrs.ErrInvalidCredentials
 	}
-	// не попутал ли данные
-	uid, err := uuid.Parse(userSessions.UserID)
-	if claims.UserID != userSessions.UserID {
-		return RefreshResponseDTO{}, errors.New("user not valid")
-	}
-	if err != nil {
-		logger.Log.Error("parse uid fail auth", zap.Error(err))
-		return RefreshResponseDTO{}, err
-	}
-	// по анологии с логином запоковываю новые токены послке успешного рефреша
-	user, err := s.users.GetUserById(ctx, uid)
-	if err != nil {
-		return RefreshResponseDTO{}, err
-	}
-	if !user.AccesStatus {
-		return RefreshResponseDTO{}, errs.ErrAccessStatus
-	}
-	payload := token.TokenPayload{
-		UserID: user.ID,
-		RoleID: user.RoleID,
-	}
-	accessToken, err := s.token.GenerateAccessToken(payload)
-	if err != nil {
-		return RefreshResponseDTO{}, err
-	}
-	refreshToken, err := s.token.GenerateRefreshToken(payload)
-
-	if err != nil {
-		return RefreshResponseDTO{}, err
+	if !user.AccessStatus {
+		return TokenResponse{}, autherrs.ErrAccessDenied
 	}
 
-	newHash := token.HashRefresh(refreshToken)
-	uidu, err := uuid.Parse(userSessions.ID)
-	if err != nil {
-		logger.Log.Error("parse uid fail auth", zap.Error(err))
-		return RefreshResponseDTO{}, err
-	}
-	_, err = s.session.UpdateSessionRefreshHash(ctx, session.Update{
-		RefreshTokenHash: newHash,
-		ExpiresAt:        time.Now().Add(s.token.RefreshTTL()),
-	}, uidu)
-	if err != nil {
-		return RefreshResponseDTO{}, err
-	}
-
-	return RefreshResponseDTO{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	}, nil
+	return s.createSession(ctx, user, deviceID)
 }
-func (s *Service) Logout(ctx context.Context, dto LogoutDTO) error {
-	claims, err := s.token.Parse(dto.RefreshToken)
+
+func (s *Service) Refresh(ctx context.Context, req RefreshTokenRequest) (TokenResponse, error) {
+	claims, session, err := s.validRefreshSession(ctx, req.RefreshToken)
 	if err != nil {
-		return err
-	}
-	if claims.Type != "refresh" {
-		return errors.New("user not valid")
-	}
-	hash := token.HashRefresh(dto.RefreshToken)
-	userSession, err := s.session.GetSessionByRefreshHash(ctx, hash)
-	if err != nil {
-		return err
-	}
-	if claims.UserID != userSession.UserID {
-		return errors.New("invalid session")
-	}
-	uid, err := uuid.Parse(userSession.ID)
-	if err != nil {
-		return err
-	}
-	err = s.session.DeleteSessionByID(ctx, uid)
-	if err != nil {
-		return err
+		return TokenResponse{}, err
 	}
 
-	return nil
+	user, err := s.users.GetUserByID(ctx, claims.UserID)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	if !user.AccessStatus {
+		return TokenResponse{}, autherrs.ErrAccessDenied
+	}
+
+	return s.rotateSession(ctx, session, user)
+}
+
+func (s *Service) Logout(ctx context.Context, refreshToken string) error {
+	_, session, err := s.validRefreshSession(ctx, refreshToken)
+	if err != nil {
+		return err
+	}
+	return s.sessions.DeleteSession(ctx, session.ID)
+}
+
+func (s *Service) PatchProfile(ctx context.Context, accessToken string, req PatchProfileRequest) (PatchProfileResponse, error) {
+	claims, err := s.tokens.Parse(accessToken)
+	if err != nil || claims.Type != "access" || claims.PrincipalType != "user" || claims.UserID == 0 {
+		return PatchProfileResponse{}, autherrs.ErrAccessDenied
+	}
+
+	response := PatchProfileResponse{}
+	if req.TelegramUsername != nil {
+		value := strings.TrimSpace(*req.TelegramUsername)
+		var username *string
+		if value != "" {
+			value = strings.TrimPrefix(value, "@")
+			if !telegramUsernamePattern.MatchString(value) {
+				return PatchProfileResponse{}, autherrs.ErrTelegramUsernameInvalid
+			}
+			username = &value
+		}
+		if err := s.users.UpdateTelegramUsername(ctx, claims.UserID, username); err != nil {
+			return PatchProfileResponse{}, err
+		}
+		response.TelegramUsername = username
+	}
+
+	if req.RoleID == nil {
+		return response, nil
+	}
+	if *req.RoleID <= 0 || strings.TrimSpace(req.RefreshToken) == "" {
+		return PatchProfileResponse{}, autherrs.ErrInvalidRegistrationData
+	}
+
+	refreshClaims, session, err := s.validRefreshSession(ctx, req.RefreshToken)
+	if err != nil || refreshClaims.UserID != claims.UserID {
+		return PatchProfileResponse{}, autherrs.ErrInvalidSession
+	}
+	if err := s.users.SetRole(ctx, claims.UserID, *req.RoleID); err != nil {
+		return PatchProfileResponse{}, err
+	}
+	user, err := s.users.GetUserByID(ctx, claims.UserID)
+	if err != nil {
+		return PatchProfileResponse{}, err
+	}
+	tokens, err := s.rotateSession(ctx, session, user)
+	if err != nil {
+		return PatchProfileResponse{}, err
+	}
+
+	response.RoleID = user.RoleID
+	response.AccessToken = tokens.AccessToken
+	response.RefreshToken = tokens.RefreshToken
+	return response, nil
+}
+
+func (s *Service) createSession(ctx context.Context, user User, deviceID string) (TokenResponse, error) {
+	tokens, err := s.generateTokens(user)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	_, err = s.sessions.CreateSession(ctx, CreateSession{
+		UserID:           user.ID,
+		RefreshTokenHash: token.HashRefresh(tokens.RefreshToken),
+		DeviceID:         deviceID,
+		ExpiresAt:        s.now().Add(s.tokens.RefreshTTL()),
+	})
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	return tokens, nil
+}
+
+func (s *Service) rotateSession(ctx context.Context, session Session, user User) (TokenResponse, error) {
+	tokens, err := s.generateTokens(user)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	err = s.sessions.RotateSession(
+		ctx,
+		session.ID,
+		token.HashRefresh(tokens.RefreshToken),
+		s.now().Add(s.tokens.RefreshTTL()),
+	)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	return tokens, nil
+}
+
+func (s *Service) generateTokens(user User) (TokenResponse, error) {
+	payload := token.TokenPayload{UserID: user.ID, RoleID: user.RoleID}
+	accessToken, err := s.tokens.GenerateAccessToken(payload)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	refreshToken, err := s.tokens.GenerateRefreshToken(payload)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	return TokenResponse{AccessToken: accessToken, RefreshToken: refreshToken}, nil
+}
+
+func (s *Service) validRefreshSession(ctx context.Context, rawToken string) (*token.Claims, Session, error) {
+	rawToken = strings.TrimSpace(rawToken)
+	claims, err := s.tokens.Parse(rawToken)
+	if err != nil || claims.Type != "refresh" || claims.PrincipalType != "user" || claims.UserID == 0 {
+		return nil, Session{}, autherrs.ErrInvalidSession
+	}
+	session, err := s.sessions.GetSessionByRefreshHash(ctx, token.HashRefresh(rawToken))
+	if err != nil || session.UserID != claims.UserID || !session.ExpiresAt.After(s.now()) {
+		return nil, Session{}, autherrs.ErrInvalidSession
+	}
+	return claims, session, nil
+}
+
+func validEmail(value string) bool {
+	parsed, err := mail.ParseAddress(value)
+	return err == nil && parsed.Address == value
+}
+
+func dateOnly(value time.Time) time.Time {
+	year, month, day := value.Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }

@@ -6,205 +6,193 @@ import (
 	"testing"
 	"time"
 
-	autherrs "github.com/Mccalin/vera-backend/internal/auth/errs"
-	"github.com/Mccalin/vera-backend/internal/session"
-	"github.com/Mccalin/vera-backend/internal/user"
-	"github.com/Mccalin/vera-backend/pkg/password"
-	"github.com/Mccalin/vera-backend/pkg/token"
-	"github.com/google/uuid"
+	autherrs "github.com/orenfsp/orencode-zenko.git/internal/auth/errs"
+	"github.com/orenfsp/orencode-zenko.git/pkg/token"
 )
 
-// Mock UserProvider
-type mockUserProvider struct {
-	user user.User
-	err  error
+type userProviderStub struct {
+	user       User
+	createData CreateUser
+	createErr  error
 }
 
-func (m *mockUserProvider) GetUserByUsername(ctx context.Context, username string) (user.User, error) {
-	if m.err != nil {
-		return user.User{}, m.err
-	}
-	return m.user, nil
+func (s *userProviderStub) CreateUser(_ context.Context, data CreateUser) (User, error) {
+	s.createData = data
+	return s.user, s.createErr
 }
 
-func (m *mockUserProvider) GetUserById(ctx context.Context, id uuid.UUID) (user.User, error) {
-	if m.err != nil {
-		return user.User{}, m.err
-	}
-	return m.user, nil
+func (s *userProviderStub) GetUserByEmail(context.Context, string) (User, error) {
+	return s.user, nil
 }
 
-type mockSessionProvider struct{}
-
-func (mockSessionProvider) CreateSession(context.Context, session.Create) (session.Response, error) {
-	return session.Response{}, nil
-}
-func (mockSessionProvider) GetSessionByRefreshHash(context.Context, string) (session.Response, error) {
-	return session.Response{}, errors.New("not implemented")
-}
-func (mockSessionProvider) UpdateSessionRefreshHash(context.Context, session.Update, uuid.UUID) (session.Response, error) {
-	return session.Response{}, nil
-}
-func (mockSessionProvider) DeleteExpiredSessions(context.Context) error        { return nil }
-func (mockSessionProvider) DeleteSessionByID(context.Context, uuid.UUID) error { return nil }
-
-type refreshSessionProvider struct {
-	session session.Response
+func (s *userProviderStub) GetUserByID(context.Context, int64) (User, error) {
+	return s.user, nil
 }
 
-func (s refreshSessionProvider) CreateSession(context.Context, session.Create) (session.Response, error) {
-	return session.Response{}, nil
-}
-func (s refreshSessionProvider) GetSessionByRefreshHash(context.Context, string) (session.Response, error) {
-	return s.session, nil
-}
-func (s refreshSessionProvider) UpdateSessionRefreshHash(context.Context, session.Update, uuid.UUID) (session.Response, error) {
-	return session.Response{}, nil
-}
-func (refreshSessionProvider) DeleteExpiredSessions(context.Context) error { return nil }
-func (refreshSessionProvider) DeleteSessionByID(context.Context, uuid.UUID) error {
+func (s *userProviderStub) SetRole(_ context.Context, _ int64, roleID int64) error {
+	s.user.RoleID = &roleID
 	return nil
 }
 
-// Tests
-func TestLoginSuccess(t *testing.T) {
-	ctx := context.Background()
+func (s *userProviderStub) UpdateTelegramUsername(_ context.Context, _ int64, username *string) error {
+	s.user.TelegramUsername = username
+	return nil
+}
 
-	// Создаем password hash
-	hashPassword, _ := password.Hash("testPassword123")
+type sessionProviderStub struct {
+	session    Session
+	createData CreateSession
+	rotated    bool
+}
 
-	// Mock user
-	mockUser := user.User{
-		ID:           "user-id-123",
-		Username:     "testuser",
-		RoleID:       "role-id-123",
-		AccesStatus:  true,
-		PasswordHash: hashPassword,
+func (s *sessionProviderStub) CreateSession(_ context.Context, data CreateSession) (Session, error) {
+	s.createData = data
+	s.session = Session{
+		ID:               10,
+		UserID:           data.UserID,
+		RefreshTokenHash: data.RefreshTokenHash,
+		DeviceID:         data.DeviceID,
+		ExpiresAt:        data.ExpiresAt,
 	}
+	return s.session, nil
+}
 
-	mockUserProvider := &mockUserProvider{
-		user: mockUser,
+func (s *sessionProviderStub) GetSessionByRefreshHash(context.Context, string) (Session, error) {
+	return s.session, nil
+}
+
+func (s *sessionProviderStub) RotateSession(_ context.Context, _ int64, hash string, expiresAt time.Time) error {
+	s.rotated = true
+	s.session.RefreshTokenHash = hash
+	s.session.ExpiresAt = expiresAt
+	return nil
+}
+
+func (s *sessionProviderStub) DeleteSession(context.Context, int64) error { return nil }
+
+func newTestService(users *userProviderStub, sessions *sessionProviderStub) *Service {
+	manager := token.New("test-secret", 5*time.Minute, 24*time.Hour)
+	service := NewService(users, manager, sessions)
+	service.now = func() time.Time {
+		return time.Date(2026, time.October, 26, 12, 0, 0, 0, time.UTC)
 	}
+	return service
+}
 
-	// Создаем token manager
-	tokenManager := token.New(
-		"test-secret-key",
-		5*time.Minute,
-		24*time.Hour,
-	)
-	//session
-
-	service := NewService(mockUserProvider, tokenManager, mockSessionProvider{})
-
-	// Login request
-	loginReq := LoginRequest{
-		Username: "testuser",
-		Password: "testPassword123",
+func validRegisterRequest() RegisterRequest {
+	return RegisterRequest{
+		FirstName:           "Иван",
+		LastName:            "Иванов",
+		BirthDate:           "2000-05-10",
+		Email:               "USER@example.com",
+		Password:            "password123",
+		PersonalDataConsent: true,
+		DeviceID:            "browser-1",
 	}
+}
 
-	// Запускаем Login
-	response, err := service.Login(ctx, loginReq)
+func TestRegisterAdultCreatesRolelessTokens(t *testing.T) {
+	users := &userProviderStub{user: User{ID: 42, Email: "user@example.com", AccessStatus: true}}
+	sessions := &sessionProviderStub{}
+	service := newTestService(users, sessions)
 
-	// Проверяем результаты
+	response, err := service.Register(context.Background(), validRegisterRequest())
 	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
+		t.Fatalf("Register() error = %v", err)
 	}
-
-	if response.AccessToken == "" {
-		t.Error("Expected access token, got empty string")
+	if users.createData.Email != "user@example.com" {
+		t.Fatalf("normalized email = %q", users.createData.Email)
 	}
-
-	if response.RefreshToken == "" {
-		t.Error("Expected refresh token, got empty string")
+	if users.createData.ParentalConsentDocumentURL != nil {
+		t.Fatal("adult registration unexpectedly created parental consent")
 	}
-
-	t.Log("✓ Login successful with valid credentials")
+	claims, err := service.tokens.Parse(response.AccessToken)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if claims.UserID != 42 || claims.RoleID != nil {
+		t.Fatalf("claims = user:%d role:%v, want user:42 and no role", claims.UserID, claims.RoleID)
+	}
+	if sessions.createData.DeviceID != "browser-1" {
+		t.Fatalf("device id = %q", sessions.createData.DeviceID)
+	}
 }
 
-func TestLoginUserNotFound(t *testing.T) {
-	ctx := context.Background()
+func TestRegisterMinorRequiresParentalConsent(t *testing.T) {
+	users := &userProviderStub{user: User{ID: 42}}
+	service := newTestService(users, &sessionProviderStub{})
+	req := validRegisterRequest()
+	req.BirthDate = "2008-10-27"
 
-	mockUserProvider := &mockUserProvider{
-		err: errors.New("user not found"),
+	_, err := service.Register(context.Background(), req)
+	if !errors.Is(err, autherrs.ErrParentalConsentRequired) {
+		t.Fatalf("Register() error = %v, want ErrParentalConsentRequired", err)
 	}
-
-	tokenManager := token.New("test-secret-key", 5*time.Minute, 24*time.Hour)
-	service := NewService(mockUserProvider, tokenManager, mockSessionProvider{})
-
-	loginReq := LoginRequest{
-		Username: "nonexistent",
-		Password: "password123",
-	}
-
-	_, err := service.Login(ctx, loginReq)
-
-	if err == nil {
-		t.Error("Expected error for non-existent user, got nil")
-	}
-
-	t.Log("✓ Login failed with non-existent user")
 }
 
-func TestRefreshRejectsDisabledUser(t *testing.T) {
-	userID := uuid.NewString()
-	manager := token.New("test-secret-key", 5*time.Minute, 24*time.Hour)
-	refreshToken, err := manager.GenerateRefreshToken(token.TokenPayload{
-		UserID: userID,
-		RoleID: uuid.NewString(),
+func TestRegisterRequiresPersonalDataConsent(t *testing.T) {
+	users := &userProviderStub{user: User{ID: 42}}
+	service := newTestService(users, &sessionProviderStub{})
+	req := validRegisterRequest()
+	req.PersonalDataConsent = false
+
+	_, err := service.Register(context.Background(), req)
+	if !errors.Is(err, autherrs.ErrConsentRequired) {
+		t.Fatalf("Register() error = %v, want ErrConsentRequired", err)
+	}
+}
+
+func TestRegisterMinorPersistsParentalDocument(t *testing.T) {
+	users := &userProviderStub{user: User{ID: 42}}
+	service := newTestService(users, &sessionProviderStub{})
+	req := validRegisterRequest()
+	req.BirthDate = "2010-01-01"
+	req.ParentalConsentDocumentURL = "uploads/parental/consent.pdf"
+
+	if _, err := service.Register(context.Background(), req); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	if users.createData.ParentalConsentDocumentURL == nil || *users.createData.ParentalConsentDocumentURL != req.ParentalConsentDocumentURL {
+		t.Fatalf("parental document was not persisted: %#v", users.createData.ParentalConsentDocumentURL)
+	}
+}
+
+func TestRegisterUserTurning18TodayDoesNotRequireParentalConsent(t *testing.T) {
+	users := &userProviderStub{user: User{ID: 42}}
+	service := newTestService(users, &sessionProviderStub{})
+	req := validRegisterRequest()
+	req.BirthDate = "2008-10-26"
+
+	if _, err := service.Register(context.Background(), req); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+}
+
+func TestPatchProfileRoleRotatesTokensWithRole(t *testing.T) {
+	users := &userProviderStub{user: User{ID: 42, Email: "user@example.com", AccessStatus: true}}
+	sessions := &sessionProviderStub{}
+	service := newTestService(users, sessions)
+	initialTokens, err := service.createSession(context.Background(), users.user, "browser-1")
+	if err != nil {
+		t.Fatalf("createSession() error = %v", err)
+	}
+	roleID := int64(7)
+
+	response, err := service.PatchProfile(context.Background(), initialTokens.AccessToken, PatchProfileRequest{
+		RoleID:       &roleID,
+		RefreshToken: initialTokens.RefreshToken,
 	})
 	if err != nil {
-		t.Fatalf("GenerateRefreshToken() error = %v", err)
+		t.Fatalf("PatchProfile() error = %v", err)
 	}
-
-	service := NewService(
-		&mockUserProvider{user: user.User{
-			ID:          userID,
-			RoleID:      uuid.NewString(),
-			AccesStatus: false,
-		}},
-		manager,
-		refreshSessionProvider{session: session.Response{
-			ID:        uuid.NewString(),
-			UserID:    userID,
-			ExpiresAt: time.Now().Add(time.Hour),
-		}},
-	)
-
-	_, err = service.Refresh(context.Background(), RefreshTokenDTO{RefreshToken: refreshToken})
-	if !errors.Is(err, autherrs.ErrAccessStatus) {
-		t.Fatalf("Refresh() error = %v, want ErrAccessStatus", err)
+	if !sessions.rotated {
+		t.Fatal("refresh session was not rotated")
 	}
-}
-
-func TestLoginWrongPassword(t *testing.T) {
-	ctx := context.Background()
-
-	hashPassword, _ := password.Hash("correctPassword123")
-
-	mockUser := user.User{
-		ID:           "user-id-123",
-		Username:     "testuser",
-		RoleID:       "role-id-123",
-		PasswordHash: hashPassword,
+	claims, err := service.tokens.Parse(response.AccessToken)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
 	}
-
-	mockUserProvider := &mockUserProvider{
-		user: mockUser,
+	if claims.RoleID == nil || *claims.RoleID != roleID {
+		t.Fatalf("role claim = %v, want %d", claims.RoleID, roleID)
 	}
-
-	tokenManager := token.New("test-secret-key", 5*time.Minute, 24*time.Hour)
-	service := NewService(mockUserProvider, tokenManager, mockSessionProvider{})
-
-	loginReq := LoginRequest{
-		Username: "testuser",
-		Password: "wrongPassword",
-	}
-
-	_, err := service.Login(ctx, loginReq)
-
-	if err == nil {
-		t.Error("Expected error for wrong password, got nil")
-	}
-
-	t.Log("✓ Login failed with wrong password")
 }

@@ -7,8 +7,8 @@ import (
 )
 
 type TokenPayload struct {
-	UserID string
-	RoleID string
+	UserID int64
+	RoleID *int64
 }
 
 type DeviceTokenPayload struct {
@@ -17,8 +17,8 @@ type DeviceTokenPayload struct {
 }
 
 type Claims struct {
-	UserID          string `json:"user_id,omitempty"`
-	RoleID          string `json:"role_id,omitempty"`
+	UserID          int64  `json:"user_id,omitempty"`
+	RoleID          *int64 `json:"role_id,omitempty"`
 	PrincipalType   string `json:"principal_type,omitempty"`
 	DeviceID        string `json:"device_id,omitempty"`
 	DeviceSessionID string `json:"device_session_id,omitempty"`

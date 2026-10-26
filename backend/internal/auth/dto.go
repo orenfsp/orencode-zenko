@@ -1,23 +1,43 @@
 package auth
 
+type RegisterRequest struct {
+	FirstName                  string `json:"first_name"`
+	LastName                   string `json:"last_name"`
+	MiddleName                 string `json:"middle_name,omitempty"`
+	BirthDate                  string `json:"birth_date"`
+	Email                      string `json:"email"`
+	Password                   string `json:"password"`
+	PersonalDataConsent        bool   `json:"personal_data_consent"`
+	ParentalConsentDocumentURL string `json:"parental_consent_document_url,omitempty"`
+	DeviceID                   string `json:"device_id"`
+}
+
+type TokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
 type LoginRequest struct {
-	Username string `json:"user_name" validate:"required"`
-	Password string `json:"password" validate:"required"`
-	DeviceID string `json:"device_id" validate:"required"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	DeviceID string `json:"device_id"`
 }
 
-type LoginResponse struct {
-	AccessToken  string `json:"access_token"`
+type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-type RefreshTokenDTO struct {
-	RefreshToken string `json:"refresh_token" validate:"required"`
+type PatchProfileRequest struct {
+	TelegramUsername *string `json:"tg_username,omitempty"`
+	RoleID           *int64  `json:"role_id,omitempty"`
+	RefreshToken     string  `json:"refresh_token,omitempty"`
 }
 
-type RefreshResponseDTO struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+type PatchProfileResponse struct {
+	TelegramUsername *string `json:"tg_username,omitempty"`
+	RoleID           *int64  `json:"role_id,omitempty"`
+	AccessToken      string  `json:"access_token,omitempty"`
+	RefreshToken     string  `json:"refresh_token,omitempty"`
 }
 
 type ErrorResponse struct {
@@ -26,7 +46,4 @@ type ErrorResponse struct {
 
 type SuccessResponse struct {
 	Data any `json:"data"`
-}
-type LogoutDTO struct {
-	RefreshToken string `json:"refresh_token" validate:"required"`
 }

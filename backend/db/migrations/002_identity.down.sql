@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS "user_session";
+DROP TABLE IF EXISTS "parental_consent";
 DROP TABLE IF EXISTS "consent_data";
 DROP TABLE IF EXISTS "anti_doping";
 DROP TABLE IF EXISTS "user_judge_category";

@@ -3,53 +3,49 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
+
 	"github.com/orenfsp/orencode-zenko.git/config"
-	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
+	"github.com/orenfsp/orencode-zenko.git/internal/auth"
 	"github.com/orenfsp/orencode-zenko.git/pkg/db"
-sqlc "github.com/orenfsp/orencode-zenko.git/db/sqlc"
-	//"github.com/orenfsp/orencode-zenko.git/pkg/token"
-	// "github.com/orenfsp/orencode-zenko.git/pkg/audit"
-	// "github.com/orenfsp/orencode-zenko.git/pkg/auth"
+	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
+	"github.com/orenfsp/orencode-zenko.git/pkg/token"
+	"go.uber.org/zap"
 )
 
 func main() {
-
-	ctx := context.Background()
-	//подключение бд
 	logger.Init()
+	defer func() { _ = logger.Log.Sync() }()
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
-	//token manager
-	// jwtManager := token.New(
-	// 	cfg.JWT.Secret,
-	// 	cfg.JWT.AccessTTL,
-	// 	cfg.JWT.RefreshTTL,
-	// )
-
-	dsn := cfg.Database.URL
-	if dsn == "" {
-		logger.Log.Fatal("not connetion db, pls chek dsn")
-	} else {
-		logger.Log.Info("db connection succes")
+	if cfg.Database.URL == "" {
+		logger.Log.Fatal("DATABASE_URL is required")
 	}
-	pool := db.NewPostgres(ctx, dsn)
+	if cfg.JWT.Secret == "" {
+		logger.Log.Fatal("JWT_SECRET is required")
+	}
+
+	pool := db.NewPostgres(context.Background(), cfg.Database.URL)
 	defer pool.Close()
-	queries := sqlc.New(pool)
 
-	defer logger.Log.Sync()
-	logger.Log.Info("server started on port " + cfg.HTTP.Port)
-	_ = queries
+	jwtManager := token.New(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
+	repository := auth.NewPostgresRepository(pool)
+	service := auth.NewService(repository, jwtManager, repository)
+	handler := auth.NewHandler(service)
 
-	// repoAudit := audit.NewRepository(queries)
-	// serviceAudit := audit.NewService(repoAudit)
-	// handlerAudit := audit.NewHandler(serviceAudit)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/v1/auth/register", handler.Register)
+	mux.HandleFunc("POST /api/v1/auth/login", handler.Login)
+	mux.HandleFunc("POST /api/v1/auth/refresh", handler.Refresh)
+	mux.HandleFunc("POST /api/v1/auth/logout", handler.Logout)
+	mux.HandleFunc("PATCH /api/v1/profile", handler.PatchProfile)
 
-	// authService := auth.NewService(
-	// 	repoUser,
-	// 	jwtManager,
-	// 	repoSession,
-	// )
-	// authHandler := auth.NewHandler(authService)
+	address := ":" + cfg.HTTP.Port
+	logger.Log.Info("server started", zap.String("address", address))
+	if err := http.ListenAndServe(address, mux); err != nil {
+		logger.Log.Fatal("http server stopped", zap.Error(err))
+	}
 }
