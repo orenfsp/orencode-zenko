@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS "judge_position";
+DROP TABLE IF EXISTS "age_group";
+DROP TABLE IF EXISTS "calendar_plan";
+DROP TABLE IF EXISTS "competition_level";
+DROP TABLE IF EXISTS "competition_type";
+DROP TABLE IF EXISTS "judge_category";
+DROP TABLE IF EXISTS "rank";
+DROP TABLE IF EXISTS "discipline";
+DROP TABLE IF EXISTS "municipality";

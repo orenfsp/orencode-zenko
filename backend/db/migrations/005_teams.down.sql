@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS "team_coach";
+DROP TABLE IF EXISTS "team_member";
+DROP TABLE IF EXISTS "team";

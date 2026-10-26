@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS "consent_data";
+DROP TABLE IF EXISTS "anti_doping";
+DROP TABLE IF EXISTS "user_judge_category";
+DROP TABLE IF EXISTS "user_rank_discipline";
+DROP TABLE IF EXISTS "athlete_coach";
+DROP TABLE IF EXISTS "user_discipline";
+DROP TABLE IF EXISTS "role_user";
+DROP TABLE IF EXISTS "role";
+DROP TABLE IF EXISTS "user";
+DROP TABLE IF EXISTS "organization";
