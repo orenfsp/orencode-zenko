@@ -20,6 +20,11 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"github.com/orenfsp/orencode-zenko.git/pkg/token"
 	"go.uber.org/zap"
+
+	"os"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/orenfsp/orencode-zenko.git/internal/notifier"
 )
 
 func main() {
@@ -40,6 +45,23 @@ func main() {
 	pool := postgres.NewPostgres(context.Background(), cfg.Database.URL)
 	defer pool.Close()
 	queries := dbsqlc.New(pool)
+
+	// --- Запуск Telegram-уведомлений ---
+	listenConn, err := pgx.Connect(context.Background(), cfg.Database.URL)
+	if err != nil {
+		logger.Log.Error("failed to connect for LISTEN: " + err.Error())
+	} else {
+		go func() {
+			tgToken := os.Getenv("TG_TOKEN_BOT")
+			if tgToken == "" {
+				logger.Log.Warn("TG_TOKEN_BOT is empty, telegram notifier disabled")
+				return
+			}
+			if err := notifier.Start(context.Background(), listenConn, queries, tgToken); err != nil {
+				logger.Log.Error("notifier stopped: " + err.Error())
+			}
+		}()
+	}
 
 	jwtManager := token.New(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
 	authRepository := auth.NewRepository(queries, pool)
@@ -108,7 +130,6 @@ func main() {
 	rankRepository := rank.NewRepository(queries)
 	rankService := rank.NewService(rankRepository)
 	rankHandler := rank.NewHandler(rankService)
-
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/admin/rank", rankHandler.CreateRank)
