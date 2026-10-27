@@ -42,6 +42,21 @@ services:
         condition: service_completed_successfully
     restart: "no"
 
+  seed-demo:
+    build:
+      context: .
+      dockerfile: dockerfile
+    image: vera-backend:local
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
+    entrypoint: ["/seed-demo"]
+    depends_on:
+      rbac-seed:
+        condition: service_completed_successfully
+    restart: "no"
+
   server:
     build:
       context: .
@@ -55,7 +70,7 @@ services:
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     depends_on:
-      rbac-seed:
+      seed-demo:
         condition: service_completed_successfully
     restart: unless-stopped
     volumes:

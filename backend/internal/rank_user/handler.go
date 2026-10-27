@@ -51,6 +51,34 @@ func (h *Handler) ListMine(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, result)
 }
 
+func (h *Handler) ListPending(w http.ResponseWriter, r *http.Request) {
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	result, err := h.service.ListPending(r.Context(), limit, offset)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, result)
+}
+
+func (h *Handler) ListHistory(w http.ResponseWriter, r *http.Request) {
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
+		return
+	}
+	result, err := h.service.ListHistory(r.Context(), identity.UserID)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, result)
+}
+
 func (h *Handler) Review(w http.ResponseWriter, r *http.Request) {
 	identity, ok := rbac.IdentityFromContext(r.Context())
 	if !ok {
@@ -86,6 +114,27 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, destination any) error {
 		return errors.New("request body must contain one JSON object")
 	}
 	return nil
+}
+
+func parsePagination(r *http.Request) (int32, int32, error) {
+	limit, offset := int64(50), int64(0)
+	var err error
+	if value := r.URL.Query().Get("limit"); value != "" {
+		limit, err = strconv.ParseInt(value, 10, 32)
+		if err != nil {
+			return 0, 0, ErrInvalidInput
+		}
+	}
+	if value := r.URL.Query().Get("offset"); value != "" {
+		offset, err = strconv.ParseInt(value, 10, 32)
+		if err != nil {
+			return 0, 0, ErrInvalidInput
+		}
+	}
+	if limit < 1 || limit > 100 || offset < 0 {
+		return 0, 0, ErrInvalidInput
+	}
+	return int32(limit), int32(offset), nil
 }
 
 func handleError(w http.ResponseWriter, err error) {

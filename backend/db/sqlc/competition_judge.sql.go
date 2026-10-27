@@ -63,6 +63,66 @@ func (q *Queries) AssignCompetitionJudge(ctx context.Context, arg AssignCompetit
 	return i, err
 }
 
+const listAdminCompetitionJudges = `-- name: ListAdminCompetitionJudges :many
+SELECT
+    cj.id,
+    cj.competition_id,
+    cj.judge_user_id,
+    u.first_name,
+    u.last_name,
+    u.middle_name,
+    cj.position_id,
+    jp.name AS position_name,
+    cj.appointed_at
+FROM competition_judge AS cj
+JOIN "user" AS u ON u.id = cj.judge_user_id
+JOIN judge_position AS jp ON jp.id = cj.position_id
+WHERE cj.competition_id = $1
+ORDER BY jp.name, u.last_name, u.first_name, cj.id
+`
+
+type ListAdminCompetitionJudgesRow struct {
+	ID            int64
+	CompetitionID int64
+	JudgeUserID   int64
+	FirstName     string
+	LastName      string
+	MiddleName    pgtype.Text
+	PositionID    int64
+	PositionName  string
+	AppointedAt   pgtype.Timestamptz
+}
+
+func (q *Queries) ListAdminCompetitionJudges(ctx context.Context, pCompetitionID int64) ([]ListAdminCompetitionJudgesRow, error) {
+	rows, err := q.db.Query(ctx, listAdminCompetitionJudges, pCompetitionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminCompetitionJudgesRow
+	for rows.Next() {
+		var i ListAdminCompetitionJudgesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CompetitionID,
+			&i.JudgeUserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.MiddleName,
+			&i.PositionID,
+			&i.PositionName,
+			&i.AppointedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCompetitionJudges = `-- name: ListCompetitionJudges :many
 SELECT
     cj.id,
