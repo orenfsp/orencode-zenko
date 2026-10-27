@@ -92,7 +92,3 @@ SET access_status = true,
     updated_at = now()
 RETURNING id;
 
--- name: UpsertConsentData :exec
-INSERT INTO consent_data (user_id, document_url)
-VALUES ($1, 'seed://super-admin')
-ON CONFLICT (user_id) DO NOTHING;

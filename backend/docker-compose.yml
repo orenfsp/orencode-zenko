@@ -57,6 +57,9 @@ services:
       rbac-seed:
         condition: service_completed_successfully
     restart: unless-stopped
+    volumes:
+      - uploaded_files:/app/private_uploads
 
 volumes:
   postgres_data:
+  uploaded_files:

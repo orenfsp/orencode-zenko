@@ -25,17 +25,11 @@ CREATE INDEX "uploaded_file_cleanup_idx"
     WHERE "status" IN ('uploaded', 'delete_pending');
 
 ALTER TABLE "consent_data"
-    ADD COLUMN "file_id" bigint UNIQUE,
-    ALTER COLUMN "document_url" DROP NOT NULL,
+    ADD COLUMN IF NOT EXISTS "file_id" bigint UNIQUE,
     ADD CONSTRAINT "consent_data_file_id_fkey"
-        FOREIGN KEY ("file_id") REFERENCES "uploaded_file" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE,
-    ADD CONSTRAINT "consent_data_document_source_check"
-        CHECK ("file_id" IS NOT NULL OR "document_url" IS NOT NULL);
+        FOREIGN KEY ("file_id") REFERENCES "uploaded_file" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "parental_consent"
-    ADD COLUMN "file_id" bigint UNIQUE,
-    ALTER COLUMN "document_url" DROP NOT NULL,
+    ADD COLUMN IF NOT EXISTS "file_id" bigint UNIQUE,
     ADD CONSTRAINT "parental_consent_file_id_fkey"
-        FOREIGN KEY ("file_id") REFERENCES "uploaded_file" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE,
-    ADD CONSTRAINT "parental_consent_document_source_check"
-        CHECK ("file_id" IS NOT NULL OR "document_url" IS NOT NULL);
+        FOREIGN KEY ("file_id") REFERENCES "uploaded_file" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;

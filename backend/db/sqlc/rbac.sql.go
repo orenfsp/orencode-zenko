@@ -229,17 +229,6 @@ func (q *Queries) RoleExists(ctx context.Context, id int64) (bool, error) {
 	return exists, err
 }
 
-const upsertConsentData = `-- name: UpsertConsentData :exec
-INSERT INTO consent_data (user_id, document_url)
-VALUES ($1, 'seed://super-admin')
-ON CONFLICT (user_id) DO NOTHING
-`
-
-func (q *Queries) UpsertConsentData(ctx context.Context, userID int64) error {
-	_, err := q.db.Exec(ctx, upsertConsentData, userID)
-	return err
-}
-
 const upsertPermission = `-- name: UpsertPermission :one
 INSERT INTO permission (code, description)
 VALUES ($1, $2)

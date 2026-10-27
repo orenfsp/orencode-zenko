@@ -149,9 +149,6 @@ func seed(ctx context.Context, pool *pgxpool.Pool, config adminSeedConfig) error
 		return err
 	}
 
-	if err := queries.UpsertConsentData(ctx, userID); err != nil {
-		return err
-	}
 	if err := queries.AssignRole(ctx, db.AssignRoleParams{UserID: userID, RoleID: roleID}); err != nil {
 		return err
 	}

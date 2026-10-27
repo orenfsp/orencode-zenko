@@ -122,13 +122,12 @@ type CompetitionType struct {
 }
 
 type ConsentDatum struct {
-	ID          int64
-	UserID      int64
-	DocumentUrl pgtype.Text
-	AcceptedAt  pgtype.Timestamptz
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
-	FileID      pgtype.Int8
+	ID         int64
+	UserID     int64
+	AcceptedAt pgtype.Timestamptz
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+	FileID     pgtype.Int8
 }
 
 type Discipline struct {
@@ -166,7 +165,6 @@ type Organization struct {
 type ParentalConsent struct {
 	ID          int64
 	UserID      int64
-	DocumentUrl pgtype.Text
 	Status      string
 	SubmittedAt pgtype.Timestamptz
 	ReviewedAt  pgtype.Timestamptz
