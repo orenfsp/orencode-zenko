@@ -77,12 +77,54 @@ func (r *sqlRepository) Create(ctx context.Context, input CreateCompetition) (Co
 		CalendarPlanNumber: nullableText(input.CalendarPlanNumber), RegulationUrl: nullableText(input.RegulationURL),
 	})
 	if err != nil {
-		return Competition{}, mapCreateError(err)
+		return Competition{}, mapWriteError(err)
 	}
 	return fromCreateRow(row), nil
 }
 
-func mapCreateError(err error) error {
+func (r *sqlRepository) GetByID(ctx context.Context, id int64) (Competition, error) {
+	row, err := r.queries.GetCompetition(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Competition{}, competitionerrs.ErrNotFound
+		}
+		return Competition{}, err
+	}
+	return fromGetCompetitionRow(row), nil
+}
+
+func (r *sqlRepository) UpdateDraft(ctx context.Context, input UpdateCompetition) (Competition, error) {
+	row, err := r.queries.UpdateDraftCompetition(ctx, db.UpdateDraftCompetitionParams{
+		PName: input.Name, PDescription: nullableText(input.Description),
+		PDisciplineID: input.DisciplineID, PCompetitionTypeID: input.CompetitionTypeID,
+		PCompetitionLevelID: input.CompetitionLevelID, PFormat: input.Format,
+		PStartAt: timestamptz(input.StartAt), PEndAt: timestamptz(input.EndAt),
+		PRegistrationStartsAt: timestamptz(input.RegistrationStartsAt),
+		PRegistrationEndsAt:   timestamptz(input.RegistrationEndsAt),
+		PVenueAddress:         nullableText(input.VenueAddress), POnlineUrl: nullableText(input.OnlineURL),
+		PCalendarPlanID:     nullableInt64(input.CalendarPlanID),
+		PCalendarPlanNumber: nullableText(input.CalendarPlanNumber),
+		PRegulationUrl:      nullableText(input.RegulationURL), PID: input.ID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			status, statusErr := r.queries.GetCompetitionStatus(ctx, input.ID)
+			if errors.Is(statusErr, pgx.ErrNoRows) {
+				return Competition{}, competitionerrs.ErrNotFound
+			}
+			if statusErr != nil {
+				return Competition{}, statusErr
+			}
+			if status != "draft" {
+				return Competition{}, competitionerrs.ErrNotDraft
+			}
+		}
+		return Competition{}, mapWriteError(err)
+	}
+	return fromUpdateRow(row), nil
+}
+
+func mapWriteError(err error) error {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {
 		return err
@@ -130,7 +172,39 @@ func fromGetRow(row db.GetPublishedCompetitionRow) Competition {
 	}
 }
 
+func fromGetCompetitionRow(row db.GetCompetitionRow) Competition {
+	return Competition{
+		ID: row.ID, Name: row.Name, Description: textPointer(row.Description),
+		DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,
+		CompetitionTypeID: row.CompetitionTypeID, CompetitionTypeName: row.CompetitionTypeName,
+		CompetitionLevelID: row.CompetitionLevelID, CompetitionLevelCode: textPointer(row.CompetitionLevelCode),
+		CompetitionLevelName: textPointer(row.CompetitionLevelName), Format: row.Format,
+		StartAt: row.StartAt.Time, EndAt: row.EndAt.Time,
+		RegistrationStartsAt: row.RegistrationStartsAt.Time, RegistrationEndsAt: row.RegistrationEndsAt.Time,
+		VenueAddress: textPointer(row.VenueAddress), OnlineURL: textPointer(row.OnlineUrl), Status: row.Status,
+		CalendarPlanID: int64Pointer(row.CalendarPlanID), CalendarPlanName: textPointer(row.CalendarPlanName),
+		CalendarPlanYear: int16Pointer(row.CalendarPlanYear), CalendarPlanNumber: textPointer(row.CalendarPlanNumber),
+		RegulationURL: textPointer(row.RegulationUrl),
+	}
+}
+
 func fromCreateRow(row db.CreateCompetitionRow) Competition {
+	return Competition{
+		ID: row.ID, Name: row.Name, Description: textPointer(row.Description),
+		DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,
+		CompetitionTypeID: row.CompetitionTypeID, CompetitionTypeName: row.CompetitionTypeName,
+		CompetitionLevelID: row.CompetitionLevelID, CompetitionLevelCode: textPointer(row.CompetitionLevelCode),
+		CompetitionLevelName: textPointer(row.CompetitionLevelName), Format: row.Format,
+		StartAt: row.StartAt.Time, EndAt: row.EndAt.Time,
+		RegistrationStartsAt: row.RegistrationStartsAt.Time, RegistrationEndsAt: row.RegistrationEndsAt.Time,
+		VenueAddress: textPointer(row.VenueAddress), OnlineURL: textPointer(row.OnlineUrl), Status: row.Status,
+		CalendarPlanID: int64Pointer(row.CalendarPlanID), CalendarPlanName: textPointer(row.CalendarPlanName),
+		CalendarPlanYear: int16Pointer(row.CalendarPlanYear), CalendarPlanNumber: textPointer(row.CalendarPlanNumber),
+		RegulationURL: textPointer(row.RegulationUrl),
+	}
+}
+
+func fromUpdateRow(row db.UpdateDraftCompetitionRow) Competition {
 	return Competition{
 		ID: row.ID, Name: row.Name, Description: textPointer(row.Description),
 		DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,

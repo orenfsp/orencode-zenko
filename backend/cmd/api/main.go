@@ -9,6 +9,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/config"
 	dbsqlc "github.com/orenfsp/orencode-zenko.git/db/sqlc"
 	"github.com/orenfsp/orencode-zenko.git/internal/auth"
+	"github.com/orenfsp/orencode-zenko.git/internal/competition"
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
@@ -91,6 +92,9 @@ func main() {
 	if err != nil {
 		logger.Log.Fatal("initialize file handler", zap.Error(err))
 	}
+	competitionRepository := competition.NewRepository(queries)
+	competitionService := competition.NewService(competitionRepository)
+	competitionHandler := competition.NewHandler(competitionService)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
@@ -103,16 +107,13 @@ func main() {
 	mux.Handle("POST /api/v1/admin/roles", protected(rbac.PermissionRolesCreate, rbacHandler.CreateRole))
 	mux.Handle("POST /api/v1/admin/users/{userID}/roles", protected(rbac.PermissionRolesAssign, rbacHandler.AssignRole))
 	mux.Handle("GET /api/v1/admin/permissions", protected(rbac.PermissionPermissionsRead, rbacHandler.ListPermissions))
+	registerCompetitionRoutes(mux, competitionHandler, protected)
 
 	mux.Handle("GET /api/v1/roles/self-assignable", rbacMiddleware.Authenticate(http.HandlerFunc(rbacHandler.ListSelfAssignableRoles)))
 
 	address := ":" + cfg.HTTP.Port
-	logger.Log.Info("server started", zap.String("address", address))
-	if err := http.ListenAndServe(address, mux); err != nil {
-		logger.Log.Fatal("http server stopped", zap.Error(err))
-	}
-
 	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(mux)
+	logger.Log.Info("server started", zap.String("address", address))
 	if err := http.ListenAndServe(address, handler); err != nil {
 		logger.Log.Fatal("http server stopped", zap.Error(err))
 	}

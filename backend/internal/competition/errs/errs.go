@@ -10,4 +10,6 @@ var (
 	ErrInvalidReference  = errors.New("invalid competition reference")
 	ErrNameConflict      = errors.New("competition name already exists")
 	ErrForbidden         = errors.New("competition creation forbidden")
+	ErrInvalidUpdate     = errors.New("invalid competition update")
+	ErrNotDraft          = errors.New("competition is not a draft")
 )
