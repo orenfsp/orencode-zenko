@@ -16,13 +16,19 @@ type AgeGroup struct {
 }
 
 type AntiDoping struct {
-	ID          int64
-	UserID      int64
-	Url         pgtype.Text
-	Ttl         pgtype.Date
-	CompletedAt pgtype.Date
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
+	ID               int64
+	UserID           int64
+	Url              pgtype.Text
+	Ttl              pgtype.Date
+	CompletedAt      pgtype.Date
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	FileID           int64
+	Status           string
+	ValidUntil       pgtype.Date
+	ReviewedByUserID pgtype.Int8
+	ReviewedAt       pgtype.Timestamptz
+	RejectionReason  pgtype.Text
 }
 
 type AuditLog struct {

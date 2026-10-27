@@ -45,10 +45,11 @@ FOR UPDATE;
 -- name: GetAttachedFileForDownload :one
 SELECT
     uploaded_file.*,
-    COALESCE(consent_data.user_id, parental_consent.user_id, 0)::bigint AS owner_user_id
+    COALESCE(consent_data.user_id, parental_consent.user_id, anti_doping.user_id, 0)::bigint AS owner_user_id
 FROM uploaded_file
 LEFT JOIN consent_data ON consent_data.file_id = uploaded_file.id
 LEFT JOIN parental_consent ON parental_consent.file_id = uploaded_file.id
+LEFT JOIN anti_doping ON anti_doping.file_id = uploaded_file.id
 WHERE uploaded_file.id = sqlc.arg(file_id)
   AND uploaded_file.status = 'attached';
 

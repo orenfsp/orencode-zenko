@@ -9,6 +9,7 @@ import (
 
 	"github.com/orenfsp/orencode-zenko.git/config"
 	dbsqlc "github.com/orenfsp/orencode-zenko.git/db/sqlc"
+	"github.com/orenfsp/orencode-zenko.git/internal/antidoping"
 	"github.com/orenfsp/orencode-zenko.git/internal/audit"
 	"github.com/orenfsp/orencode-zenko.git/internal/auth"
 	"github.com/orenfsp/orencode-zenko.git/internal/calendarplan"
@@ -153,6 +154,17 @@ func main() {
 		logger.Log.Fatal("initialize file handler", zap.Error(err))
 	}
 
+	antiDopingRepository, err := antidoping.NewRepository(queries, pool)
+	if err != nil {
+		logger.Log.Fatal("initialize anti-doping repository", zap.Error(err))
+	}
+	antiDopingService := antidoping.NewService(antiDopingRepository)
+	antiDopingHandler := antidoping.NewHandler(antiDopingService, fileService)
+
+	antiDopingCtx, cancelAntiDoping := context.WithCancel(context.Background())
+	defer cancelAntiDoping()
+	go runAntiDopingExpiration(antiDopingCtx, antiDopingService)
+
 	// Competition.
 	competitionRepository := competition.NewRepository(queries)
 	competitionService := competition.NewService(competitionRepository)
@@ -265,6 +277,14 @@ func main() {
 	// Files.
 	mux.Handle("GET /api/v1/files/{fileID}/download", rbacMiddleware.Authenticate(http.HandlerFunc(fileHandler.Download)))
 	mux.Handle("GET /api/v1/admin/files", protected(rbac.PermissionFilesRead, fileHandler.ListAll))
+	registerAntiDopingRoutes(
+		mux,
+		antiDopingHandler,
+		func(handler http.HandlerFunc) http.Handler {
+			return rbacMiddleware.Authenticate(handler)
+		},
+		protected,
+	)
 
 	// RBAC administration.
 	mux.Handle("GET /api/v1/admin/roles", protected(rbac.PermissionRolesRead, rbacHandler.ListRoles))
@@ -312,5 +332,32 @@ func main() {
 	logger.Log.Info("server started", zap.String("address", address))
 	if err := http.ListenAndServe(address, handler); err != nil {
 		logger.Log.Fatal("http server stopped", zap.Error(err))
+	}
+}
+
+func runAntiDopingExpiration(ctx context.Context, service *antidoping.Service) {
+	expire := func() {
+		rows, err := service.Expire(ctx)
+		if err != nil {
+			if ctx.Err() == nil {
+				logger.Log.Error("anti-doping expiration failed", zap.Error(err))
+			}
+			return
+		}
+		if rows > 0 {
+			logger.Log.Info("anti-doping certificates expired", zap.Int64("count", rows))
+		}
+	}
+
+	expire()
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			expire()
+		}
 	}
 }

@@ -17,6 +17,7 @@ const (
 	PermissionCalendarPlansUpdate       = "calendar_plans.update"
 	PermissionMunicipalitiesRead        = "municipalities.read"
 	PermissionMunicipalitiesCreate      = "municipalities.create"
+	PermissionAntiDopingReview          = "anti_doping.review"
 
 	SuperAdminRoleCode = "super_admin"
 )
@@ -54,6 +55,7 @@ var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionCalendarPlansUpdate, Description: "Изменение календарных планов"},
 	{Code: PermissionMunicipalitiesRead, Description: "Просмотр муниципалитетов"},
 	{Code: PermissionMunicipalitiesCreate, Description: "Создание муниципалитетов"},
+	{Code: PermissionAntiDopingReview, Description: "Проверка антидопинговых сертификатов"},
 }
 
 type Role struct {
