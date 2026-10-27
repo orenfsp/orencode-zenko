@@ -1,11 +1,15 @@
 package rbac
 
 const (
-	PermissionRolesRead       = "roles.read"
-	PermissionRolesCreate     = "roles.create"
-	PermissionRolesAssign     = "roles.assign"
-	PermissionPermissionsRead = "permissions.read"
-	PermissionFilesRead       = "files.read"
+	PermissionRolesRead               = "roles.read"
+	PermissionRolesCreate             = "roles.create"
+	PermissionRolesAssign             = "roles.assign"
+	PermissionPermissionsRead         = "permissions.read"
+	PermissionFilesRead               = "files.read"
+	PermissionCompetitionEventsCreate = "competition_events.create"
+	PermissionCompetitionEventsUpdate = "competition_events.update"
+	PermissionCompetitionEventsDelete = "competition_events.delete"
+	PermissionCompetitionEventsRead   = "competition_events.read"
 
 	SuperAdminRoleCode = "super_admin"
 )
@@ -21,6 +25,10 @@ var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionRolesAssign, Description: "Назначение ролей пользователям"},
 	{Code: PermissionPermissionsRead, Description: "Просмотр доступных разрешений"},
 	{Code: PermissionFilesRead, Description: "Просмотр документов пользователей"},
+	{Code: PermissionCompetitionEventsCreate, Description: "Создание зачётов соревнований"},
+	{Code: PermissionCompetitionEventsUpdate, Description: "Изменение зачётов соревнований"},
+	{Code: PermissionCompetitionEventsDelete, Description: "Удаление зачётов соревнований"},
+	{Code: PermissionCompetitionEventsRead, Description: "Просмотр неопубликованных зачётов соревнований"},
 }
 
 type Role struct {

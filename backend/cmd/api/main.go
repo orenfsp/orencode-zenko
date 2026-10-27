@@ -10,6 +10,7 @@ import (
 	dbsqlc "github.com/orenfsp/orencode-zenko.git/db/sqlc"
 	"github.com/orenfsp/orencode-zenko.git/internal/auth"
 	"github.com/orenfsp/orencode-zenko.git/internal/competition"
+	"github.com/orenfsp/orencode-zenko.git/internal/competitionevent"
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
@@ -95,6 +96,9 @@ func main() {
 	competitionRepository := competition.NewRepository(queries)
 	competitionService := competition.NewService(competitionRepository)
 	competitionHandler := competition.NewHandler(competitionService)
+	competitionEventRepository := competitionevent.NewRepository(queries, pool)
+	competitionEventService := competitionevent.NewService(competitionEventRepository)
+	competitionEventHandler := competitionevent.NewHandler(competitionEventService)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
@@ -108,6 +112,7 @@ func main() {
 	mux.Handle("POST /api/v1/admin/users/{userID}/roles", protected(rbac.PermissionRolesAssign, rbacHandler.AssignRole))
 	mux.Handle("GET /api/v1/admin/permissions", protected(rbac.PermissionPermissionsRead, rbacHandler.ListPermissions))
 	registerCompetitionRoutes(mux, competitionHandler, protected)
+	registerCompetitionEventRoutes(mux, competitionEventHandler, protected)
 
 	mux.Handle("GET /api/v1/roles/self-assignable", rbacMiddleware.Authenticate(http.HandlerFunc(rbacHandler.ListSelfAssignableRoles)))
 
