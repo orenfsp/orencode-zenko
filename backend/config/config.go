@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -12,10 +13,12 @@ type Config struct {
 	Database DatabaseConfig
 	JWT      JWTConfig
 	Device   DeviceConfig
+	Storage  StorageConfig
 }
 
 type HTTPConfig struct {
-	Port string
+	Port               string
+	CORSAllowedOrigins []string
 }
 type DatabaseConfig struct {
 	URL string
@@ -28,6 +31,13 @@ type JWTConfig struct {
 
 type DeviceConfig struct {
 	SessionTTL time.Duration
+}
+
+type StorageConfig struct {
+	Path             string        // STORAGE_PATH, default "./private_uploads"
+	CleanupInterval  time.Duration // FILE_CLEANUP_INTERVAL, default 10m
+	CleanupRetention time.Duration // FILE_CLEANUP_RETENTION, default 15m
+	CleanupBatch     string        // FILE_CLEANUP_BATCH, default 100
 }
 
 func Load() (*Config, error) {
@@ -52,6 +62,38 @@ func Load() (*Config, error) {
 			return nil, err
 		}
 	}
+	origins := []string{}
+	if raw := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS")); raw != "" {
+		for _, part := range strings.Split(raw, ",") {
+			if p := strings.TrimSpace(part); p != "" {
+				origins = append(origins, p)
+			}
+		}
+	}
+
+	storagePath := "./private_uploads"
+	if value := os.Getenv("STORAGE_PATH"); value != "" {
+		storagePath = value
+	}
+	storageCleanupInterval := 24 * 365 * time.Hour
+	if value := os.Getenv("STORAGE_CLEANUP_INTERVAL"); value != "" {
+		storageCleanupInterval, err = time.ParseDuration(value)
+		if err != nil {
+			return nil, err
+		}
+	}
+	storageCleanupRetention := 24 * 365 * time.Hour
+	if value := os.Getenv("STORAGE_CLEANUP_RETENTION"); value != "" {
+		storageCleanupRetention, err = time.ParseDuration(value)
+		if err != nil {
+			return nil, err
+		}
+	}
+	storageCleanupBatch := "100"
+	if value := os.Getenv("STORAGE_CLEANUP_INTERVAL"); value != "" {
+
+		storageCleanupBatch = value
+	}
 
 	cfg := &Config{
 		Database: DatabaseConfig{
@@ -67,6 +109,12 @@ func Load() (*Config, error) {
 		},
 		Device: DeviceConfig{
 			SessionTTL: deviceSessionTTL,
+		},
+		Storage: StorageConfig{
+			Path:             storagePath,
+			CleanupInterval:  storageCleanupInterval,
+			CleanupRetention: storageCleanupRetention,
+			CleanupBatch:     storageCleanupBatch,
 		},
 	}
 	return cfg, nil

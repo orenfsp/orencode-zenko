@@ -4,11 +4,12 @@ import (
 	"context"
 	"log"
 	"net/http"
-	
+
 	"github.com/orenfsp/orencode-zenko.git/config"
 	dbsqlc "github.com/orenfsp/orencode-zenko.git/db/sqlc"
 	"github.com/orenfsp/orencode-zenko.git/internal/auth"
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
+	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
@@ -49,7 +50,7 @@ func main() {
 	if err != nil {
 		logger.Log.Fatal("initialize file repository", zap.Error(err))
 	}
-	fileStorage, err := file.NewLocalStorage("./private_uploads")
+	fileStorage, err := file.NewLocalStorage(cfg.Storage.Path)
 	if err != nil {
 		logger.Log.Fatal("initialize file storage", zap.Error(err))
 	}
@@ -78,6 +79,11 @@ func main() {
 	address := ":" + cfg.HTTP.Port
 	logger.Log.Info("server started", zap.String("address", address))
 	if err := http.ListenAndServe(address, mux); err != nil {
+		logger.Log.Fatal("http server stopped", zap.Error(err))
+	}
+
+	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(mux)
+	if err := http.ListenAndServe(address, handler); err != nil {
 		logger.Log.Fatal("http server stopped", zap.Error(err))
 	}
 }
