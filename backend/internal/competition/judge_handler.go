@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	competitionerrs "github.com/orenfsp/orencode-zenko.git/internal/competition/errs"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"go.uber.org/zap"
@@ -79,6 +80,25 @@ func (h *JudgeHandler) Remove(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *JudgeHandler) ListByUser(w http.ResponseWriter, r *http.Request) {
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok || identity.UserID <= 0 {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
+		return
+	}
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "limit и offset должны быть целыми числами")
+		return
+	}
+	items, err := h.service.ListByJudgeUser(r.Context(), identity.UserID, limit, offset)
+	if err != nil {
+		handleJudgeError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, items)
+}
+
 func parseJudgeID(value string) (int64, error) {
 	id, err := strconv.ParseInt(value, 10, 64)
 	if err != nil || id <= 0 {
@@ -91,6 +111,8 @@ func handleJudgeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, ErrInvalidJudgeRequest), errors.Is(err, ErrInvalidJudgeReference):
 		writeError(w, http.StatusBadRequest, "некорректные данные назначения судьи")
+	case errors.Is(err, competitionerrs.ErrInvalidPagination): // ← новое
+		writeError(w, http.StatusBadRequest, "limit должен быть от 1 до 100, offset не может быть отрицательным")
 	case errors.Is(err, ErrJudgeCompetitionMissing), errors.Is(err, ErrJudgeCompetitionPrivate):
 		writeError(w, http.StatusNotFound, "соревнование не найдено")
 	case errors.Is(err, ErrJudgeUserMissing):

@@ -1,6 +1,10 @@
 package competition
 
-import "context"
+import (
+	"context"
+
+	competitionerrs "github.com/orenfsp/orencode-zenko.git/internal/competition/errs"
+)
 
 const JudgeRoleCode = "judge"
 
@@ -110,4 +114,30 @@ func (s *JudgeService) requireDraft(ctx context.Context, competitionID int64) er
 		return ErrJudgeCompetitionLocked
 	}
 	return nil
+}
+func (s *JudgeService) ListByJudgeUser(
+	ctx context.Context, judgeUserID int64, limit, offset int32,
+) ([]JudgeCompetitionDTO, error) {
+	if judgeUserID <= 0 {
+		return nil, ErrInvalidJudgeRequest
+	}
+	if limit < 1 || limit > MaxLimit || offset < 0 {
+		return nil, competitionerrs.ErrInvalidPagination
+	}
+	items, err := s.repository.ListCompetitionsByJudgeUser(ctx, judgeUserID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]JudgeCompetitionDTO, 0, len(items))
+	for _, item := range items {
+		result = append(result, JudgeCompetitionDTO{
+			ID: item.ID, Name: item.Name,
+			Discipline:      ReferenceDTO{ID: item.DisciplineID, Name: item.DisciplineName},
+			CompetitionType: ReferenceDTO{ID: item.CompetitionTypeID, Name: item.CompetitionTypeName},
+			Format:          item.Format, StartAt: item.StartAt, EndAt: item.EndAt, Status: item.Status,
+			Position:    JudgePositionDTO{ID: item.PositionID, Name: item.PositionName},
+			AppointedAt: item.AppointedAt,
+		})
+	}
+	return result, nil
 }

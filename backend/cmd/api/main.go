@@ -227,7 +227,7 @@ func main() {
 	rankApplicationService := rankuser.NewService(rankApplicationRepository)
 	rankApplicationHandler := rankuser.NewHandler(rankApplicationService)
 
-		// Adds the authenticated user's ID to the context expected by usercoach.Handler.
+	// Adds the authenticated user's ID to the context expected by usercoach.Handler.
 	// The token is verified by the existing RBAC middleware first.
 	withUserCoachIdentity := func(next http.Handler) http.Handler {
 		return rbacMiddleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -333,6 +333,11 @@ func main() {
 	if err := http.ListenAndServe(address, handler); err != nil {
 		logger.Log.Fatal("http server stopped", zap.Error(err))
 	}
+
+	competitionJudgeHandler := competition.NewJudgeHandler(competition.NewJudgeService(competition.NewJudgeRepository(queries)))
+
+	mux.Handle("GET /api/v1/profile/competitions",
+		rbacMiddleware.Authenticate(http.HandlerFunc(competitionJudgeHandler.ListByUser)))
 }
 
 func runAntiDopingExpiration(ctx context.Context, service *antidoping.Service) {

@@ -34,3 +34,15 @@ type CreatedCompetitionJudgeDTO struct {
 	PositionID    int64     `json:"position_id"`
 	AppointedAt   time.Time `json:"appointed_at"`
 }
+type JudgeCompetitionDTO struct {
+	ID              int64            `json:"id"`
+	Name            string           `json:"name"`
+	Discipline      ReferenceDTO     `json:"discipline"`
+	CompetitionType ReferenceDTO     `json:"competition_type"`
+	Format          string           `json:"format"`
+	StartAt         time.Time        `json:"start_at"`
+	EndAt           time.Time        `json:"end_at"`
+	Status          string           `json:"status"`
+	Position        JudgePositionDTO `json:"position"`
+	AppointedAt     time.Time        `json:"appointed_at"`
+}

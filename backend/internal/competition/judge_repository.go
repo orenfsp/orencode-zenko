@@ -17,6 +17,22 @@ type CompetitionJudge struct {
 	AppointedAt   time.Time
 }
 
+type JudgeCompetition struct {
+	ID                  int64
+	Name                string
+	DisciplineID        int64
+	DisciplineName      string
+	CompetitionTypeID   int64
+	CompetitionTypeName string
+	Format              string
+	StartAt             time.Time
+	EndAt               time.Time
+	Status              string
+	PositionID          int64
+	PositionName        string
+	AppointedAt         time.Time
+}
+
 type CreatedCompetitionJudge struct {
 	ID            int64
 	CompetitionID int64
@@ -43,4 +59,5 @@ type JudgeRepository interface {
 		ctx context.Context, competitionID, judgeUserID, positionID int64,
 	) (CreatedCompetitionJudge, error)
 	RemoveCompetitionJudge(ctx context.Context, competitionID, assignmentID int64) (bool, error)
+	ListCompetitionsByJudgeUser(ctx context.Context, judgeUserID int64, limit, offset int32) ([]JudgeCompetition, error)
 }

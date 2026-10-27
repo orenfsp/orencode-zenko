@@ -121,3 +121,26 @@ func mapJudgeWriteError(err error) error {
 	}
 	return err
 }
+func (r *sqlJudgeRepository) ListCompetitionsByJudgeUser(
+	ctx context.Context, judgeUserID int64, limit, offset int32,
+) ([]JudgeCompetition, error) {
+	rows, err := r.queries.ListCompetitionsByJudgeUser(ctx, db.ListCompetitionsByJudgeUserParams{
+		JudgeUserID: judgeUserID,
+		Limit:       limit,
+		Offset:      offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]JudgeCompetition, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, JudgeCompetition{
+			ID: row.ID, Name: row.Name,
+			DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,
+			CompetitionTypeID: row.CompetitionTypeID, CompetitionTypeName: row.CompetitionTypeName,
+			Format: row.Format, StartAt: row.StartAt.Time, EndAt: row.EndAt.Time, Status: row.Status,
+			PositionID: row.PositionID, PositionName: row.PositionName, AppointedAt: row.AppointedAt.Time,
+		})
+	}
+	return result, nil
+}

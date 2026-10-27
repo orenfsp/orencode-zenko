@@ -304,3 +304,28 @@ JOIN discipline AS d ON d.id = c.discipline_id
 JOIN competition_type AS ct ON ct.id = c.competition_type_id
 JOIN competition_level AS cl ON cl.id = c.competition_level_id
 LEFT JOIN calendar_plan AS cp ON cp.id = c.calendar_plan_id;
+
+
+-- name: ListCompetitionsByJudgeUser :many
+SELECT
+    c.id,
+    c.name,
+    c.discipline_id,
+    d.name AS discipline_name,
+    c.competition_type_id,
+    ct.name AS competition_type_name,
+    c.format,
+    c.start_at,
+    c.end_at,
+    c.status,
+    cj.position_id,
+    jp.name AS position_name,
+    cj.appointed_at
+FROM competition c
+JOIN discipline d ON d.id = c.discipline_id
+JOIN competition_type ct ON ct.id = c.competition_type_id
+JOIN competition_judge cj ON cj.competition_id = c.id
+JOIN judge_position jp ON jp.id = cj.position_id
+WHERE cj.judge_user_id = $1
+ORDER BY c.start_at DESC, c.id DESC
+LIMIT $2 OFFSET $3;
