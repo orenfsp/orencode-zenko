@@ -188,7 +188,7 @@ func (h *Handler) PatchProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "некорректный JSON")
 		return
 	}
-	if req.TelegramUsername == nil && req.RoleID == nil {
+	if req.TelegramUsername == nil && req.RoleID == nil && len(req.RoleIDs) == 0 {
 		writeError(w, http.StatusBadRequest, "не переданы изменения профиля")
 		return
 	}

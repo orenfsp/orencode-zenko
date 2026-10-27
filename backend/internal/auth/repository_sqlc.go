@@ -136,6 +136,10 @@ func (r *sqlRepository) GetUserByID(ctx context.Context, id int64) (User, error)
 }
 
 func (r *sqlRepository) SetRole(ctx context.Context, userID, roleID int64) error {
+	return r.SetRoles(ctx, userID, []int64{roleID})
+}
+
+func (r *sqlRepository) SetRoles(ctx context.Context, userID int64, roleIDs []int64) error {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
@@ -143,18 +147,23 @@ func (r *sqlRepository) SetRole(ctx context.Context, userID, roleID int64) error
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := r.queries.WithTx(tx)
 
-	assignable, err := queries.IsRoleSelfAssignable(ctx, roleID)
-	if err != nil {
-		return err
-	}
-	if !assignable {
-		return autherrs.ErrRoleNotFound
+	for _, roleID := range roleIDs {
+		assignable, err := queries.IsRoleSelfAssignable(ctx, roleID)
+		if err != nil {
+			return err
+		}
+		if !assignable {
+			return autherrs.ErrRoleNotFound
+		}
 	}
 	if err := queries.DeleteUserRoles(ctx, userID); err != nil {
 		return err
 	}
-	if err := queries.AssignRole(ctx, db.AssignRoleParams{UserID: userID, RoleID: roleID}); err != nil {
-		return err
+	// Insert in reverse order so the first selected role remains the active JWT role.
+	for index := len(roleIDs) - 1; index >= 0; index-- {
+		if err := queries.AssignRole(ctx, db.AssignRoleParams{UserID: userID, RoleID: roleIDs[index]}); err != nil {
+			return err
+		}
 	}
 	return tx.Commit(ctx)
 }

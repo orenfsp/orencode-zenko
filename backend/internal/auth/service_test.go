@@ -34,6 +34,13 @@ func (s *userProviderStub) SetRole(_ context.Context, _ int64, roleID int64) err
 	return nil
 }
 
+func (s *userProviderStub) SetRoles(_ context.Context, _ int64, roleIDs []int64) error {
+	if len(roleIDs) > 0 {
+		s.user.RoleID = &roleIDs[0]
+	}
+	return nil
+}
+
 func (s *userProviderStub) UpdateTelegramUsername(_ context.Context, _ int64, username *string) error {
 	s.user.TelegramUsername = username
 	return nil
@@ -200,5 +207,33 @@ func TestPatchProfileRoleRotatesTokensWithRole(t *testing.T) {
 	}
 	if claims.RoleID == nil || *claims.RoleID != roleID {
 		t.Fatalf("role claim = %v, want %d", claims.RoleID, roleID)
+	}
+}
+
+func TestPatchProfileStoresMultipleRolesAndUsesFirstAsActive(t *testing.T) {
+	users := &userProviderStub{user: User{ID: 42, Email: "user@example.com", AccessStatus: true}}
+	sessions := &sessionProviderStub{}
+	service := newTestService(users, sessions)
+	initialTokens, err := service.createSession(context.Background(), users.user)
+	if err != nil {
+		t.Fatalf("createSession() error = %v", err)
+	}
+
+	response, err := service.PatchProfile(context.Background(), initialTokens.AccessToken, PatchProfileRequest{
+		RoleIDs:      []int64{7, 8},
+		RefreshToken: initialTokens.RefreshToken,
+	})
+	if err != nil {
+		t.Fatalf("PatchProfile() error = %v", err)
+	}
+	if len(response.RoleIDs) != 2 || response.RoleIDs[0] != 7 || response.RoleIDs[1] != 8 {
+		t.Fatalf("role ids = %v, want [7 8]", response.RoleIDs)
+	}
+	claims, err := service.tokens.Parse(response.AccessToken)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if claims.RoleID == nil || *claims.RoleID != 7 {
+		t.Fatalf("active role claim = %v, want 7", claims.RoleID)
 	}
 }

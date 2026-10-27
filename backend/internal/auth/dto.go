@@ -26,12 +26,14 @@ type RefreshTokenRequest struct {
 type PatchProfileRequest struct {
 	TelegramUsername *string `json:"tg_username,omitempty"`
 	RoleID           *int64  `json:"role_id,omitempty"`
+	RoleIDs          []int64 `json:"role_ids,omitempty"`
 	RefreshToken     string  `json:"refresh_token,omitempty"`
 }
 
 type PatchProfileResponse struct {
 	TelegramUsername *string `json:"tg_username,omitempty"`
 	RoleID           *int64  `json:"role_id,omitempty"`
+	RoleIDs          []int64 `json:"role_ids,omitempty"`
 	AccessToken      string  `json:"access_token,omitempty"`
 	RefreshToken     string  `json:"refresh_token,omitempty"`
 }
