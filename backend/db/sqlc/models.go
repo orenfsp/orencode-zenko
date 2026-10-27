@@ -181,7 +181,7 @@ type Permission struct {
 type Rank struct {
 	ID        int64
 	Name      string
-	Ttl       pgtype.Text
+	Ttl       pgtype.Int4
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
 }
