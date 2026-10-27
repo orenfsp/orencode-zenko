@@ -14,11 +14,8 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/auth"
 	"github.com/orenfsp/orencode-zenko.git/internal/calendarplan"
 	"github.com/orenfsp/orencode-zenko.git/internal/competition"
-	"github.com/orenfsp/orencode-zenko.git/internal/dashboard"
-	"github.com/orenfsp/orencode-zenko.git/internal/deadline"
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
-	"github.com/orenfsp/orencode-zenko.git/internal/judgecategory"
 	"github.com/orenfsp/orencode-zenko.git/internal/municipality"
 	"github.com/orenfsp/orencode-zenko.git/internal/notification" // <-- ДОБАВЛЕНО
 	"github.com/orenfsp/orencode-zenko.git/internal/notifier"
@@ -26,7 +23,6 @@ import (
 	rankuser "github.com/orenfsp/orencode-zenko.git/internal/rank_user"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/internal/reference"
-	"github.com/orenfsp/orencode-zenko.git/internal/registry"
 	"github.com/orenfsp/orencode-zenko.git/internal/result"
 	usercoach "github.com/orenfsp/orencode-zenko.git/internal/user_coach"
 	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
@@ -182,19 +178,6 @@ func main() {
 	calendarPlanRepository := calendarplan.NewRepository(queries)
 	calendarPlanService := calendarplan.NewService(calendarPlanRepository)
 	calendarPlanHandler := calendarplan.NewHandler(calendarPlanService)
-	dashboardRepository := dashboard.NewRepository(queries)
-	dashboardService := dashboard.NewService(dashboardRepository)
-	dashboardHandler := dashboard.NewHandler(dashboardService)
-	registryRepository := registry.NewRepository(queries)
-	registryService := registry.NewService(registryRepository)
-	registryHandler := registry.NewHandler(registryService)
-	roleChecker := rbac.NewRoleChecker(queries)
-	judgeCategoryRepository := judgecategory.NewRepository(queries, pool)
-	judgeCategoryService := judgecategory.NewService(judgeCategoryRepository, roleChecker)
-	judgeCategoryHandler := judgecategory.NewHandler(judgeCategoryService)
-	deadlineRepository := deadline.NewRepository(queries)
-	deadlineService := deadline.NewService(deadlineRepository, rbacRepository)
-	deadlineHandler := deadline.NewHandler(deadlineService)
 
 	// Reference data.
 	referenceRepository := reference.NewRepository(queries)
@@ -204,6 +187,7 @@ func main() {
 	// User-coach relations.
 	userCoachRepo := usercoach.NewSQLRepository(queries)
 
+	var roleChecker usercoach.RoleChecker = rbac.NewRoleChecker(queries)
 	userCoachService, err := usercoach.NewService(userCoachRepo, roleChecker)
 	if err != nil {
 		logger.Log.Fatal("initialize user coach service", zap.Error(err))
@@ -323,31 +307,14 @@ func main() {
 	mux.Handle("GET /api/v1/profile/competition-results", rbacMiddleware.Authenticate(http.HandlerFunc(resultHandler.History)))
 	registerCalendarPlanRoutes(mux, calendarPlanHandler, protected)
 	registerReferenceRoutes(mux, referenceHandler)
-	registerDashboardRoutes(mux, dashboardHandler, protected)
-	registerRegistryRoutes(mux, registryHandler, protected)
-	registerJudgeCategoryRoutes(
-		mux,
-		judgeCategoryHandler,
-		func(handler http.HandlerFunc) http.Handler { return rbacMiddleware.Authenticate(handler) },
-		protected,
-	)
-	registerDeadlineRoutes(
-		mux,
-		deadlineHandler,
-		func(handler http.HandlerFunc) http.Handler { return rbacMiddleware.Authenticate(handler) },
-		protected,
-	)
 
 	// Rankings.
 	mux.HandleFunc("POST /api/v1/admin/rank", rankHandler.CreateRank)
 	mux.HandleFunc("GET /api/v1/rank/{id}", rankHandler.GetRank)
 	mux.HandleFunc("GET /api/v1/rank/", rankHandler.ListRank)
-	registerRankApplicationRoutes(
-		mux,
-		rankApplicationHandler,
-		func(handler http.HandlerFunc) http.Handler { return rbacMiddleware.Authenticate(handler) },
-		protected,
-	)
+	mux.Handle("POST /api/v1/rank-applications", rbacMiddleware.Authenticate(http.HandlerFunc(rankApplicationHandler.Create)))
+	mux.Handle("GET /api/v1/rank-applications/mine", rbacMiddleware.Authenticate(http.HandlerFunc(rankApplicationHandler.ListMine)))
+	mux.Handle("PATCH /api/v1/admin/rank-applications/{applicationID}", protected(rbac.PermissionRolesAssign, rankApplicationHandler.Review))
 
 	mux.HandleFunc("GET /api/v1/municipalities", municipalityHandler.List)
 	mux.HandleFunc("GET /api/v1/municipalities/{id}", municipalityHandler.Get)
@@ -371,6 +338,9 @@ func main() {
 
 	mux.Handle("GET /api/v1/profile/competitions",
 		rbacMiddleware.Authenticate(http.HandlerFunc(competitionJudgeHandler.ListByUser)))
+
+	mux.Handle("GET /api/v1/profile/assignments",
+		rbacMiddleware.Authenticate(http.HandlerFunc(competitionJudgeHandler.ListAssignments)))
 }
 
 func runAntiDopingExpiration(ctx context.Context, service *antidoping.Service) {

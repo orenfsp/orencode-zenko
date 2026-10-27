@@ -31,24 +31,6 @@ func (s *JudgeService) ListPublic(ctx context.Context, competitionID int64) ([]C
 	if err != nil {
 		return nil, err
 	}
-	return toJudgeDTOs(items), nil
-}
-
-func (s *JudgeService) ListAdmin(ctx context.Context, competitionID int64) ([]CompetitionJudgeDTO, error) {
-	if competitionID <= 0 {
-		return nil, ErrInvalidJudgeRequest
-	}
-	if _, err := s.repository.GetCompetitionStatus(ctx, competitionID); err != nil {
-		return nil, err
-	}
-	items, err := s.repository.ListAdminCompetitionJudges(ctx, competitionID)
-	if err != nil {
-		return nil, err
-	}
-	return toJudgeDTOs(items), nil
-}
-
-func toJudgeDTOs(items []CompetitionJudge) []CompetitionJudgeDTO {
 	result := make([]CompetitionJudgeDTO, 0, len(items))
 	for _, item := range items {
 		result = append(result, CompetitionJudgeDTO{
@@ -60,7 +42,7 @@ func toJudgeDTOs(items []CompetitionJudge) []CompetitionJudgeDTO {
 			Position: JudgePositionDTO{ID: item.PositionID, Name: item.PositionName},
 		})
 	}
-	return result
+	return result, nil
 }
 
 func (s *JudgeService) Assign(
@@ -153,6 +135,40 @@ func (s *JudgeService) ListByJudgeUser(
 			Discipline:      ReferenceDTO{ID: item.DisciplineID, Name: item.DisciplineName},
 			CompetitionType: ReferenceDTO{ID: item.CompetitionTypeID, Name: item.CompetitionTypeName},
 			Format:          item.Format, StartAt: item.StartAt, EndAt: item.EndAt, Status: item.Status,
+			Position:    JudgePositionDTO{ID: item.PositionID, Name: item.PositionName},
+			AppointedAt: item.AppointedAt,
+		})
+	}
+	return result, nil
+}
+
+func (s *JudgeService) ListAssignments(
+	ctx context.Context, judgeUserID int64, limit, offset int32,
+) ([]JudgeAssignmentDTO, error) {
+	if judgeUserID <= 0 {
+		return nil, ErrInvalidJudgeRequest
+	}
+	if limit < 1 || limit > MaxLimit || offset < 0 {
+		return nil, competitionerrs.ErrInvalidPagination
+	}
+	items, err := s.repository.ListJudgeAssignments(ctx, judgeUserID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]JudgeAssignmentDTO, 0, len(items))
+	for _, item := range items {
+		result = append(result, JudgeAssignmentDTO{
+			ID: item.AssignmentID,
+			Competition: JudgeCompetitionDTO{
+				ID:              item.CompetitionID,
+				Name:            item.CompetitionName,
+				Discipline:      ReferenceDTO{ID: item.DisciplineID, Name: item.DisciplineName},
+				CompetitionType: ReferenceDTO{ID: item.CompetitionTypeID, Name: item.CompetitionTypeName},
+				Format:          item.Format,
+				StartAt:         item.StartAt,
+				EndAt:           item.EndAt,
+				Status:          item.Status,
+			},
 			Position:    JudgePositionDTO{ID: item.PositionID, Name: item.PositionName},
 			AppointedAt: item.AppointedAt,
 		})

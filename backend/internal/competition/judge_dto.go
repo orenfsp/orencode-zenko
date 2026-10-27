@@ -46,3 +46,10 @@ type JudgeCompetitionDTO struct {
 	Position        JudgePositionDTO `json:"position"`
 	AppointedAt     time.Time        `json:"appointed_at"`
 }
+
+type JudgeAssignmentDTO struct {
+	ID          int64               `json:"id"`
+	Competition JudgeCompetitionDTO `json:"competition"`
+	Position    JudgePositionDTO    `json:"position"`
+	AppointedAt time.Time           `json:"appointed_at"`
+}

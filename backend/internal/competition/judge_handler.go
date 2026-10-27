@@ -33,20 +33,6 @@ func (h *JudgeHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, items)
 }
 
-func (h *JudgeHandler) ListAdmin(w http.ResponseWriter, r *http.Request) {
-	competitionID, err := parseJudgeID(r.PathValue("id"))
-	if err != nil {
-		handleJudgeError(w, err)
-		return
-	}
-	items, err := h.service.ListAdmin(r.Context(), competitionID)
-	if err != nil {
-		handleJudgeError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, items)
-}
-
 func (h *JudgeHandler) Assign(w http.ResponseWriter, r *http.Request) {
 	identity, ok := rbac.IdentityFromContext(r.Context())
 	if !ok || identity.UserID <= 0 {
@@ -113,6 +99,24 @@ func (h *JudgeHandler) ListByUser(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, items)
 }
 
+func (h *JudgeHandler) ListAssignments(w http.ResponseWriter, r *http.Request) {
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok || identity.UserID <= 0 {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
+		return
+	}
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "limit и offset должны быть целыми числами")
+		return
+	}
+	items, err := h.service.ListAssignments(r.Context(), identity.UserID, limit, offset)
+	if err != nil {
+		handleJudgeError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, items)
+}
 func parseJudgeID(value string) (int64, error) {
 	id, err := strconv.ParseInt(value, 10, 64)
 	if err != nil || id <= 0 {
@@ -123,6 +127,11 @@ func parseJudgeID(value string) (int64, error) {
 
 func handleJudgeError(w http.ResponseWriter, err error) {
 	switch {
+
+	case errors.Is(err, competitionerrs.ErrInvalidPagination):
+		writeError(w, http.StatusBadRequest, "limit должен быть от 1 до 100, offset не может быть отрицательным")
+	case errors.Is(err, ErrInvalidJudgeRequest), errors.Is(err, ErrInvalidJudgeReference):
+		writeError(w, http.StatusBadRequest, "некорректные данные назначения судьи")
 	case errors.Is(err, ErrInvalidJudgeRequest), errors.Is(err, ErrInvalidJudgeReference):
 		writeError(w, http.StatusBadRequest, "некорректные данные назначения судьи")
 	case errors.Is(err, competitionerrs.ErrInvalidPagination): // ← новое
