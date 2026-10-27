@@ -500,6 +500,87 @@ func (q *Queries) ListCalendarCompetitions(ctx context.Context, arg ListCalendar
 	return items, nil
 }
 
+const listCompetitionsByJudgeUser = `-- name: ListCompetitionsByJudgeUser :many
+SELECT
+    c.id,
+    c.name,
+    c.discipline_id,
+    d.name AS discipline_name,
+    c.competition_type_id,
+    ct.name AS competition_type_name,
+    c.format,
+    c.start_at,
+    c.end_at,
+    c.status,
+    cj.position_id,
+    jp.name AS position_name,
+    cj.appointed_at
+FROM competition c
+JOIN discipline d ON d.id = c.discipline_id
+JOIN competition_type ct ON ct.id = c.competition_type_id
+JOIN competition_judge cj ON cj.competition_id = c.id
+JOIN judge_position jp ON jp.id = cj.position_id
+WHERE cj.judge_user_id = $1
+ORDER BY c.start_at DESC, c.id DESC
+LIMIT $2 OFFSET $3
+`
+
+type ListCompetitionsByJudgeUserParams struct {
+	JudgeUserID int64
+	Limit       int32
+	Offset      int32
+}
+
+type ListCompetitionsByJudgeUserRow struct {
+	ID                  int64
+	Name                string
+	DisciplineID        int64
+	DisciplineName      string
+	CompetitionTypeID   int64
+	CompetitionTypeName string
+	Format              string
+	StartAt             pgtype.Timestamptz
+	EndAt               pgtype.Timestamptz
+	Status              string
+	PositionID          int64
+	PositionName        string
+	AppointedAt         pgtype.Timestamptz
+}
+
+func (q *Queries) ListCompetitionsByJudgeUser(ctx context.Context, arg ListCompetitionsByJudgeUserParams) ([]ListCompetitionsByJudgeUserRow, error) {
+	rows, err := q.db.Query(ctx, listCompetitionsByJudgeUser, arg.JudgeUserID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCompetitionsByJudgeUserRow
+	for rows.Next() {
+		var i ListCompetitionsByJudgeUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.DisciplineID,
+			&i.DisciplineName,
+			&i.CompetitionTypeID,
+			&i.CompetitionTypeName,
+			&i.Format,
+			&i.StartAt,
+			&i.EndAt,
+			&i.Status,
+			&i.PositionID,
+			&i.PositionName,
+			&i.AppointedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPublicCompetitions = `-- name: ListPublicCompetitions :many
 SELECT
     c.id,

@@ -28,6 +28,9 @@ func (handlerRBACRepository) ListRoles(context.Context) ([]rbac.Role, error) { r
 func (handlerRBACRepository) ListPermissions(context.Context) ([]rbac.Permission, error) {
 	return nil, nil
 }
+func (handlerRBACRepository) ListSelfAssignableRoles(context.Context) ([]rbac.Role, error) {
+	return nil, nil
+}
 
 func authenticatedRequest(t *testing.T, method, target string, body *bytes.Reader) *http.Request {
 	t.Helper()

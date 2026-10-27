@@ -124,6 +124,21 @@ func (r *SQLCRepository) ListPendingCleanup(
 	return result, nil
 }
 
+func (r *SQLCRepository) ListAll(ctx context.Context, limit, offset int32) ([]UploadedFile, error) {
+	rows, err := r.queries.ListUploadedFiles(ctx, db.ListUploadedFilesParams{
+		PageLimit:  limit,
+		PageOffset: offset,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list uploaded files: %w", err)
+	}
+	result := make([]UploadedFile, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, mapUploadedFile(row))
+	}
+	return result, nil
+}
+
 func mapUploadedFile(row db.UploadedFile) UploadedFile {
 	return UploadedFile{
 		ID:               row.ID,

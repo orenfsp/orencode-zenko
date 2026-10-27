@@ -95,10 +95,11 @@ func (q *Queries) DeleteUploadedFileByStorageKey(ctx context.Context, storageKey
 const getAttachedFileForDownload = `-- name: GetAttachedFileForDownload :one
 SELECT
     uploaded_file.id, uploaded_file.purpose_code, uploaded_file.storage_key, uploaded_file.original_filename, uploaded_file.content_type, uploaded_file.size_bytes, uploaded_file.sha256, uploaded_file.status, uploaded_file.created_at, uploaded_file.updated_at,
-    COALESCE(consent_data.user_id, parental_consent.user_id, 0)::bigint AS owner_user_id
+    COALESCE(consent_data.user_id, parental_consent.user_id, anti_doping.user_id, 0)::bigint AS owner_user_id
 FROM uploaded_file
 LEFT JOIN consent_data ON consent_data.file_id = uploaded_file.id
 LEFT JOIN parental_consent ON parental_consent.file_id = uploaded_file.id
+LEFT JOIN anti_doping ON anti_doping.file_id = uploaded_file.id
 WHERE uploaded_file.id = $1
   AND uploaded_file.status = 'attached'
 `
@@ -214,6 +215,50 @@ type ListFilesPendingCleanupParams struct {
 
 func (q *Queries) ListFilesPendingCleanup(ctx context.Context, arg ListFilesPendingCleanupParams) ([]UploadedFile, error) {
 	rows, err := q.db.Query(ctx, listFilesPendingCleanup, arg.UploadedBefore, arg.BatchSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UploadedFile
+	for rows.Next() {
+		var i UploadedFile
+		if err := rows.Scan(
+			&i.ID,
+			&i.PurposeCode,
+			&i.StorageKey,
+			&i.OriginalFilename,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.Sha256,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUploadedFiles = `-- name: ListUploadedFiles :many
+SELECT id, purpose_code, storage_key, original_filename, content_type, size_bytes, sha256, status, created_at, updated_at
+FROM uploaded_file
+ORDER BY created_at DESC, id DESC
+LIMIT $2::integer
+OFFSET $1::integer
+`
+
+type ListUploadedFilesParams struct {
+	PageOffset int32
+	PageLimit  int32
+}
+
+func (q *Queries) ListUploadedFiles(ctx context.Context, arg ListUploadedFilesParams) ([]UploadedFile, error) {
+	rows, err := q.db.Query(ctx, listUploadedFiles, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}

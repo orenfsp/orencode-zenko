@@ -1,18 +1,15 @@
 package audit
 
-import "encoding/json"
-
 type ResponseDTO struct {
-	ID              string          `json:"id"`
-	EventType       string          `json:"event_type"`
-	ActorKind       string          `json:"actor_kind"`
-	ActorUserID     *string         `json:"actor_user_id"`
-	ActorDeviceID   *string         `json:"actor_device_id"`
-	EntityType      string          `json:"entity_type"`
-	EntityID        string          `json:"entity_id"`
-	EmergencyCallID *string         `json:"emergency_call_id"`
-	Payload         json.RawMessage `json:"payload"`
-	OccurredAt      string          `json:"occurred_at"`
+	ID          int64  `json:"id"`
+	EventType   string `json:"event_type"`
+	ActorUserID int64  `json:"actor_user_id"`
+	EntityType  string `json:"entity_type"`
+	EntityID    *int64 `json:"entity_id,omitempty"`
+	Method      string `json:"method"`
+	Route       string `json:"route"`
+	Status      int16  `json:"status"`
+	OccurredAt  string `json:"occurred_at"`
 }
 
 type ErrorResponse struct {

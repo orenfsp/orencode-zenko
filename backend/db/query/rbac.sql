@@ -10,6 +10,15 @@ SELECT EXISTS (
       AND p.code = $2
 );
 
+-- name: HasRole :one
+SELECT EXISTS (
+    SELECT 1
+    FROM role_user
+    JOIN role ON role.id = role_user.role_id
+    WHERE role_user.user_id = sqlc.arg(user_id)
+      AND role.code = sqlc.arg(code)
+);
+
 -- name: CreateRole :one
 INSERT INTO role (code, name, self_assignable)
 VALUES ($1, $2, $3)
@@ -75,6 +84,16 @@ ON CONFLICT (code) DO UPDATE
 SET name = EXCLUDED.name,
     is_system = true,
     self_assignable = false,
+    updated_at = now()
+RETURNING id;
+
+-- name: UpsertSelfAssignableRole :one
+INSERT INTO role (code, name, is_system, self_assignable)
+VALUES ($1, $2, false, true)
+ON CONFLICT (code) DO UPDATE
+SET name = EXCLUDED.name,
+    is_system = false,
+    self_assignable = true,
     updated_at = now()
 RETURNING id;
 

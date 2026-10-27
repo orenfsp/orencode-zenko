@@ -197,10 +197,27 @@ func (s *Service) PatchProfile(ctx context.Context, accessToken string, req Patc
 		response.TelegramUsername = username
 	}
 
-	if req.RoleID == nil {
+	roleIDs := req.RoleIDs
+	if req.RoleID != nil {
+		if len(roleIDs) > 0 {
+			return PatchProfileResponse{}, autherrs.ErrInvalidRegistrationData
+		}
+		roleIDs = []int64{*req.RoleID}
+	}
+	if len(roleIDs) == 0 {
 		return response, nil
 	}
-	if *req.RoleID <= 0 || strings.TrimSpace(req.RefreshToken) == "" {
+	seenRoleIDs := make(map[int64]struct{}, len(roleIDs))
+	for _, roleID := range roleIDs {
+		if roleID <= 0 {
+			return PatchProfileResponse{}, autherrs.ErrInvalidRegistrationData
+		}
+		if _, exists := seenRoleIDs[roleID]; exists {
+			return PatchProfileResponse{}, autherrs.ErrInvalidRegistrationData
+		}
+		seenRoleIDs[roleID] = struct{}{}
+	}
+	if strings.TrimSpace(req.RefreshToken) == "" {
 		return PatchProfileResponse{}, autherrs.ErrInvalidRegistrationData
 	}
 
@@ -208,7 +225,7 @@ func (s *Service) PatchProfile(ctx context.Context, accessToken string, req Patc
 	if err != nil || refreshClaims.UserID != claims.UserID {
 		return PatchProfileResponse{}, autherrs.ErrInvalidSession
 	}
-	if err := s.users.SetRole(ctx, claims.UserID, *req.RoleID); err != nil {
+	if err := s.users.SetRoles(ctx, claims.UserID, roleIDs); err != nil {
 		return PatchProfileResponse{}, err
 	}
 	user, err := s.users.GetUserByID(ctx, claims.UserID)
@@ -221,6 +238,7 @@ func (s *Service) PatchProfile(ctx context.Context, accessToken string, req Patc
 	}
 
 	response.RoleID = user.RoleID
+	response.RoleIDs = roleIDs
 	response.AccessToken = tokens.AccessToken
 	response.RefreshToken = tokens.RefreshToken
 	return response, nil

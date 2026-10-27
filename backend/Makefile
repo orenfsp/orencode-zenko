@@ -17,6 +17,10 @@ sqlc:
 seed-rbac:
 	go run ./cmd/seed-rbac
 
+# Idempotently inserts the approved reference data that is available in project materials.
+seed-reference:
+	go run ./cmd/seed-reference
+
 # Testing commands
 test:
 	go test -v ./...

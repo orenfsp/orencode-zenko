@@ -1,15 +1,32 @@
 package rbac
 
 const (
-	PermissionRolesRead               = "roles.read"
-	PermissionRolesCreate             = "roles.create"
-	PermissionRolesAssign             = "roles.assign"
-	PermissionPermissionsRead         = "permissions.read"
-	PermissionFilesRead               = "files.read"
-	PermissionCompetitionEventsCreate = "competition_events.create"
-	PermissionCompetitionEventsUpdate = "competition_events.update"
-	PermissionCompetitionEventsDelete = "competition_events.delete"
-	PermissionCompetitionEventsRead   = "competition_events.read"
+	PermissionRolesRead                 = "roles.read"
+	PermissionRolesCreate               = "roles.create"
+	PermissionRolesAssign               = "roles.assign"
+	PermissionPermissionsRead           = "permissions.read"
+	PermissionFilesRead                 = "files.read"
+	PermissionCompetitionEventsCreate   = "competition_events.create"
+	PermissionCompetitionEventsUpdate   = "competition_events.update"
+	PermissionCompetitionEventsDelete   = "competition_events.delete"
+	PermissionCompetitionEventsRead     = "competition_events.read"
+	PermissionCompetitionsCreate        = "competitions.create"
+	PermissionCompetitionsUpdate        = "competitions.update"
+	PermissionCompetitionJudgesManage   = "competition_judges.manage"
+	PermissionCompetitionResultsRead    = "competition_results.read"
+	PermissionCompetitionResultsManage  = "competition_results.manage"
+	PermissionCompetitionResultsApprove = "competition_results.approve"
+	PermissionCalendarPlansRead         = "calendar_plans.read"
+	PermissionCalendarPlansCreate       = "calendar_plans.create"
+	PermissionCalendarPlansUpdate       = "calendar_plans.update"
+	PermissionMunicipalitiesRead        = "municipalities.read"
+	PermissionMunicipalitiesCreate      = "municipalities.create"
+	PermissionAntiDopingReview          = "anti_doping.review"
+	PermissionDashboardRead             = "dashboard.read"
+	PermissionRegistryRead              = "registry.read"
+	PermissionJudgeCategoriesReview     = "judge_categories.review"
+	PermissionRankApplicationsReview    = "rank_applications.review"
+	PermissionDeadlinesManage           = "deadlines.manage"
 
 	SuperAdminRoleCode = "super_admin"
 )
@@ -17,6 +34,17 @@ const (
 type PermissionDefinition struct {
 	Code        string
 	Description string
+}
+
+type SeedRoleDefinition struct {
+	Code string
+	Name string
+}
+
+var DefaultSelfAssignableRoles = []SeedRoleDefinition{
+	{Code: "participant", Name: "Участник"},
+	{Code: "coach", Name: "Тренер"},
+	{Code: "judge", Name: "Судья"},
 }
 
 var DefaultPermissions = []PermissionDefinition{
@@ -29,6 +57,23 @@ var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionCompetitionEventsUpdate, Description: "Изменение зачётов соревнований"},
 	{Code: PermissionCompetitionEventsDelete, Description: "Удаление зачётов соревнований"},
 	{Code: PermissionCompetitionEventsRead, Description: "Просмотр неопубликованных зачётов соревнований"},
+	{Code: PermissionCompetitionsCreate, Description: "Создание соревнований"},
+	{Code: PermissionCompetitionsUpdate, Description: "Изменение соревнований"},
+	{Code: PermissionCompetitionJudgesManage, Description: "Назначение и снятие судей соревнования"},
+	{Code: PermissionCompetitionResultsRead, Description: "Просмотр таблиц результатов соревнований"},
+	{Code: PermissionCompetitionResultsManage, Description: "Ввод и расчёт результатов соревнований"},
+	{Code: PermissionCompetitionResultsApprove, Description: "Утверждение результатов соревнований"},
+	{Code: PermissionCalendarPlansRead, Description: "Просмотр календарных планов"},
+	{Code: PermissionCalendarPlansCreate, Description: "Создание календарных планов"},
+	{Code: PermissionCalendarPlansUpdate, Description: "Изменение календарных планов"},
+	{Code: PermissionMunicipalitiesRead, Description: "Просмотр муниципалитетов"},
+	{Code: PermissionMunicipalitiesCreate, Description: "Создание муниципалитетов"},
+	{Code: PermissionAntiDopingReview, Description: "Проверка антидопинговых сертификатов"},
+	{Code: PermissionDashboardRead, Description: "Просмотр дашборда федерации"},
+	{Code: PermissionRegistryRead, Description: "Просмотр единого реестра федерации"},
+	{Code: PermissionJudgeCategoriesReview, Description: "Рассмотрение заявок на судейские категории"},
+	{Code: PermissionRankApplicationsReview, Description: "Рассмотрение заявок на спортивные разряды"},
+	{Code: PermissionDeadlinesManage, Description: "Управление сроками федерации"},
 }
 
 type Role struct {

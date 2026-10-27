@@ -3,8 +3,9 @@ package file
 type Purpose string
 
 const (
-	PurposePersonalDataConsent Purpose = "personal_data_consent"
-	PurposeParentalConsent     Purpose = "parental_consent"
+	PurposePersonalDataConsent   Purpose = "personal_data_consent"
+	PurposeParentalConsent       Purpose = "parental_consent"
+	PurposeAntiDopingCertificate Purpose = "anti_doping_certificate"
 )
 
 type Policy struct {
@@ -28,6 +29,14 @@ func DefaultPolicies() map[Purpose]Policy {
 		PurposeParentalConsent: {
 			MaxBytes:    10 << 20,
 			AllowedMIME: cloneMIMEPolicy(allowedDocuments),
+		},
+		PurposeAntiDopingCertificate: {
+			MaxBytes: 10 << 20,
+			AllowedMIME: map[string]string{
+				"application/pdf": ".pdf",
+				"image/jpeg":      ".jpg",
+				"image/png":       ".png",
+			},
 		},
 	}
 }

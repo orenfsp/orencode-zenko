@@ -17,6 +17,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w" \
     -o /out/seed-rbac \
     ./cmd/seed-rbac \
+    && CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /out/seed-demo \
+    ./cmd/seed-demo \
     && mkdir -p /out/private_uploads \
     && chmod 0700 /out/private_uploads
 
@@ -24,6 +29,7 @@ FROM scratch
 
 COPY --from=build /out/api /api
 COPY --from=build /out/seed-rbac /seed-rbac
+COPY --from=build /out/seed-demo /seed-demo
 COPY --from=build --chown=65532:65532 \
     /out/private_uploads /app/private_uploads
 

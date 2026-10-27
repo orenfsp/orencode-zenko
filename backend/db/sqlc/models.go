@@ -16,25 +16,31 @@ type AgeGroup struct {
 }
 
 type AntiDoping struct {
-	ID          int64
-	UserID      int64
-	Url         pgtype.Text
-	Ttl         pgtype.Date
-	CompletedAt pgtype.Date
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
+	ID               int64
+	UserID           int64
+	Url              pgtype.Text
+	Ttl              pgtype.Date
+	CompletedAt      pgtype.Date
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	FileID           int64
+	Status           string
+	ValidUntil       pgtype.Date
+	ReviewedByUserID pgtype.Int8
+	ReviewedAt       pgtype.Timestamptz
+	RejectionReason  pgtype.Text
 }
 
-type AthleteCoach struct {
-	ID            int64
-	AthleteUserID int64
-	CoachUserID   int64
-	DisciplineID  int64
-	// pending, active, suspended, completed, rejected
-	Status      string
-	RequestedAt pgtype.Timestamptz
-	ConfirmedAt pgtype.Timestamptz
-	EndedAt     pgtype.Timestamptz
+type AuditLog struct {
+	ID          int64
+	EventType   string
+	ActorUserID int64
+	EntityType  string
+	EntityID    pgtype.Int8
+	Method      string
+	Route       string
+	Status      int16
+	OccurredAt  pgtype.Timestamptz
 }
 
 type CalendarPlan struct {
@@ -89,6 +95,49 @@ type CompetitionEvent struct {
 	ProtocolUrl   pgtype.Text
 }
 
+type CompetitionEventResultEntry struct {
+	ID                       int64
+	SheetID                  int64
+	TeamID                   pgtype.Int8
+	ResultStatus             string
+	SolvedCount              int32
+	TotalTimeDeciseconds     int64
+	LastSolveTimeDeciseconds int64
+	NegativeAttempts         int32
+	Place                    pgtype.Int4
+}
+
+type CompetitionEventResultEntryApplication struct {
+	EntryID       int64
+	ApplicationID int64
+}
+
+// Черновик или утверждённый зачёт конкретного мероприятия соревнования
+type CompetitionEventResultSheet struct {
+	ID                 int64
+	EventID            int64
+	Mode               string
+	TaskCount          int16
+	Status             string
+	CalculatedAt       pgtype.Timestamptz
+	ApprovedByUserID   pgtype.Int8
+	ApprovedAt         pgtype.Timestamptz
+	ProtocolStorageKey pgtype.Text
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+	Revision           int64
+}
+
+type CompetitionEventTaskResult struct {
+	EntryID    int64
+	TaskNumber int16
+	Status     string
+	// Время положительного решения задачи в десятых долях секунды
+	SolveTimeDeciseconds pgtype.Int8
+	// Количество отрицательных решений по задаче до положительного решения или окончания зачёта
+	NegativeAttempts int32
+}
+
 type CompetitionJudge struct {
 	ID            int64
 	CompetitionID int64
@@ -111,7 +160,8 @@ type CompetitionResult struct {
 	Place         pgtype.Int4
 	Score         pgtype.Numeric
 	// finished, did_not_start, disqualified
-	ResultStatus pgtype.Text
+	ResultStatus  pgtype.Text
+	AwardedRankID pgtype.Int8
 }
 
 type CompetitionType struct {
@@ -137,9 +187,33 @@ type Discipline struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type InappNotification struct {
+	ID        int64
+	UserID    int64
+	Title     string
+	Message   string
+	IsRead    bool
+	CreatedAt pgtype.Timestamptz
+}
+
 type JudgeCategory struct {
 	ID   int64
 	Name string
+}
+
+type JudgeCategoryApplication struct {
+	ID               int64
+	JudgeUserID      int64
+	CategoryID       int64
+	ApplicationType  string
+	Status           string
+	SubmittedAt      pgtype.Timestamptz
+	ReviewedByUserID pgtype.Int8
+	ReviewedAt       pgtype.Timestamptz
+	AssignedAt       pgtype.Date
+	ExpiresAt        pgtype.Date
+	OrderNumber      pgtype.Text
+	RejectionReason  pgtype.Text
 }
 
 // Предложенная структура: на скриншоте поля справочника ещё не определены.
@@ -152,6 +226,14 @@ type JudgePosition struct {
 type Municipality struct {
 	ID   int64
 	Name string
+}
+
+type NotificationOutbox struct {
+	ID           int64
+	RecipientID  int64
+	Payload      []byte
+	TelegramSent bool
+	CreatedAt    pgtype.Timestamptz
 }
 
 type Organization struct {
@@ -181,9 +263,39 @@ type Permission struct {
 type Rank struct {
 	ID        int64
 	Name      string
-	Ttl       pgtype.Text
+	Ttl       pgtype.Int4
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
+}
+
+type RankApplication struct {
+	ID                int64
+	AthleteUserID     int64
+	RankID            int64
+	DisciplineID      int64
+	SubmittedByUserID int64
+	Status            string
+	ReviewedByUserID  pgtype.Int8
+	ReviewedAt        pgtype.Timestamptz
+	RejectionReason   pgtype.Text
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+	ApplicationType   string
+	CompetitionID     pgtype.Int8
+	ResultID          pgtype.Int8
+	AssignedAt        pgtype.Date
+	ExpiresAt         pgtype.Date
+	OrderNumber       pgtype.Text
+}
+
+type ReportDeadline struct {
+	ID              int64
+	Name            string
+	DueAt           pgtype.Timestamptz
+	Status          string
+	CreatedByUserID int64
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
 }
 
 type Role struct {
@@ -232,6 +344,12 @@ type TeamMember struct {
 	LeftAt   pgtype.Date
 }
 
+type TelegramLink struct {
+	UserID   int64
+	ChatID   int64
+	LinkedAt pgtype.Timestamptz
+}
+
 type UploadedFile struct {
 	ID               int64
 	PurposeCode      string
@@ -264,6 +382,18 @@ type User struct {
 	UpdatedAt      pgtype.Timestamptz
 }
 
+type UserCoach struct {
+	ID           int64
+	UserID       int64
+	CoachUserID  int64
+	DisciplineID int64
+	// pending, active, suspended, completed, rejected
+	Status      string
+	RequestedAt pgtype.Timestamptz
+	ConfirmedAt pgtype.Timestamptz
+	EndedAt     pgtype.Timestamptz
+}
+
 type UserDiscipline struct {
 	UserID       int64
 	DisciplineID int64
@@ -279,6 +409,14 @@ type UserJudgeCategory struct {
 	OrderNumber pgtype.Text
 }
 
+type UserRank struct {
+	ID        int64
+	RankID    int64
+	UserID    int64
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
 type UserRankDiscipline struct {
 	ID           int64
 	UserID       int64
@@ -288,6 +426,7 @@ type UserRankDiscipline struct {
 	AwardedAt    pgtype.Date
 	ExpiresAt    pgtype.Date
 	OrderNumber  pgtype.Text
+	CreatedAt    pgtype.Timestamptz
 }
 
 type UserSession struct {

@@ -18,6 +18,9 @@ type repositoryStub struct {
 	markDeletePending  bool
 	deleteDiscardable  bool
 	markedByStorageKey bool
+	all                []UploadedFile
+	listLimit          int32
+	listOffset         int32
 }
 
 func (r *repositoryStub) Create(_ context.Context, input NewUploadedFile) (UploadedFile, error) {
@@ -70,6 +73,12 @@ func (*repositoryStub) DeleteUploadedByStorageKey(context.Context, string) error
 
 func (*repositoryStub) ListPendingCleanup(context.Context, time.Time, int32) ([]UploadedFile, error) {
 	return nil, nil
+}
+
+func (r *repositoryStub) ListAll(_ context.Context, limit, offset int32) ([]UploadedFile, error) {
+	r.listLimit = limit
+	r.listOffset = offset
+	return r.all, nil
 }
 
 type storageStub struct {
@@ -256,6 +265,34 @@ func TestDownloadRejectsOtherUserWithoutPermission(t *testing.T) {
 	}
 	if storage.opened {
 		t.Fatal("storage must not be opened for unauthorized user")
+	}
+}
+
+func TestListAllPassesPagination(t *testing.T) {
+	repo := &repositoryStub{all: []UploadedFile{{ID: 1, Status: StatusAttached}}}
+	service, err := NewService(repo, &storageStub{}, DefaultPolicies())
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	files, err := service.ListAll(context.Background(), 20, 40)
+	if err != nil {
+		t.Fatalf("ListAll() error = %v", err)
+	}
+	if len(files) != 1 || repo.listLimit != 20 || repo.listOffset != 40 {
+		t.Fatalf("files = %#v, pagination = %d/%d", files, repo.listLimit, repo.listOffset)
+	}
+}
+
+func TestListAllRejectsInvalidPagination(t *testing.T) {
+	service, err := NewService(&repositoryStub{}, &storageStub{}, DefaultPolicies())
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	_, err = service.ListAll(context.Background(), 0, 0)
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("ListAll() error = %v, want ErrInvalidInput", err)
 	}
 }
 
