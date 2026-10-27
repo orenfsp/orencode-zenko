@@ -157,7 +157,7 @@ export default function HomePage() {
             БАС
           </Button>
         </div>
-        <div className="grid grid-cols-2 gap-5 w-full">
+        <div className="grid grid-cols-2 gap-5 w-full px-10">
           <div className=" bg-black text-white rounded-[20px] w-full">
             <div className="flex w-full justify-between">
               <span className="opacity-60">Алгоритмическое программирование</span>
