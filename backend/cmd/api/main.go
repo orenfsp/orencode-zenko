@@ -14,6 +14,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/competition"
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
+	"github.com/orenfsp/orencode-zenko.git/internal/municipality"
 	"github.com/orenfsp/orencode-zenko.git/internal/rank"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/internal/reference"
@@ -22,6 +23,11 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"github.com/orenfsp/orencode-zenko.git/pkg/token"
 	"go.uber.org/zap"
+
+	"os"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/orenfsp/orencode-zenko.git/internal/notifier"
 )
 
 func main() {
@@ -44,7 +50,23 @@ func main() {
 
 	queries := dbsqlc.New(pool)
 
-	// Authentication.
+	// --- Запуск Telegram-уведомлений ---
+	listenConn, err := pgx.Connect(context.Background(), cfg.Database.URL)
+	if err != nil {
+		logger.Log.Error("failed to connect for LISTEN: " + err.Error())
+	} else {
+		go func() {
+			tgToken := os.Getenv("TG_TOKEN_BOT")
+			if tgToken == "" {
+				logger.Log.Warn("TG_TOKEN_BOT is empty, telegram notifier disabled")
+				return
+			}
+			if err := notifier.Start(context.Background(), listenConn, queries, tgToken); err != nil {
+				logger.Log.Error("notifier stopped: " + err.Error())
+			}
+		}()
+	}
+
 	jwtManager := token.New(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
 	authRepository := auth.NewRepository(queries, pool)
 	authService := auth.NewService(authRepository, jwtManager, authRepository)
@@ -53,6 +75,10 @@ func main() {
 	rbacRepository := rbac.NewRepository(queries, pool)
 	rbacService := rbac.NewService(rbacRepository)
 	rbacHandler := rbac.NewHandler(rbacService)
+
+	municipalityRepo := municipality.NewRepository(queries)
+	municipalityService := municipality.NewService(municipalityRepo)
+	municipalityHandler := municipality.NewHandler(municipalityService)
 	rbacMiddleware := rbac.NewMiddleware(jwtManager, rbacRepository)
 
 	protected := func(permission string, handler http.HandlerFunc) http.Handler {
@@ -123,8 +149,9 @@ func main() {
 	competitionRepository := competition.NewRepository(queries)
 	competitionService := competition.NewService(competitionRepository)
 	competitionHandler := competition.NewHandler(competitionService)
-
-	// Calendar plans.
+	judgeRepository := competition.NewJudgeRepository(queries)
+	judgeService := competition.NewJudgeService(judgeRepository)
+	judgeHandler := competition.NewJudgeHandler(judgeService)
 	calendarPlanRepository := calendarplan.NewRepository(queries)
 	calendarPlanService := calendarplan.NewService(calendarPlanRepository)
 	calendarPlanHandler := calendarplan.NewHandler(calendarPlanService)
@@ -211,6 +238,7 @@ func main() {
 
 	// Competition, calendar plans and reference data.
 	registerCompetitionRoutes(mux, competitionHandler, protected)
+	registerCompetitionJudgeRoutes(mux, judgeHandler, protected)
 	registerCalendarPlanRoutes(mux, calendarPlanHandler, protected)
 	registerReferenceRoutes(mux, referenceHandler)
 
@@ -219,7 +247,10 @@ func main() {
 	mux.HandleFunc("GET /api/v1/rank/{id}", rankHandler.GetRank)
 	mux.HandleFunc("GET /api/v1/rank/", rankHandler.ListRank)
 
-	// Start server.
+	mux.HandleFunc("GET /api/v1/municipalities", municipalityHandler.List)
+	mux.HandleFunc("GET /api/v1/municipalities/{id}", municipalityHandler.Get)
+	mux.Handle("POST /api/v1/admin/municipalities",
+		protected(rbac.PermissionMunicipalitiesCreate, municipalityHandler.Create))
 	address := ":" + cfg.HTTP.Port
 	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(mux)
 
