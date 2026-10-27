@@ -55,6 +55,18 @@ func (r *judgeRepositoryStub) RemoveCompetitionJudge(
 	return r.removed, r.removeErr
 }
 
+func (r *judgeRepositoryStub) ListCompetitionsByJudgeUser(
+	context.Context, int64, int32, int32,
+) ([]JudgeCompetition, error) {
+	return []JudgeCompetition{}, nil
+}
+
+func (r *judgeRepositoryStub) ListJudgeAssignments(
+	context.Context, int64, int32, int32,
+) ([]JudgeAssignment, error) {
+	return []JudgeAssignment{}, nil
+}
+
 func validJudgeValidation() JudgeAssignmentValidation {
 	return JudgeAssignmentValidation{
 		CompetitionExists: true, UserExists: true, JudgeRoleExists: true, PositionExists: true,

@@ -6,6 +6,10 @@ const (
 	PermissionRolesAssign               = "roles.assign"
 	PermissionPermissionsRead           = "permissions.read"
 	PermissionFilesRead                 = "files.read"
+	PermissionCompetitionEventsCreate   = "competition_events.create"
+	PermissionCompetitionEventsUpdate   = "competition_events.update"
+	PermissionCompetitionEventsDelete   = "competition_events.delete"
+	PermissionCompetitionEventsRead     = "competition_events.read"
 	PermissionCompetitionsCreate        = "competitions.create"
 	PermissionCompetitionsUpdate        = "competitions.update"
 	PermissionCompetitionJudgesManage   = "competition_judges.manage"
@@ -49,6 +53,10 @@ var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionRolesAssign, Description: "Назначение ролей пользователям"},
 	{Code: PermissionPermissionsRead, Description: "Просмотр доступных разрешений"},
 	{Code: PermissionFilesRead, Description: "Просмотр документов пользователей"},
+	{Code: PermissionCompetitionEventsCreate, Description: "Создание зачётов соревнований"},
+	{Code: PermissionCompetitionEventsUpdate, Description: "Изменение зачётов соревнований"},
+	{Code: PermissionCompetitionEventsDelete, Description: "Удаление зачётов соревнований"},
+	{Code: PermissionCompetitionEventsRead, Description: "Просмотр неопубликованных зачётов соревнований"},
 	{Code: PermissionCompetitionsCreate, Description: "Создание соревнований"},
 	{Code: PermissionCompetitionsUpdate, Description: "Изменение соревнований"},
 	{Code: PermissionCompetitionJudgesManage, Description: "Назначение и снятие судей соревнования"},

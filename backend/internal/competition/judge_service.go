@@ -31,6 +31,24 @@ func (s *JudgeService) ListPublic(ctx context.Context, competitionID int64) ([]C
 	if err != nil {
 		return nil, err
 	}
+	return toJudgeDTOs(items), nil
+}
+
+func (s *JudgeService) ListAdmin(ctx context.Context, competitionID int64) ([]CompetitionJudgeDTO, error) {
+	if competitionID <= 0 {
+		return nil, ErrInvalidJudgeRequest
+	}
+	if _, err := s.repository.GetCompetitionStatus(ctx, competitionID); err != nil {
+		return nil, err
+	}
+	items, err := s.repository.ListAdminCompetitionJudges(ctx, competitionID)
+	if err != nil {
+		return nil, err
+	}
+	return toJudgeDTOs(items), nil
+}
+
+func toJudgeDTOs(items []CompetitionJudge) []CompetitionJudgeDTO {
 	result := make([]CompetitionJudgeDTO, 0, len(items))
 	for _, item := range items {
 		result = append(result, CompetitionJudgeDTO{
@@ -42,7 +60,7 @@ func (s *JudgeService) ListPublic(ctx context.Context, competitionID int64) ([]C
 			Position: JudgePositionDTO{ID: item.PositionID, Name: item.PositionName},
 		})
 	}
-	return result, nil
+	return result
 }
 
 func (s *JudgeService) Assign(
