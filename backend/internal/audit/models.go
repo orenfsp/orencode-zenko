@@ -6,6 +6,10 @@ const (
 	EventRoleCreated      = "role.created"
 	EventUserRoleAssigned = "user.role.assigned"
 	EventProfileUpdated   = "user.profile.updated"
+	EventResultConfigured = "competition_result.configured"
+	EventResultUpdated    = "competition_result.updated"
+	EventResultCalculated = "competition_result.calculated"
+	EventResultApproved   = "competition_result.approved"
 )
 
 type EventCreate struct {

@@ -16,10 +16,13 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"github.com/orenfsp/orencode-zenko.git/internal/municipality"
+	"github.com/orenfsp/orencode-zenko.git/internal/notification" // <-- ДОБАВЛЕНО
+	"github.com/orenfsp/orencode-zenko.git/internal/notifier"
 	"github.com/orenfsp/orencode-zenko.git/internal/rank"
 	rankuser "github.com/orenfsp/orencode-zenko.git/internal/rank_user"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/internal/reference"
+	"github.com/orenfsp/orencode-zenko.git/internal/result"
 	usercoach "github.com/orenfsp/orencode-zenko.git/internal/user_coach"
 	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
@@ -29,7 +32,6 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/orenfsp/orencode-zenko.git/internal/notifier"
 )
 
 func main() {
@@ -158,6 +160,9 @@ func main() {
 	judgeRepository := competition.NewJudgeRepository(queries)
 	judgeService := competition.NewJudgeService(judgeRepository)
 	judgeHandler := competition.NewJudgeHandler(judgeService)
+	resultRepository := result.NewRepository(queries, pool)
+	resultService := result.NewService(resultRepository, fileStorage, result.NewPDFProtocolGenerator())
+	resultHandler := result.NewHandler(resultService)
 	calendarPlanRepository := calendarplan.NewRepository(queries)
 	calendarPlanService := calendarplan.NewService(calendarPlanRepository)
 	calendarPlanHandler := calendarplan.NewHandler(calendarPlanService)
@@ -210,7 +215,7 @@ func main() {
 	rankApplicationService := rankuser.NewService(rankApplicationRepository)
 	rankApplicationHandler := rankuser.NewHandler(rankApplicationService)
 
-	// Adds the authenticated user's ID to the context expected by usercoach.Handler.
+		// Adds the authenticated user's ID to the context expected by usercoach.Handler.
 	// The token is verified by the existing RBAC middleware first.
 	withUserCoachIdentity := func(next http.Handler) http.Handler {
 		return rbacMiddleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -243,6 +248,10 @@ func main() {
 		}))
 	}
 
+	// --- Инициализация уведомлений для фронта ---
+	notificationRepo := notification.NewRepository(queries)
+	notificationHandler := notification.NewHandler(notificationRepo)
+
 	// HTTP routes.
 	mux := http.NewServeMux()
 
@@ -274,6 +283,8 @@ func main() {
 	// Competition, calendar plans and reference data.
 	registerCompetitionRoutes(mux, competitionHandler, protected)
 	registerCompetitionJudgeRoutes(mux, judgeHandler, protected)
+	registerCompetitionResultRoutes(mux, resultHandler, protected)
+	mux.Handle("GET /api/v1/profile/competition-results", rbacMiddleware.Authenticate(http.HandlerFunc(resultHandler.History)))
 	registerCalendarPlanRoutes(mux, calendarPlanHandler, protected)
 	registerReferenceRoutes(mux, referenceHandler)
 
@@ -289,6 +300,12 @@ func main() {
 	mux.HandleFunc("GET /api/v1/municipalities/{id}", municipalityHandler.Get)
 	mux.Handle("POST /api/v1/admin/municipalities",
 		protected(rbac.PermissionMunicipalitiesCreate, municipalityHandler.Create))
+
+	// --- Роуты для уведомлений ---
+	// Используем rbacMiddleware.Authenticate, чтобы проверить токен (когда друг подключит JWT)
+	mux.Handle("GET /api/v1/notifications", rbacMiddleware.Authenticate(http.HandlerFunc(notificationHandler.ListNotifications)))
+	mux.Handle("PATCH /api/v1/notifications/{id}/read", rbacMiddleware.Authenticate(http.HandlerFunc(notificationHandler.MarkAsRead)))
+
 	address := ":" + cfg.HTTP.Port
 	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(auditMiddleware.Wrap(mux))
 

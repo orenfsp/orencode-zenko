@@ -89,6 +89,49 @@ type CompetitionEvent struct {
 	ProtocolUrl   pgtype.Text
 }
 
+type CompetitionEventResultEntry struct {
+	ID                       int64
+	SheetID                  int64
+	TeamID                   pgtype.Int8
+	ResultStatus             string
+	SolvedCount              int32
+	TotalTimeDeciseconds     int64
+	LastSolveTimeDeciseconds int64
+	NegativeAttempts         int32
+	Place                    pgtype.Int4
+}
+
+type CompetitionEventResultEntryApplication struct {
+	EntryID       int64
+	ApplicationID int64
+}
+
+// Черновик или утверждённый зачёт конкретного мероприятия соревнования
+type CompetitionEventResultSheet struct {
+	ID                 int64
+	EventID            int64
+	Mode               string
+	TaskCount          int16
+	Status             string
+	CalculatedAt       pgtype.Timestamptz
+	ApprovedByUserID   pgtype.Int8
+	ApprovedAt         pgtype.Timestamptz
+	ProtocolStorageKey pgtype.Text
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+	Revision           int64
+}
+
+type CompetitionEventTaskResult struct {
+	EntryID    int64
+	TaskNumber int16
+	Status     string
+	// Время положительного решения задачи в десятых долях секунды
+	SolveTimeDeciseconds pgtype.Int8
+	// Количество отрицательных решений по задаче до положительного решения или окончания зачёта
+	NegativeAttempts int32
+}
+
 type CompetitionJudge struct {
 	ID            int64
 	CompetitionID int64
@@ -135,6 +178,15 @@ type Discipline struct {
 	ID        int64
 	Name      string
 	UpdatedAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
+type InappNotification struct {
+	ID        int64
+	UserID    int64
+	Title     string
+	Message   string
+	IsRead    bool
 	CreatedAt pgtype.Timestamptz
 }
 
