@@ -1,1 +1,1 @@
--- audit_log is owned by migration 008_audit_log.
+DROP TABLE IF EXISTS audit_log;
