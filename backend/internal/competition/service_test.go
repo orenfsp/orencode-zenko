@@ -11,28 +11,36 @@ import (
 
 type repositoryStub struct {
 	items          []Competition
+	calendarItems  []Competition
 	item           Competition
 	created        Competition
 	listErr        error
+	calendarErr    error
 	getErr         error
 	referenceErr   error
 	createErr      error
 	updateErr      error
 	seenLimit      int32
 	seenOffset     int32
+	seenCalendar   CalendarFilter
 	seenID         int64
 	seenReferences CompetitionReferences
 	seenCreate     CreateCompetition
 	seenUpdate     UpdateCompetition
 }
 
-func (s *repositoryStub) ListPublished(_ context.Context, limit, offset int32) ([]Competition, error) {
+func (s *repositoryStub) ListPublic(_ context.Context, limit, offset int32) ([]Competition, error) {
 	s.seenLimit = limit
 	s.seenOffset = offset
 	return s.items, s.listErr
 }
 
-func (s *repositoryStub) GetPublished(_ context.Context, id int64) (Competition, error) {
+func (s *repositoryStub) ListCalendar(_ context.Context, filter CalendarFilter) ([]Competition, error) {
+	s.seenCalendar = filter
+	return s.calendarItems, s.calendarErr
+}
+
+func (s *repositoryStub) GetPublic(_ context.Context, id int64) (Competition, error) {
 	s.seenID = id
 	return s.item, s.getErr
 }
@@ -89,8 +97,10 @@ func validCreateRequest() CreateRequest {
 
 func stringPointer(value string) *string { return &value }
 
-func TestServiceListPublishedCompetitions(t *testing.T) {
-	repo := &repositoryStub{items: []Competition{testCompetition()}}
+func TestServiceListPublicCompetitions(t *testing.T) {
+	item := testCompetition()
+	item.Status = "completed"
+	repo := &repositoryStub{items: []Competition{item}}
 	service := NewService(repo)
 
 	result, err := service.List(context.Background(), 25, 10)
@@ -143,8 +153,153 @@ func TestServiceListPropagatesRepositoryError(t *testing.T) {
 	}
 }
 
-func TestServiceGetPublishedCompetition(t *testing.T) {
-	repo := &repositoryStub{item: testCompetition()}
+func TestServiceCalendarReturnsEmptyJSONReadySlice(t *testing.T) {
+	filter := CalendarFilter{
+		From:  time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
+		To:    time.Date(2026, time.February, 1, 0, 0, 0, 0, time.UTC),
+		Limit: DefaultLimit,
+	}
+	result, err := NewService(&repositoryStub{}).Calendar(context.Background(), filter)
+	if err != nil {
+		t.Fatalf("Calendar() error = %v", err)
+	}
+	if result == nil || len(result) != 0 {
+		t.Fatalf("Calendar() result = %#v, want non-nil empty slice", result)
+	}
+}
+
+func TestServiceCalendarIncludesCompetitionsSpanningMonthsAndPeriodBoundaries(t *testing.T) {
+	from := time.Date(2026, time.February, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.UTC)
+	spanning := testCompetition()
+	spanning.StartAt = time.Date(2026, time.January, 30, 10, 0, 0, 0, time.UTC)
+	spanning.EndAt = time.Date(2026, time.March, 2, 10, 0, 0, 0, time.UTC)
+	endingAtFrom := testCompetition()
+	endingAtFrom.ID = 8
+	endingAtFrom.StartAt = from.Add(-time.Hour)
+	endingAtFrom.EndAt = from
+	startingAtTo := testCompetition()
+	startingAtTo.ID = 9
+	startingAtTo.StartAt = to
+	startingAtTo.EndAt = to.Add(time.Hour)
+	startingAtFrom := testCompetition()
+	startingAtFrom.ID = 10
+	startingAtFrom.StartAt = from
+	startingAtFrom.EndAt = from.Add(time.Hour)
+	endingAtTo := testCompetition()
+	endingAtTo.ID = 11
+	endingAtTo.StartAt = to.Add(-time.Hour)
+	endingAtTo.EndAt = to
+
+	result, err := NewService(&repositoryStub{calendarItems: []Competition{
+		spanning, endingAtFrom, startingAtTo, startingAtFrom, endingAtTo,
+	}}).Calendar(context.Background(), CalendarFilter{From: from, To: to, Limit: DefaultLimit})
+	if err != nil {
+		t.Fatalf("Calendar() error = %v", err)
+	}
+	if len(result) != 3 || result[0].ID != spanning.ID || result[1].ID != 10 || result[2].ID != 11 {
+		t.Fatalf("Calendar() result = %#v", result)
+	}
+}
+
+func TestServiceCalendarHidesNonPublicStatuses(t *testing.T) {
+	from := time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, time.November, 30, 0, 0, 0, 0, time.UTC)
+	draft := testCompetition()
+	draft.Status = "draft"
+	review := testCompetition()
+	review.ID = 8
+	review.Status = "under_review"
+	completed := testCompetition()
+	completed.ID = 9
+	completed.Status = "completed"
+
+	result, err := NewService(&repositoryStub{calendarItems: []Competition{draft, review, completed}}).Calendar(
+		context.Background(), CalendarFilter{From: from, To: to, Limit: DefaultLimit},
+	)
+	if err != nil {
+		t.Fatalf("Calendar() error = %v", err)
+	}
+	if len(result) != 1 || result[0].ID != completed.ID {
+		t.Fatalf("Calendar() result = %#v, want only completed competition", result)
+	}
+}
+
+func TestPublicCompetitionStatuses(t *testing.T) {
+	for _, status := range publicCompetitionStatuses {
+		if !isPublicCompetitionStatus(status) {
+			t.Fatalf("status %q must be public", status)
+		}
+	}
+	for _, status := range []string{"draft", "under_review", "unknown"} {
+		if isPublicCompetitionStatus(status) {
+			t.Fatalf("status %q must not be public", status)
+		}
+	}
+}
+
+func TestServiceCalendarPassesFiltersAndPagination(t *testing.T) {
+	disciplineID, levelID := int64(2), int64(4)
+	filter := CalendarFilter{
+		From:         time.Date(2026, time.November, 1, 0, 0, 0, 0, time.FixedZone("YEKT", 5*60*60)),
+		To:           time.Date(2026, time.December, 1, 0, 0, 0, 0, time.FixedZone("YEKT", 5*60*60)),
+		DisciplineID: &disciplineID, LevelID: &levelID, Limit: 25, Offset: 50,
+	}
+	repo := &repositoryStub{}
+	if _, err := NewService(repo).Calendar(context.Background(), filter); err != nil {
+		t.Fatalf("Calendar() error = %v", err)
+	}
+	if repo.seenCalendar.DisciplineID == nil || *repo.seenCalendar.DisciplineID != disciplineID ||
+		repo.seenCalendar.LevelID == nil || *repo.seenCalendar.LevelID != levelID ||
+		repo.seenCalendar.Limit != 25 || repo.seenCalendar.Offset != 50 ||
+		!repo.seenCalendar.From.Equal(filter.From) || !repo.seenCalendar.To.Equal(filter.To) {
+		t.Fatalf("repository filter = %#v, want %#v", repo.seenCalendar, filter)
+	}
+}
+
+func TestServiceCalendarRejectsInvalidInput(t *testing.T) {
+	validFrom := time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC)
+	validTo := validFrom.Add(24 * time.Hour)
+	zeroID, negativeID := int64(0), int64(-1)
+	tests := []struct {
+		name   string
+		filter CalendarFilter
+		want   error
+	}{
+		{name: "missing from", filter: CalendarFilter{To: validTo, Limit: DefaultLimit}, want: competitionerrs.ErrInvalidCalendarPeriod},
+		{name: "empty period", filter: CalendarFilter{From: validFrom, To: validFrom, Limit: DefaultLimit}, want: competitionerrs.ErrInvalidCalendarPeriod},
+		{name: "reversed period", filter: CalendarFilter{From: validTo, To: validFrom, Limit: DefaultLimit}, want: competitionerrs.ErrInvalidCalendarPeriod},
+		{name: "zero discipline", filter: CalendarFilter{From: validFrom, To: validTo, DisciplineID: &zeroID, Limit: DefaultLimit}, want: competitionerrs.ErrInvalidCalendarFilter},
+		{name: "negative level", filter: CalendarFilter{From: validFrom, To: validTo, LevelID: &negativeID, Limit: DefaultLimit}, want: competitionerrs.ErrInvalidCalendarFilter},
+		{name: "invalid limit", filter: CalendarFilter{From: validFrom, To: validTo, Limit: MaxLimit + 1}, want: competitionerrs.ErrInvalidPagination},
+		{name: "negative offset", filter: CalendarFilter{From: validFrom, To: validTo, Limit: DefaultLimit, Offset: -1}, want: competitionerrs.ErrInvalidPagination},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewService(&repositoryStub{}).Calendar(context.Background(), tt.filter)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("Calendar() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestServiceCalendarPropagatesRepositoryError(t *testing.T) {
+	wantErr := errors.New("database unavailable")
+	_, err := NewService(&repositoryStub{calendarErr: wantErr}).Calendar(context.Background(), CalendarFilter{
+		From:  time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC),
+		To:    time.Date(2026, time.November, 2, 0, 0, 0, 0, time.UTC),
+		Limit: DefaultLimit,
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Calendar() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestServiceGetPublicCompetition(t *testing.T) {
+	item := testCompetition()
+	item.Status = "completed"
+	repo := &repositoryStub{item: item}
 	result, err := NewService(repo).Get(context.Background(), 7)
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
@@ -161,8 +316,8 @@ func TestServiceGetMissingCompetition(t *testing.T) {
 	}
 }
 
-func TestServiceGetUnpublishedCompetitionIsNotAccessible(t *testing.T) {
-	// The repository's published-only SQL reports drafts exactly like missing rows.
+func TestServiceGetNonPublicCompetitionIsNotAccessible(t *testing.T) {
+	// The repository's public-status SQL reports drafts exactly like missing rows.
 	_, err := NewService(&repositoryStub{getErr: competitionerrs.ErrNotFound}).Get(context.Background(), 8)
 	if !errors.Is(err, competitionerrs.ErrNotFound) {
 		t.Fatalf("Get() error = %v, want ErrNotFound", err)

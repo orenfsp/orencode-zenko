@@ -1,4 +1,4 @@
--- name: ListPublishedCompetitions :many
+-- name: ListPublicCompetitions :many
 SELECT
     c.id,
     c.name,
@@ -28,11 +28,46 @@ JOIN discipline AS d ON d.id = c.discipline_id
 JOIN competition_type AS ct ON ct.id = c.competition_type_id
 JOIN competition_level AS cl ON cl.id = c.competition_level_id
 LEFT JOIN calendar_plan AS cp ON cp.id = c.calendar_plan_id
-WHERE c.status = 'published'
+WHERE c.status = ANY(sqlc.arg(p_public_statuses)::text[])
 ORDER BY c.start_at, c.id
 LIMIT $1 OFFSET $2;
 
--- name: GetPublishedCompetition :one
+-- name: ListCalendarCompetitions :many
+SELECT
+    c.id,
+    c.name,
+    c.discipline_id,
+    d.name AS discipline_name,
+    c.competition_type_id,
+    ct.name AS competition_type_name,
+    c.competition_level_id,
+    cl.code AS competition_level_code,
+    cl.name AS competition_level_name,
+    c.format,
+    c.start_at,
+    c.end_at,
+    c.venue_address,
+    c.online_url,
+    c.status
+FROM competition AS c
+JOIN discipline AS d ON d.id = c.discipline_id
+JOIN competition_type AS ct ON ct.id = c.competition_type_id
+JOIN competition_level AS cl ON cl.id = c.competition_level_id
+WHERE c.status = ANY(sqlc.arg(p_public_statuses)::text[])
+  AND c.start_at < sqlc.arg(p_to)
+  AND c.end_at > sqlc.arg(p_from)
+  AND (
+      sqlc.narg(p_discipline_id)::bigint IS NULL
+      OR c.discipline_id = sqlc.narg(p_discipline_id)
+  )
+  AND (
+      sqlc.narg(p_level_id)::bigint IS NULL
+      OR c.competition_level_id = sqlc.narg(p_level_id)
+  )
+ORDER BY c.start_at, c.id
+LIMIT sqlc.arg(p_limit) OFFSET sqlc.arg(p_offset);
+
+-- name: GetPublicCompetition :one
 SELECT
     c.id,
     c.name,
@@ -62,7 +97,8 @@ JOIN discipline AS d ON d.id = c.discipline_id
 JOIN competition_type AS ct ON ct.id = c.competition_type_id
 JOIN competition_level AS cl ON cl.id = c.competition_level_id
 LEFT JOIN calendar_plan AS cp ON cp.id = c.calendar_plan_id
-WHERE c.id = $1 AND c.status = 'published';
+WHERE c.id = $1
+  AND c.status = ANY(sqlc.arg(p_public_statuses)::text[]);
 
 -- name: ValidateCompetitionReferences :one
 SELECT

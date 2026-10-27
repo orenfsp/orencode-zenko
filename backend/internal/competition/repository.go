@@ -5,6 +5,15 @@ import (
 	"time"
 )
 
+var publicCompetitionStatuses = []string{
+	"published",
+	"registration_open",
+	"registration_closed",
+	"ongoing",
+	"results_pending",
+	"completed",
+}
+
 type Competition struct {
 	ID                   int64
 	Name                 string
@@ -76,9 +85,19 @@ type UpdateCompetition struct {
 	RegulationURL        *string
 }
 
+type CalendarFilter struct {
+	From         time.Time
+	To           time.Time
+	DisciplineID *int64
+	LevelID      *int64
+	Limit        int32
+	Offset       int32
+}
+
 type Repository interface {
-	ListPublished(ctx context.Context, limit, offset int32) ([]Competition, error)
-	GetPublished(ctx context.Context, id int64) (Competition, error)
+	ListPublic(ctx context.Context, limit, offset int32) ([]Competition, error)
+	ListCalendar(ctx context.Context, filter CalendarFilter) ([]Competition, error)
+	GetPublic(ctx context.Context, id int64) (Competition, error)
 	ValidateReferences(ctx context.Context, references CompetitionReferences) error
 	Create(ctx context.Context, input CreateCompetition) (Competition, error)
 	GetByID(ctx context.Context, id int64) (Competition, error)

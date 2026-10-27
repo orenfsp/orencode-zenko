@@ -20,10 +20,11 @@ func NewRepository(queries *db.Queries) Repository {
 	return &sqlRepository{queries: queries}
 }
 
-func (r *sqlRepository) ListPublished(ctx context.Context, limit, offset int32) ([]Competition, error) {
-	rows, err := r.queries.ListPublishedCompetitions(ctx, db.ListPublishedCompetitionsParams{
-		Limit:  limit,
-		Offset: offset,
+func (r *sqlRepository) ListPublic(ctx context.Context, limit, offset int32) ([]Competition, error) {
+	rows, err := r.queries.ListPublicCompetitions(ctx, db.ListPublicCompetitionsParams{
+		Limit:           limit,
+		Offset:          offset,
+		PPublicStatuses: publicCompetitionStatuses,
 	})
 	if err != nil {
 		return nil, err
@@ -36,8 +37,31 @@ func (r *sqlRepository) ListPublished(ctx context.Context, limit, offset int32) 
 	return result, nil
 }
 
-func (r *sqlRepository) GetPublished(ctx context.Context, id int64) (Competition, error) {
-	row, err := r.queries.GetPublishedCompetition(ctx, id)
+func (r *sqlRepository) ListCalendar(ctx context.Context, filter CalendarFilter) ([]Competition, error) {
+	rows, err := r.queries.ListCalendarCompetitions(ctx, db.ListCalendarCompetitionsParams{
+		PPublicStatuses: publicCompetitionStatuses,
+		PFrom:           timestamptz(filter.From),
+		PTo:             timestamptz(filter.To),
+		PDisciplineID:   nullableInt64(filter.DisciplineID),
+		PLevelID:        nullableInt64(filter.LevelID),
+		PLimit:          filter.Limit,
+		POffset:         filter.Offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]Competition, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, fromCalendarRow(row))
+	}
+	return result, nil
+}
+
+func (r *sqlRepository) GetPublic(ctx context.Context, id int64) (Competition, error) {
+	row, err := r.queries.GetPublicCompetition(ctx, db.GetPublicCompetitionParams{
+		ID: id, PPublicStatuses: publicCompetitionStatuses,
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Competition{}, competitionerrs.ErrNotFound
@@ -140,7 +164,7 @@ func mapWriteError(err error) error {
 	return err
 }
 
-func fromListRow(row db.ListPublishedCompetitionsRow) Competition {
+func fromListRow(row db.ListPublicCompetitionsRow) Competition {
 	return Competition{
 		ID: row.ID, Name: row.Name, Description: textPointer(row.Description),
 		DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,
@@ -156,7 +180,19 @@ func fromListRow(row db.ListPublishedCompetitionsRow) Competition {
 	}
 }
 
-func fromGetRow(row db.GetPublishedCompetitionRow) Competition {
+func fromCalendarRow(row db.ListCalendarCompetitionsRow) Competition {
+	return Competition{
+		ID: row.ID, Name: row.Name,
+		DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,
+		CompetitionTypeID: row.CompetitionTypeID, CompetitionTypeName: row.CompetitionTypeName,
+		CompetitionLevelID: row.CompetitionLevelID, CompetitionLevelCode: textPointer(row.CompetitionLevelCode),
+		CompetitionLevelName: textPointer(row.CompetitionLevelName), Format: row.Format,
+		StartAt: row.StartAt.Time, EndAt: row.EndAt.Time,
+		VenueAddress: textPointer(row.VenueAddress), OnlineURL: textPointer(row.OnlineUrl), Status: row.Status,
+	}
+}
+
+func fromGetRow(row db.GetPublicCompetitionRow) Competition {
 	return Competition{
 		ID: row.ID, Name: row.Name, Description: textPointer(row.Description),
 		DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,

@@ -16,10 +16,13 @@ type routeCompetitionRepository struct {
 	item competition.Competition
 }
 
-func (r *routeCompetitionRepository) ListPublished(context.Context, int32, int32) ([]competition.Competition, error) {
+func (r *routeCompetitionRepository) ListPublic(context.Context, int32, int32) ([]competition.Competition, error) {
 	return []competition.Competition{}, nil
 }
-func (r *routeCompetitionRepository) GetPublished(context.Context, int64) (competition.Competition, error) {
+func (r *routeCompetitionRepository) ListCalendar(context.Context, competition.CalendarFilter) ([]competition.Competition, error) {
+	return []competition.Competition{}, nil
+}
+func (r *routeCompetitionRepository) GetPublic(context.Context, int64) (competition.Competition, error) {
 	return r.item, nil
 }
 func (r *routeCompetitionRepository) ValidateReferences(context.Context, competition.CompetitionReferences) error {
@@ -78,6 +81,7 @@ func TestRegisterCompetitionRoutes(t *testing.T) {
 		path   string
 		want   int
 	}{
+		{method: http.MethodGet, path: "/api/v1/calendar/competitions?from=2026-11-01&to=2026-12-01", want: http.StatusOK},
 		{method: http.MethodGet, path: "/api/v1/competitions", want: http.StatusOK},
 		{method: http.MethodGet, path: "/api/v1/competitions/7", want: http.StatusOK},
 		{method: http.MethodPost, path: "/api/v1/competitions", want: http.StatusUnauthorized},
@@ -94,6 +98,9 @@ func TestRegisterCompetitionRoutes(t *testing.T) {
 	}
 	if permissions[http.MethodPatch] != competition.PermissionUpdate {
 		t.Fatalf("PATCH permission = %q", permissions[http.MethodPatch])
+	}
+	if _, protected := permissions[http.MethodGet]; protected {
+		t.Fatal("public GET routes must not use authorization or RBAC middleware")
 	}
 }
 
