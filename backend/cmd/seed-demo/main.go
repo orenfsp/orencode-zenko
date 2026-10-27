@@ -105,6 +105,27 @@ func main() {
 		log.Fatal("create event:", err)
 	}
 
+			// Создаем фиктивный файл для антидопингового сертификата
+	var fileID int64
+	err = pool.QueryRow(ctx, `
+		INSERT INTO uploaded_file (purpose_code, storage_key, original_filename, content_type, size_bytes, sha256)
+		VALUES ('anti_doping', 'demo/anti_doping.pdf', 'anti_doping.pdf', 'application/pdf', 1024, repeat('a', 64))
+		RETURNING id`).Scan(&fileID)
+	if err != nil {
+		log.Fatal("create uploaded_file:", err)
+	}
+
+	// Создаем антидопинговый сертификат
+	completedAt := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	validUntil := time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC)
+	_, err = pool.Exec(ctx, `
+		INSERT INTO anti_doping (user_id, file_id, status, completed_at, valid_until, reviewed_by_user_id, reviewed_at)
+		VALUES ($1, $2, 'valid', $3, $4, $5, NOW())
+		ON CONFLICT DO NOTHING`, athleteID, fileID, completedAt, validUntil, adminID)
+	if err != nil {
+		log.Fatal("create anti-doping:", err)
+	}
+
 	// ========== 4. ЗАЯВКА И РЕЗУЛЬТАТ ==========
 	var applicationID int64
 	err = pool.QueryRow(ctx, `
