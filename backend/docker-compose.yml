@@ -51,6 +51,7 @@ services:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL_DOCKER}
+      STORAGE_PATH: ${STORAGE_PATH}
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     depends_on:

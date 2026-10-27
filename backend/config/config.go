@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,7 +38,7 @@ type StorageConfig struct {
 	Path             string        // STORAGE_PATH, default "./private_uploads"
 	CleanupInterval  time.Duration // FILE_CLEANUP_INTERVAL, default 10m
 	CleanupRetention time.Duration // FILE_CLEANUP_RETENTION, default 15m
-	CleanupBatch     string        // FILE_CLEANUP_BATCH, default 100
+	CleanupBatch     int32         // FILE_CLEANUP_BATCH, default 100
 }
 
 func Load() (*Config, error) {
@@ -89,10 +90,14 @@ func Load() (*Config, error) {
 			return nil, err
 		}
 	}
-	storageCleanupBatch := "100"
+	var storageCleanupBatch int32 = 100
 	if value := os.Getenv("STORAGE_CLEANUP_INTERVAL"); value != "" {
+		val, err := strconv.ParseInt(value, 10, 32)
+		if err != nil {
+			return nil, err
+		}
+		storageCleanupBatch = int32(val)
 
-		storageCleanupBatch = value
 	}
 
 	cfg := &Config{

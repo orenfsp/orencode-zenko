@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/orenfsp/orencode-zenko.git/config"
 	dbsqlc "github.com/orenfsp/orencode-zenko.git/db/sqlc"
@@ -58,6 +59,33 @@ func main() {
 	if err != nil {
 		logger.Log.Fatal("initialize file service", zap.Error(err))
 	}
+
+	cleanupCtx, cancelCleanup := context.WithCancel(context.Background())
+	defer cancelCleanup()
+
+	go func(ctx context.Context, svc *file.Service, cfg config.StorageConfig) {
+		ticker := time.NewTicker(cfg.CleanupInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				cutoff := time.Now().Add(-cfg.CleanupRetention)
+				result, err := svc.CleanupPending(ctx, cutoff, cfg.CleanupBatch)
+				if err != nil {
+					logger.Log.Error("file cleanup failed", zap.Error(err),
+						zap.Int("processed", result.Processed), zap.Int("failed", result.Failed))
+					continue
+				}
+				if result.Processed > 0 {
+					logger.Log.Info("file cleanup finished",
+						zap.Int("processed", result.Processed), zap.Int("failed", result.Failed))
+				}
+			}
+		}
+	}(cleanupCtx, fileService, cfg.Storage)
+
 	authHandler := auth.NewHandler(service, fileService)
 	fileHandler, err := file.NewHandler(fileService, rbacRepository)
 	if err != nil {
