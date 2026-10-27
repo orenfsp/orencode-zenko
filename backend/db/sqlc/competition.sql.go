@@ -193,6 +193,109 @@ func (q *Queries) CreateCompetition(ctx context.Context, arg CreateCompetitionPa
 	return i, err
 }
 
+const getCompetition = `-- name: GetCompetition :one
+SELECT
+    c.id,
+    c.name,
+    c.description,
+    c.discipline_id,
+    d.name AS discipline_name,
+    c.competition_type_id,
+    ct.name AS competition_type_name,
+    c.competition_level_id,
+    cl.code AS competition_level_code,
+    cl.name AS competition_level_name,
+    c.format,
+    c.start_at,
+    c.end_at,
+    c.registration_starts_at,
+    c.registration_ends_at,
+    c.venue_address,
+    c.online_url,
+    c.status,
+    c.calendar_plan_id,
+    cp.name AS calendar_plan_name,
+    cp.year AS calendar_plan_year,
+    c.calendar_plan_number,
+    c.regulation_url
+FROM competition AS c
+JOIN discipline AS d ON d.id = c.discipline_id
+JOIN competition_type AS ct ON ct.id = c.competition_type_id
+JOIN competition_level AS cl ON cl.id = c.competition_level_id
+LEFT JOIN calendar_plan AS cp ON cp.id = c.calendar_plan_id
+WHERE c.id = $1
+`
+
+type GetCompetitionRow struct {
+	ID                   int64
+	Name                 string
+	Description          pgtype.Text
+	DisciplineID         int64
+	DisciplineName       string
+	CompetitionTypeID    int64
+	CompetitionTypeName  string
+	CompetitionLevelID   int64
+	CompetitionLevelCode pgtype.Text
+	CompetitionLevelName pgtype.Text
+	Format               string
+	StartAt              pgtype.Timestamptz
+	EndAt                pgtype.Timestamptz
+	RegistrationStartsAt pgtype.Timestamptz
+	RegistrationEndsAt   pgtype.Timestamptz
+	VenueAddress         pgtype.Text
+	OnlineUrl            pgtype.Text
+	Status               string
+	CalendarPlanID       pgtype.Int8
+	CalendarPlanName     pgtype.Text
+	CalendarPlanYear     pgtype.Int2
+	CalendarPlanNumber   pgtype.Text
+	RegulationUrl        pgtype.Text
+}
+
+func (q *Queries) GetCompetition(ctx context.Context, id int64) (GetCompetitionRow, error) {
+	row := q.db.QueryRow(ctx, getCompetition, id)
+	var i GetCompetitionRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.DisciplineID,
+		&i.DisciplineName,
+		&i.CompetitionTypeID,
+		&i.CompetitionTypeName,
+		&i.CompetitionLevelID,
+		&i.CompetitionLevelCode,
+		&i.CompetitionLevelName,
+		&i.Format,
+		&i.StartAt,
+		&i.EndAt,
+		&i.RegistrationStartsAt,
+		&i.RegistrationEndsAt,
+		&i.VenueAddress,
+		&i.OnlineUrl,
+		&i.Status,
+		&i.CalendarPlanID,
+		&i.CalendarPlanName,
+		&i.CalendarPlanYear,
+		&i.CalendarPlanNumber,
+		&i.RegulationUrl,
+	)
+	return i, err
+}
+
+const getCompetitionStatus = `-- name: GetCompetitionStatus :one
+SELECT status
+FROM competition
+WHERE id = $1
+`
+
+func (q *Queries) GetCompetitionStatus(ctx context.Context, id int64) (string, error) {
+	row := q.db.QueryRow(ctx, getCompetitionStatus, id)
+	var status string
+	err := row.Scan(&status)
+	return status, err
+}
+
 const getPublishedCompetition = `-- name: GetPublishedCompetition :one
 SELECT
     c.id,
@@ -391,6 +494,170 @@ func (q *Queries) ListPublishedCompetitions(ctx context.Context, arg ListPublish
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateDraftCompetition = `-- name: UpdateDraftCompetition :one
+WITH updated AS (
+    UPDATE competition AS target
+    SET
+        name = $1,
+        description = $2,
+        discipline_id = $3,
+        competition_type_id = $4,
+        competition_level_id = $5,
+        format = $6,
+        start_at = $7,
+        end_at = $8,
+        registration_starts_at = $9,
+        registration_ends_at = $10,
+        venue_address = $11,
+        online_url = $12,
+        calendar_plan_id = $13,
+        calendar_plan_number = $14,
+        regulation_url = $15,
+        updated_at = now()
+    WHERE target.id = $16 AND target.status = 'draft'
+    RETURNING
+        id,
+        name,
+        description,
+        discipline_id,
+        competition_type_id,
+        competition_level_id,
+        format,
+        start_at,
+        end_at,
+        registration_starts_at,
+        registration_ends_at,
+        venue_address,
+        online_url,
+        status,
+        calendar_plan_id,
+        calendar_plan_number,
+        regulation_url
+)
+SELECT
+    c.id,
+    c.name,
+    c.description,
+    c.discipline_id,
+    d.name AS discipline_name,
+    c.competition_type_id,
+    ct.name AS competition_type_name,
+    c.competition_level_id,
+    cl.code AS competition_level_code,
+    cl.name AS competition_level_name,
+    c.format,
+    c.start_at,
+    c.end_at,
+    c.registration_starts_at,
+    c.registration_ends_at,
+    c.venue_address,
+    c.online_url,
+    c.status,
+    c.calendar_plan_id,
+    cp.name AS calendar_plan_name,
+    cp.year AS calendar_plan_year,
+    c.calendar_plan_number,
+    c.regulation_url
+FROM updated AS c
+JOIN discipline AS d ON d.id = c.discipline_id
+JOIN competition_type AS ct ON ct.id = c.competition_type_id
+JOIN competition_level AS cl ON cl.id = c.competition_level_id
+LEFT JOIN calendar_plan AS cp ON cp.id = c.calendar_plan_id
+`
+
+type UpdateDraftCompetitionParams struct {
+	PName                 string
+	PDescription          pgtype.Text
+	PDisciplineID         int64
+	PCompetitionTypeID    int64
+	PCompetitionLevelID   int64
+	PFormat               string
+	PStartAt              pgtype.Timestamptz
+	PEndAt                pgtype.Timestamptz
+	PRegistrationStartsAt pgtype.Timestamptz
+	PRegistrationEndsAt   pgtype.Timestamptz
+	PVenueAddress         pgtype.Text
+	POnlineUrl            pgtype.Text
+	PCalendarPlanID       pgtype.Int8
+	PCalendarPlanNumber   pgtype.Text
+	PRegulationUrl        pgtype.Text
+	PID                   int64
+}
+
+type UpdateDraftCompetitionRow struct {
+	ID                   int64
+	Name                 string
+	Description          pgtype.Text
+	DisciplineID         int64
+	DisciplineName       string
+	CompetitionTypeID    int64
+	CompetitionTypeName  string
+	CompetitionLevelID   int64
+	CompetitionLevelCode pgtype.Text
+	CompetitionLevelName pgtype.Text
+	Format               string
+	StartAt              pgtype.Timestamptz
+	EndAt                pgtype.Timestamptz
+	RegistrationStartsAt pgtype.Timestamptz
+	RegistrationEndsAt   pgtype.Timestamptz
+	VenueAddress         pgtype.Text
+	OnlineUrl            pgtype.Text
+	Status               string
+	CalendarPlanID       pgtype.Int8
+	CalendarPlanName     pgtype.Text
+	CalendarPlanYear     pgtype.Int2
+	CalendarPlanNumber   pgtype.Text
+	RegulationUrl        pgtype.Text
+}
+
+func (q *Queries) UpdateDraftCompetition(ctx context.Context, arg UpdateDraftCompetitionParams) (UpdateDraftCompetitionRow, error) {
+	row := q.db.QueryRow(ctx, updateDraftCompetition,
+		arg.PName,
+		arg.PDescription,
+		arg.PDisciplineID,
+		arg.PCompetitionTypeID,
+		arg.PCompetitionLevelID,
+		arg.PFormat,
+		arg.PStartAt,
+		arg.PEndAt,
+		arg.PRegistrationStartsAt,
+		arg.PRegistrationEndsAt,
+		arg.PVenueAddress,
+		arg.POnlineUrl,
+		arg.PCalendarPlanID,
+		arg.PCalendarPlanNumber,
+		arg.PRegulationUrl,
+		arg.PID,
+	)
+	var i UpdateDraftCompetitionRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.DisciplineID,
+		&i.DisciplineName,
+		&i.CompetitionTypeID,
+		&i.CompetitionTypeName,
+		&i.CompetitionLevelID,
+		&i.CompetitionLevelCode,
+		&i.CompetitionLevelName,
+		&i.Format,
+		&i.StartAt,
+		&i.EndAt,
+		&i.RegistrationStartsAt,
+		&i.RegistrationEndsAt,
+		&i.VenueAddress,
+		&i.OnlineUrl,
+		&i.Status,
+		&i.CalendarPlanID,
+		&i.CalendarPlanName,
+		&i.CalendarPlanYear,
+		&i.CalendarPlanNumber,
+		&i.RegulationUrl,
+	)
+	return i, err
 }
 
 const validateCompetitionReferences = `-- name: ValidateCompetitionReferences :one

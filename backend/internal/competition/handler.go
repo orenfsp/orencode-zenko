@@ -1,7 +1,6 @@
 package competition
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,20 +8,13 @@ import (
 	"strconv"
 
 	competitionerrs "github.com/orenfsp/orencode-zenko.git/internal/competition/errs"
+	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"go.uber.org/zap"
 )
 
 type Handler struct {
 	service *Service
-}
-
-type authorizedEmployeeKey struct{}
-
-// WithAuthorizedEmployee records the user ID only after authentication and
-// the federation employee role have been verified by integration middleware.
-func WithAuthorizedEmployee(ctx context.Context, userID int64) context.Context {
-	return context.WithValue(ctx, authorizedEmployeeKey{}, userID)
 }
 
 func NewHandler(service *Service) *Handler {
@@ -60,9 +52,9 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	createdBy, ok := r.Context().Value(authorizedEmployeeKey{}).(int64)
-	if !ok || createdBy <= 0 {
-		writeError(w, http.StatusForbidden, "создание соревнования доступно только сотруднику федерации")
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok || identity.UserID <= 0 {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
 		return
 	}
 
@@ -71,12 +63,37 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "некорректный JSON")
 		return
 	}
-	created, err := h.service.Create(r.Context(), createdBy, req)
+	created, err := h.service.Create(r.Context(), identity.UserID, req)
 	if err != nil {
 		handleServiceError(w, err)
 		return
 	}
 	writeSuccess(w, http.StatusCreated, created)
+}
+
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok || identity.UserID <= 0 {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		writeError(w, http.StatusBadRequest, "некорректный ID соревнования")
+		return
+	}
+
+	var req UpdateRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "некорректный JSON")
+		return
+	}
+	updated, err := h.service.Update(r.Context(), id, req)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, updated)
 }
 
 func parsePagination(r *http.Request) (int32, int32, error) {
@@ -120,8 +137,12 @@ func handleServiceError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, "соревнование не найдено")
 	case errors.Is(err, competitionerrs.ErrInvalidCreate), errors.Is(err, competitionerrs.ErrInvalidReference):
 		writeError(w, http.StatusBadRequest, "некорректные данные соревнования")
+	case errors.Is(err, competitionerrs.ErrInvalidUpdate):
+		writeError(w, http.StatusBadRequest, "некорректные изменения соревнования")
 	case errors.Is(err, competitionerrs.ErrNameConflict):
 		writeError(w, http.StatusConflict, "соревнование с таким названием уже существует")
+	case errors.Is(err, competitionerrs.ErrNotDraft):
+		writeError(w, http.StatusConflict, "редактировать можно только черновик соревнования")
 	case errors.Is(err, competitionerrs.ErrForbidden):
 		writeError(w, http.StatusForbidden, "создание соревнования доступно только сотруднику федерации")
 	default:

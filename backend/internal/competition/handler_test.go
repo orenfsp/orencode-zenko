@@ -2,14 +2,51 @@ package competition
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	competitionerrs "github.com/orenfsp/orencode-zenko.git/internal/competition/errs"
+	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
+	"github.com/orenfsp/orencode-zenko.git/pkg/token"
 )
+
+type handlerRBACRepository struct{}
+
+func (handlerRBACRepository) HasPermission(context.Context, int64, string) (bool, error) {
+	return true, nil
+}
+func (handlerRBACRepository) CreateRole(context.Context, rbac.CreateRoleRequest) (rbac.Role, error) {
+	return rbac.Role{}, nil
+}
+func (handlerRBACRepository) AssignRole(context.Context, int64, int64) error { return nil }
+func (handlerRBACRepository) ListRoles(context.Context) ([]rbac.Role, error) { return nil, nil }
+func (handlerRBACRepository) ListPermissions(context.Context) ([]rbac.Permission, error) {
+	return nil, nil
+}
+
+func authenticatedRequest(t *testing.T, method, target string, body *bytes.Reader) *http.Request {
+	t.Helper()
+	manager := token.New("competition-handler-test-secret", time.Minute, time.Hour)
+	accessToken, err := manager.GenerateAccessToken(token.TokenPayload{UserID: 42})
+	if err != nil {
+		t.Fatalf("GenerateAccessToken() error = %v", err)
+	}
+	request := httptest.NewRequest(method, target, body)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+	var captured *http.Request
+	rbac.NewMiddleware(manager, handlerRBACRepository{}).Authenticate(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		captured = r
+	})).ServeHTTP(httptest.NewRecorder(), request)
+	if captured == nil {
+		t.Fatal("authentication middleware did not pass the request")
+	}
+	return captured
+}
 
 func competitionMux(repo Repository) *http.ServeMux {
 	handler := NewHandler(NewService(repo))
@@ -116,8 +153,8 @@ func TestHandlerCreateRequiresAuthorizedEmployee(t *testing.T) {
 	response := httptest.NewRecorder()
 	NewHandler(NewService(&repositoryStub{})).Create(response, request)
 
-	if response.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403", response.Code)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", response.Code)
 	}
 }
 
@@ -130,8 +167,7 @@ func TestHandlerCreatesCompetition(t *testing.T) {
 	created := testCompetition()
 	created.Status = "draft"
 	repo := &repositoryStub{created: created}
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/competitions", bytes.NewReader(body))
-	request = request.WithContext(WithAuthorizedEmployee(request.Context(), 42))
+	request := authenticatedRequest(t, http.MethodPost, "/api/v1/competitions", bytes.NewReader(body))
 	response := httptest.NewRecorder()
 	NewHandler(NewService(repo)).Create(response, request)
 
@@ -153,8 +189,7 @@ func TestHandlerCreatesCompetition(t *testing.T) {
 }
 
 func TestHandlerCreateRejectsInvalidJSON(t *testing.T) {
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/competitions", bytes.NewBufferString(`{"name":`))
-	request = request.WithContext(WithAuthorizedEmployee(request.Context(), 42))
+	request := authenticatedRequest(t, http.MethodPost, "/api/v1/competitions", bytes.NewReader([]byte(`{"name":`)))
 	response := httptest.NewRecorder()
 	NewHandler(NewService(&repositoryStub{})).Create(response, request)
 
@@ -167,8 +202,7 @@ func TestHandlerCreateRejectsInvalidData(t *testing.T) {
 	req := validCreateRequest()
 	req.Name = ""
 	body, _ := json.Marshal(req)
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/competitions", bytes.NewReader(body))
-	request = request.WithContext(WithAuthorizedEmployee(request.Context(), 42))
+	request := authenticatedRequest(t, http.MethodPost, "/api/v1/competitions", bytes.NewReader(body))
 	response := httptest.NewRecorder()
 	NewHandler(NewService(&repositoryStub{})).Create(response, request)
 
@@ -179,12 +213,101 @@ func TestHandlerCreateRejectsInvalidData(t *testing.T) {
 
 func TestHandlerCreateReturnsConflictForDuplicateName(t *testing.T) {
 	body, _ := json.Marshal(validCreateRequest())
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/competitions", bytes.NewReader(body))
-	request = request.WithContext(WithAuthorizedEmployee(request.Context(), 42))
+	request := authenticatedRequest(t, http.MethodPost, "/api/v1/competitions", bytes.NewReader(body))
 	response := httptest.NewRecorder()
 	NewHandler(NewService(&repositoryStub{createErr: competitionerrs.ErrNameConflict})).Create(response, request)
 
 	if response.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409", response.Code)
+	}
+}
+
+func TestHandlerUpdatesCompetitionPartially(t *testing.T) {
+	current := testCompetition()
+	current.Status = "draft"
+	current.Description = stringPointer("Сохранить")
+	updated := current
+	updated.Name = "Новое название"
+	repo := &repositoryStub{item: current, created: updated}
+	request := authenticatedRequest(t, http.MethodPatch, "/api/v1/competitions/7", bytes.NewReader([]byte(`{"name":"Новое название"}`)))
+	request.SetPathValue("id", "7")
+	response := httptest.NewRecorder()
+
+	NewHandler(NewService(repo)).Update(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", response.Code, response.Body.String())
+	}
+	if repo.seenUpdate.Name != "Новое название" || repo.seenUpdate.Description == nil || *repo.seenUpdate.Description != "Сохранить" {
+		t.Fatalf("repository update = %#v", repo.seenUpdate)
+	}
+}
+
+func TestHandlerUpdateDistinguishesNullFromOmitted(t *testing.T) {
+	current := testCompetition()
+	current.Status = "draft"
+	current.Description = stringPointer("Удалить")
+	updated := current
+	updated.Description = nil
+	repo := &repositoryStub{item: current, created: updated}
+	request := authenticatedRequest(t, http.MethodPatch, "/api/v1/competitions/7", bytes.NewReader([]byte(`{"description":null}`)))
+	request.SetPathValue("id", "7")
+	response := httptest.NewRecorder()
+
+	NewHandler(NewService(repo)).Update(response, request)
+
+	if response.Code != http.StatusOK || repo.seenUpdate.Description != nil {
+		t.Fatalf("status = %d, description = %#v", response.Code, repo.seenUpdate.Description)
+	}
+}
+
+func TestHandlerUpdateRejectsInvalidPayloads(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "empty patch", body: `{}`},
+		{name: "unknown field", body: `{"status":"published"}`},
+		{name: "null required field", body: `{"name":null}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			current := testCompetition()
+			current.Status = "draft"
+			request := authenticatedRequest(t, http.MethodPatch, "/api/v1/competitions/7", bytes.NewReader([]byte(tt.body)))
+			request.SetPathValue("id", "7")
+			response := httptest.NewRecorder()
+
+			NewHandler(NewService(&repositoryStub{item: current})).Update(response, request)
+
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400; body = %s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestHandlerUpdateMapsDomainErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		repo   *repositoryStub
+		status int
+	}{
+		{name: "missing", repo: &repositoryStub{getErr: competitionerrs.ErrNotFound}, status: http.StatusNotFound},
+		{name: "not draft", repo: &repositoryStub{item: testCompetition()}, status: http.StatusConflict},
+		{name: "repository failure", repo: &repositoryStub{getErr: errors.New("database unavailable")}, status: http.StatusInternalServerError},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := authenticatedRequest(t, http.MethodPatch, "/api/v1/competitions/7", bytes.NewReader([]byte(`{"name":"Новое"}`)))
+			request.SetPathValue("id", "7")
+			response := httptest.NewRecorder()
+
+			NewHandler(NewService(tt.repo)).Update(response, request)
+
+			if response.Code != tt.status {
+				t.Fatalf("status = %d, want %d", response.Code, tt.status)
+			}
+		})
 	}
 }

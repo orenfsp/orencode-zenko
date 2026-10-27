@@ -17,11 +17,13 @@ type repositoryStub struct {
 	getErr         error
 	referenceErr   error
 	createErr      error
+	updateErr      error
 	seenLimit      int32
 	seenOffset     int32
 	seenID         int64
 	seenReferences CompetitionReferences
 	seenCreate     CreateCompetition
+	seenUpdate     UpdateCompetition
 }
 
 func (s *repositoryStub) ListPublished(_ context.Context, limit, offset int32) ([]Competition, error) {
@@ -45,7 +47,19 @@ func (s *repositoryStub) Create(_ context.Context, input CreateCompetition) (Com
 	return s.created, s.createErr
 }
 
+func (s *repositoryStub) GetByID(_ context.Context, id int64) (Competition, error) {
+	s.seenID = id
+	return s.item, s.getErr
+}
+
+func (s *repositoryStub) UpdateDraft(_ context.Context, input UpdateCompetition) (Competition, error) {
+	s.seenUpdate = input
+	return s.created, s.updateErr
+}
+
 func testCompetition() Competition {
+	venueAddress := "Оренбург, ул. Советская, 1"
+	onlineURL := "https://contest.example.org"
 	return Competition{
 		ID: 7, Name: "Кубок Оренбуржья", DisciplineID: 2,
 		DisciplineName:    "Алгоритмическое программирование",
@@ -55,6 +69,8 @@ func testCompetition() Competition {
 		EndAt:                time.Date(2026, time.November, 11, 16, 0, 0, 0, time.UTC),
 		RegistrationStartsAt: time.Date(2026, time.October, 1, 0, 0, 0, 0, time.UTC),
 		RegistrationEndsAt:   time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC),
+		VenueAddress:         &venueAddress,
+		OnlineURL:            &onlineURL,
 	}
 }
 
@@ -234,5 +250,109 @@ func TestServiceCreatePropagatesRepositoryError(t *testing.T) {
 	_, err := NewService(&repositoryStub{createErr: wantErr}).Create(context.Background(), 42, validCreateRequest())
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("Create() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestServiceUpdateChangesOnlyProvidedFields(t *testing.T) {
+	current := testCompetition()
+	current.Status = "draft"
+	current.Description = stringPointer("Старое описание")
+	updated := current
+	updated.Name = "Новое название"
+	repo := &repositoryStub{item: current, created: updated}
+	req := UpdateRequest{Name: PatchField[string]{Present: true, Value: " Новое название "}}
+
+	result, err := NewService(repo).Update(context.Background(), current.ID, req)
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if repo.seenUpdate.Name != "Новое название" {
+		t.Fatalf("updated name = %q", repo.seenUpdate.Name)
+	}
+	if repo.seenUpdate.Description == nil || *repo.seenUpdate.Description != "Старое описание" {
+		t.Fatalf("unmentioned description changed: %#v", repo.seenUpdate.Description)
+	}
+	if !repo.seenUpdate.StartAt.Equal(current.StartAt) || result.Name != "Новое название" {
+		t.Fatal("unmentioned dates changed or response was not mapped")
+	}
+}
+
+func TestServiceUpdateClearsNullableField(t *testing.T) {
+	current := testCompetition()
+	current.Status = "draft"
+	current.Description = stringPointer("Удалить")
+	updated := current
+	updated.Description = nil
+	repo := &repositoryStub{item: current, created: updated}
+
+	_, err := NewService(repo).Update(context.Background(), current.ID, UpdateRequest{
+		Description: PatchField[string]{Present: true, Null: true},
+	})
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if repo.seenUpdate.Description != nil {
+		t.Fatalf("description = %#v, want nil", repo.seenUpdate.Description)
+	}
+}
+
+func TestServiceUpdateRejectsEmptyPatch(t *testing.T) {
+	_, err := NewService(&repositoryStub{}).Update(context.Background(), 7, UpdateRequest{})
+	if !errors.Is(err, competitionerrs.ErrInvalidUpdate) {
+		t.Fatalf("Update() error = %v, want ErrInvalidUpdate", err)
+	}
+}
+
+func TestServiceUpdateRejectsNullRequiredField(t *testing.T) {
+	current := testCompetition()
+	current.Status = "draft"
+	_, err := NewService(&repositoryStub{item: current}).Update(context.Background(), 7, UpdateRequest{
+		Name: PatchField[string]{Present: true, Null: true},
+	})
+	if !errors.Is(err, competitionerrs.ErrInvalidUpdate) {
+		t.Fatalf("Update() error = %v, want ErrInvalidUpdate", err)
+	}
+}
+
+func TestServiceUpdateMissingCompetition(t *testing.T) {
+	_, err := NewService(&repositoryStub{getErr: competitionerrs.ErrNotFound}).Update(
+		context.Background(), 404, UpdateRequest{Name: PatchField[string]{Present: true, Value: "Новое"}},
+	)
+	if !errors.Is(err, competitionerrs.ErrNotFound) {
+		t.Fatalf("Update() error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestServiceUpdateRejectsPublishedCompetition(t *testing.T) {
+	current := testCompetition()
+	current.Status = "published"
+	_, err := NewService(&repositoryStub{item: current}).Update(
+		context.Background(), current.ID, UpdateRequest{Name: PatchField[string]{Present: true, Value: "Новое"}},
+	)
+	if !errors.Is(err, competitionerrs.ErrNotDraft) {
+		t.Fatalf("Update() error = %v, want ErrNotDraft", err)
+	}
+}
+
+func TestServiceUpdateRejectsInvalidFinalDates(t *testing.T) {
+	current := testCompetition()
+	current.Status = "draft"
+	_, err := NewService(&repositoryStub{item: current}).Update(context.Background(), current.ID, UpdateRequest{
+		EndAt: PatchField[time.Time]{Present: true, Value: current.StartAt},
+	})
+	if !errors.Is(err, competitionerrs.ErrInvalidUpdate) {
+		t.Fatalf("Update() error = %v, want ErrInvalidUpdate", err)
+	}
+}
+
+func TestServiceUpdatePropagatesRepositoryError(t *testing.T) {
+	current := testCompetition()
+	current.Status = "draft"
+	wantErr := errors.New("update failed")
+	_, err := NewService(&repositoryStub{item: current, updateErr: wantErr}).Update(
+		context.Background(), current.ID, UpdateRequest{Name: PatchField[string]{Present: true, Value: "Новое"}},
+	)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Update() error = %v, want %v", err, wantErr)
 	}
 }

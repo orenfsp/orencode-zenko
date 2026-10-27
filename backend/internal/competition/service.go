@@ -74,6 +74,157 @@ func (s *Service) Create(ctx context.Context, createdBy int64, req CreateRequest
 	return toResponse(created), nil
 }
 
+func (s *Service) Update(ctx context.Context, id int64, req UpdateRequest) (ResponseDTO, error) {
+	if id <= 0 {
+		return ResponseDTO{}, competitionerrs.ErrInvalidID
+	}
+	if req.Empty() {
+		return ResponseDTO{}, competitionerrs.ErrInvalidUpdate
+	}
+
+	current, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return ResponseDTO{}, err
+	}
+	if current.Status != "draft" {
+		return ResponseDTO{}, competitionerrs.ErrNotDraft
+	}
+
+	input, err := mergeUpdate(current, req)
+	if err != nil {
+		return ResponseDTO{}, err
+	}
+	if err := s.repo.ValidateReferences(ctx, CompetitionReferences{
+		DisciplineID: input.DisciplineID, CompetitionTypeID: input.CompetitionTypeID,
+		CompetitionLevelID: input.CompetitionLevelID, CalendarPlanID: input.CalendarPlanID,
+	}); err != nil {
+		return ResponseDTO{}, err
+	}
+
+	updated, err := s.repo.UpdateDraft(ctx, input)
+	if err != nil {
+		return ResponseDTO{}, err
+	}
+	return toResponse(updated), nil
+}
+
+func mergeUpdate(current Competition, req UpdateRequest) (UpdateCompetition, error) {
+	input := UpdateCompetition{
+		ID: current.ID, Name: current.Name, Description: current.Description,
+		DisciplineID: current.DisciplineID, CompetitionTypeID: current.CompetitionTypeID,
+		CompetitionLevelID: current.CompetitionLevelID, Format: current.Format,
+		StartAt: current.StartAt, EndAt: current.EndAt,
+		RegistrationStartsAt: current.RegistrationStartsAt, RegistrationEndsAt: current.RegistrationEndsAt,
+		VenueAddress: current.VenueAddress, OnlineURL: current.OnlineURL,
+		CalendarPlanID: current.CalendarPlanID, CalendarPlanNumber: current.CalendarPlanNumber,
+		RegulationURL: current.RegulationURL,
+	}
+
+	if requiredPatchIsNull(req) {
+		return UpdateCompetition{}, competitionerrs.ErrInvalidUpdate
+	}
+	if req.Name.Present {
+		input.Name = strings.TrimSpace(req.Name.Value)
+	}
+	if req.Description.Present {
+		input.Description = patchOptionalString(req.Description)
+	}
+	if req.DisciplineID.Present {
+		input.DisciplineID = req.DisciplineID.Value
+	}
+	if req.CompetitionTypeID.Present {
+		input.CompetitionTypeID = req.CompetitionTypeID.Value
+	}
+	if req.CompetitionLevelID.Present {
+		input.CompetitionLevelID = req.CompetitionLevelID.Value
+	}
+	if req.Format.Present {
+		input.Format = strings.ToLower(strings.TrimSpace(req.Format.Value))
+	}
+	if req.StartAt.Present {
+		input.StartAt = req.StartAt.Value
+	}
+	if req.EndAt.Present {
+		input.EndAt = req.EndAt.Value
+	}
+	if req.RegistrationStartsAt.Present {
+		input.RegistrationStartsAt = req.RegistrationStartsAt.Value
+	}
+	if req.RegistrationEndsAt.Present {
+		input.RegistrationEndsAt = req.RegistrationEndsAt.Value
+	}
+	if req.VenueAddress.Present {
+		input.VenueAddress = patchOptionalString(req.VenueAddress)
+	}
+	if req.OnlineURL.Present {
+		input.OnlineURL = patchOptionalString(req.OnlineURL)
+	}
+	if req.CalendarPlanID.Present {
+		if req.CalendarPlanID.Null {
+			input.CalendarPlanID = nil
+		} else {
+			input.CalendarPlanID = &req.CalendarPlanID.Value
+		}
+	}
+	if req.CalendarPlanNumber.Present {
+		input.CalendarPlanNumber = patchOptionalString(req.CalendarPlanNumber)
+	}
+	if req.RegulationURL.Present {
+		input.RegulationURL = patchOptionalString(req.RegulationURL)
+	}
+
+	if !validUpdate(input) {
+		return UpdateCompetition{}, competitionerrs.ErrInvalidUpdate
+	}
+	return input, nil
+}
+
+func requiredPatchIsNull(req UpdateRequest) bool {
+	return (req.Name.Present && req.Name.Null) ||
+		(req.DisciplineID.Present && req.DisciplineID.Null) ||
+		(req.CompetitionTypeID.Present && req.CompetitionTypeID.Null) ||
+		(req.CompetitionLevelID.Present && req.CompetitionLevelID.Null) ||
+		(req.Format.Present && req.Format.Null) ||
+		(req.StartAt.Present && req.StartAt.Null) ||
+		(req.EndAt.Present && req.EndAt.Null) ||
+		(req.RegistrationStartsAt.Present && req.RegistrationStartsAt.Null) ||
+		(req.RegistrationEndsAt.Present && req.RegistrationEndsAt.Null)
+}
+
+func patchOptionalString(field PatchField[string]) *string {
+	if field.Null {
+		return nil
+	}
+	return normalizedOptional(&field.Value)
+}
+
+func validUpdate(input UpdateCompetition) bool {
+	if input.Name == "" || utf8.RuneCountInString(input.Name) > 250 ||
+		input.DisciplineID <= 0 || input.CompetitionTypeID <= 0 || input.CompetitionLevelID <= 0 ||
+		(input.Format != "offline" && input.Format != "online" && input.Format != "mixed") ||
+		input.StartAt.IsZero() || input.EndAt.IsZero() ||
+		input.RegistrationStartsAt.IsZero() || input.RegistrationEndsAt.IsZero() ||
+		!input.StartAt.Before(input.EndAt) ||
+		!input.RegistrationStartsAt.Before(input.RegistrationEndsAt) ||
+		input.RegistrationEndsAt.After(input.StartAt) ||
+		(input.CalendarPlanID != nil && *input.CalendarPlanID <= 0) {
+		return false
+	}
+	if (input.Format == "offline" || input.Format == "mixed") && input.VenueAddress == nil {
+		return false
+	}
+	if (input.Format == "online" || input.Format == "mixed") && input.OnlineURL == nil {
+		return false
+	}
+	if input.OnlineURL != nil && !validHTTPURL(*input.OnlineURL) {
+		return false
+	}
+	if input.RegulationURL != nil && !validHTTPURL(*input.RegulationURL) {
+		return false
+	}
+	return input.CalendarPlanID != nil || input.CalendarPlanNumber == nil
+}
+
 func validateCreateRequest(createdBy int64, req CreateRequest) (CreateCompetition, error) {
 	name := strings.TrimSpace(req.Name)
 	format := strings.ToLower(strings.TrimSpace(req.Format))
