@@ -23,6 +23,17 @@ type PermissionDefinition struct {
 	Description string
 }
 
+type SeedRoleDefinition struct {
+	Code string
+	Name string
+}
+
+var DefaultSelfAssignableRoles = []SeedRoleDefinition{
+	{Code: "participant", Name: "Участник"},
+	{Code: "coach", Name: "Тренер"},
+	{Code: "judge", Name: "Судья"},
+}
+
 var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionRolesRead, Description: "Просмотр ролей"},
 	{Code: PermissionRolesCreate, Description: "Создание ролей"},

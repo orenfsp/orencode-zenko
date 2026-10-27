@@ -128,6 +128,14 @@ func seed(ctx context.Context, pool *pgxpool.Pool, config adminSeedConfig) error
 	if err != nil {
 		return err
 	}
+	for _, role := range rbac.DefaultSelfAssignableRoles {
+		if _, err := queries.UpsertSelfAssignableRole(ctx, db.UpsertSelfAssignableRoleParams{
+			Code: role.Code,
+			Name: role.Name,
+		}); err != nil {
+			return err
+		}
+	}
 
 	for _, permissionID := range permissionIDs {
 		if err := queries.AssignRolePermission(ctx, db.AssignRolePermissionParams{

@@ -348,6 +348,29 @@ func (q *Queries) UpsertSeedAdminUser(ctx context.Context, arg UpsertSeedAdminUs
 	return id, err
 }
 
+const upsertSelfAssignableRole = `-- name: UpsertSelfAssignableRole :one
+INSERT INTO role (code, name, is_system, self_assignable)
+VALUES ($1, $2, false, true)
+ON CONFLICT (code) DO UPDATE
+SET name = EXCLUDED.name,
+    is_system = false,
+    self_assignable = true,
+    updated_at = now()
+RETURNING id
+`
+
+type UpsertSelfAssignableRoleParams struct {
+	Code string
+	Name string
+}
+
+func (q *Queries) UpsertSelfAssignableRole(ctx context.Context, arg UpsertSelfAssignableRoleParams) (int64, error) {
+	row := q.db.QueryRow(ctx, upsertSelfAssignableRole, arg.Code, arg.Name)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const upsertSuperAdminRole = `-- name: UpsertSuperAdminRole :one
 INSERT INTO role (code, name, is_system, self_assignable)
 VALUES ($1, $2, true, false)

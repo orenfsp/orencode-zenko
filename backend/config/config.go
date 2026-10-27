@@ -15,6 +15,7 @@ type Config struct {
 	JWT      JWTConfig
 	Device   DeviceConfig
 	Storage  StorageConfig
+	Rank     RankConfig
 }
 
 type HTTPConfig struct {
@@ -39,6 +40,10 @@ type StorageConfig struct {
 	CleanupInterval  time.Duration // FILE_CLEANUP_INTERVAL, default 10m
 	CleanupRetention time.Duration // FILE_CLEANUP_RETENTION, default 15m
 	CleanupBatch     int32         // FILE_CLEANUP_BATCH, default 100
+}
+
+type RankConfig struct {
+	CleanupInterval time.Duration // RANK_CLEANUP_INTERVAL, default 24h
 }
 
 func Load() (*Config, error) {
@@ -99,6 +104,13 @@ func Load() (*Config, error) {
 		storageCleanupBatch = int32(val)
 
 	}
+	rankCleanupInterval := 24 * time.Hour
+	if value := os.Getenv("RANK_CLEANUP_INTERVAL"); value != "" {
+		rankCleanupInterval, err = time.ParseDuration(value)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	cfg := &Config{
 		Database: DatabaseConfig{
@@ -121,6 +133,7 @@ func Load() (*Config, error) {
 			CleanupRetention: storageCleanupRetention,
 			CleanupBatch:     storageCleanupBatch,
 		},
+		Rank: RankConfig{CleanupInterval: rankCleanupInterval},
 	}
 	return cfg, nil
 }

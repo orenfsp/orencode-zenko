@@ -17,6 +17,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"github.com/orenfsp/orencode-zenko.git/internal/municipality"
 	"github.com/orenfsp/orencode-zenko.git/internal/rank"
+	rankuser "github.com/orenfsp/orencode-zenko.git/internal/rank_user"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/internal/reference"
 	usercoach "github.com/orenfsp/orencode-zenko.git/internal/user_coach"
@@ -180,6 +181,34 @@ func main() {
 	rankRepository := rank.NewRepository(queries)
 	rankService := rank.NewService(rankRepository)
 	rankHandler := rank.NewHandler(rankService)
+	cleanupExpiredRanks := func(ctx context.Context) {
+		deleted, err := rankService.CleanupExpired(ctx)
+		if err != nil {
+			logger.Log.Error("rank cleanup failed", zap.Error(err))
+			return
+		}
+		if deleted > 0 {
+			logger.Log.Info("expired ranks deleted", zap.Int64("count", deleted))
+		}
+	}
+	cleanupExpiredRanks(cleanupCtx)
+	if cfg.Rank.CleanupInterval > 0 {
+		go func(ctx context.Context, interval time.Duration) {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					cleanupExpiredRanks(ctx)
+				}
+			}
+		}(cleanupCtx, cfg.Rank.CleanupInterval)
+	}
+	rankApplicationRepository := rankuser.NewRepository(queries)
+	rankApplicationService := rankuser.NewService(rankApplicationRepository)
+	rankApplicationHandler := rankuser.NewHandler(rankApplicationService)
 
 	// Adds the authenticated user's ID to the context expected by usercoach.Handler.
 	// The token is verified by the existing RBAC middleware first.
@@ -251,6 +280,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/admin/rank", rankHandler.CreateRank)
 	mux.HandleFunc("GET /api/v1/rank/{id}", rankHandler.GetRank)
 	mux.HandleFunc("GET /api/v1/rank/", rankHandler.ListRank)
+	mux.Handle("POST /api/v1/rank-applications", rbacMiddleware.Authenticate(http.HandlerFunc(rankApplicationHandler.Create)))
+	mux.Handle("GET /api/v1/rank-applications/mine", rbacMiddleware.Authenticate(http.HandlerFunc(rankApplicationHandler.ListMine)))
+	mux.Handle("PATCH /api/v1/admin/rank-applications/{applicationID}", protected(rbac.PermissionRolesAssign, rankApplicationHandler.Review))
 
 	mux.HandleFunc("GET /api/v1/municipalities", municipalityHandler.List)
 	mux.HandleFunc("GET /api/v1/municipalities/{id}", municipalityHandler.Get)

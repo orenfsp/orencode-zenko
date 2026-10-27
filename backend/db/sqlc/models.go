@@ -111,7 +111,8 @@ type CompetitionResult struct {
 	Place         pgtype.Int4
 	Score         pgtype.Numeric
 	// finished, did_not_start, disqualified
-	ResultStatus pgtype.Text
+	ResultStatus  pgtype.Text
+	AwardedRankID pgtype.Int8
 }
 
 type CompetitionType struct {
@@ -192,6 +193,20 @@ type Rank struct {
 	Ttl       pgtype.Int4
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
+}
+
+type RankApplication struct {
+	ID                int64
+	AthleteUserID     int64
+	RankID            int64
+	DisciplineID      int64
+	SubmittedByUserID int64
+	Status            string
+	ReviewedByUserID  pgtype.Int8
+	ReviewedAt        pgtype.Timestamptz
+	RejectionReason   pgtype.Text
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
 
 type Role struct {
@@ -322,6 +337,7 @@ type UserRankDiscipline struct {
 	AwardedAt    pgtype.Date
 	ExpiresAt    pgtype.Date
 	OrderNumber  pgtype.Text
+	CreatedAt    pgtype.Timestamptz
 }
 
 type UserSession struct {
