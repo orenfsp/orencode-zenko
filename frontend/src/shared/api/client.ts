@@ -6,7 +6,7 @@ export interface RequestOptions {
   retry?: boolean;
   params?: Record<string, string | number | boolean | undefined>;
   signal?: AbortSignal;
-  responseType?: "json" | "blob";
+  responseType?: "json" | "blob" | "response";
 }
 
 interface ApiClientOptions {
@@ -30,6 +30,7 @@ function toUrl(path: string, params?: RequestOptions["params"]) {
 async function parse<T>(response: Response, responseType: RequestOptions["responseType"]): Promise<T> {
   if (response.status === 204) return undefined as T;
   if (response.ok && responseType === "blob") return (await response.blob()) as T;
+  if (response.ok && responseType === "response") return response as T;
   const payload = (await response.json().catch(() => ({}))) as T | ApiErrorPayload;
   if (!response.ok) {
     const error = payload as ApiErrorPayload;

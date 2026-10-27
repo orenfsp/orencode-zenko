@@ -1,6 +1,7 @@
 import { BrandLogo } from "@/shared/ui/brand-logo";
 import { cn } from "@/shared/lib/utils";
 import Image from "next/image";
+import RibbonGlowDark from "./bg-effect-dark";
 
 export function AuthShell({
   children,
@@ -23,14 +24,31 @@ export function AuthShell({
         className="relative h-svh w-full overflow-hidden bg-[#d9d9d9]"
         aria-hidden="true"
       >
-        <Image
-          src="/assets/login_cover.png"
+        {/* <Image
+          src="/assets/register_cover.png"
           alt=""
           fill
           priority
           sizes="50vw"
           className="object-cover object-top"
-        />
+        /> */}
+        <RibbonGlowDark />
+        <div className="absolute top-0 left-0 w-full h-full p-5 text-white flex flex-col gap-5">
+          <span className="font-mono text-[64px] leading-[1] font-[300]">
+            Выстраивайте <br /> путь к новым <br /> достижениям
+          </span>
+          <span className="opacity-60 font-[300] w-1/2">
+            Соревнования, рейтинг и вся спортивная история всегда доступны
+            спортсмену и тренеру.
+          </span>
+          <div className="flex-1 min-h-0 -mx-5 -mb-5">
+            <img
+              src="/assets/phone-mockup.png"
+              alt=""
+              className="w-full h-full object-cover object-top"
+            />
+          </div>
+        </div>
       </aside>
     </main>
   );

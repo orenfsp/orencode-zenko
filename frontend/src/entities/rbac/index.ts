@@ -1,2 +1,2 @@
 export { rbacApi } from "./api/rbac";
-export type { CreateRolePayload, Permission, Role } from "./model/types";
+export type { AssignRolePayload, CreateRolePayload, Permission, PermissionCode, Role } from "./model/types";

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { CircleCheck, CirclePlus } from "lucide";
 
-import { chooseRole, readTokens, storeTokens } from "@/entities/session";
+import { chooseRoles, readTokens, storeTokens } from "@/entities/session";
+import { rbacApi, type Role } from "@/entities/rbac";
 import { useNotifications } from "@/shared/lib/notifications";
 import { BrandLogo } from "@/shared/ui/brand-logo";
 import { Button } from "@/shared/ui/button";
@@ -20,7 +21,7 @@ import { MorphIcon } from "@/shared/ui/morph-icon";
 import { Spinner } from "@/shared/ui/spinner";
 import { cn } from "@/shared/lib/utils";
 
-type RoleKey = "athlete" | "coach" | "judge";
+type RoleKey = "participant" | "coach" | "judge";
 
 const roles: Array<{
   key: RoleKey;
@@ -28,16 +29,14 @@ const roles: Array<{
   description: string;
   image: string;
   imagePosition: string;
-  envId?: string;
 }> = [
   {
-    key: "athlete",
+    key: "participant",
     title: "Спортсмен",
     description:
       "Участвуйте в соревнованиях, отслеживайте результаты, рейтинг и путь к новому разряду.",
     image: "/assets/role-athlete.png",
     imagePosition: "50% 70%",
-    envId: process.env.NEXT_PUBLIC_ROLE_ATHLETE_ID,
   },
   {
     key: "coach",
@@ -46,7 +45,6 @@ const roles: Array<{
       "Сопровождайте спортсменов, подавайте заявки и следите за их результатами и разрядами.",
     image: "/assets/role-coach.png",
     imagePosition: "center",
-    envId: process.env.NEXT_PUBLIC_ROLE_COACH_ID,
   },
   {
     key: "judge",
@@ -55,30 +53,39 @@ const roles: Array<{
       "Получайте назначения, работайте с результатами и следите за своей судейской категорией.",
     image: "/assets/role-judge.png",
     imagePosition: "50% 45%",
-    envId: process.env.NEXT_PUBLIC_ROLE_JUDGE_ID,
   },
 ];
 
 export function RoleSelection() {
   const router = useRouter();
   const notify = useNotifications();
-  const [selected, setSelected] = useState<RoleKey>("athlete");
+  const [selected, setSelected] = useState<RoleKey[]>(["participant"]);
+  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    rbacApi.selfAssignableRoles()
+      .then((result) => { if (active) setAvailableRoles(result); })
+      .catch((cause) => { if (active) notify.error(cause instanceof Error ? cause.message : "Не удалось загрузить роли"); })
+      .finally(() => { if (active) setRolesLoading(false); });
+      
+    return () => { active = false; };
+  }, [notify]);
 
   async function handleContinue() {
     setPending(true);
-    const role = roles.find((item) => item.key === selected);
-    const roleId = Number(role?.envId);
+    const selectedRoles = selected.map((code) => availableRoles.find((item) => item.code === code));
     const tokens = readTokens();
 
     try {
-      if (tokens && Number.isInteger(roleId) && roleId > 0) {
-        const nextTokens = await chooseRole(roleId, tokens);
-        storeTokens(nextTokens);
-      } else {
-        localStorage.setItem("zenko_selected_role", selected);
-      }
-      notify.success("Роль сохранена");
+      if (!tokens) throw new Error("Сессия не найдена. Войдите снова");
+      if (selected.length === 0) throw new Error("Выберите хотя бы одну роль");
+      if (selectedRoles.some((role) => !role)) throw new Error("Одна из выбранных ролей сейчас недоступна");
+      const nextTokens = await chooseRoles(selectedRoles.map((role) => role!.id), tokens);
+      storeTokens(nextTokens);
+      notify.success(selected.length > 1 ? "Роли сохранены" : "Роль сохранена");
       router.push("/workspace");
     } catch (cause) {
       notify.error(
@@ -97,14 +104,14 @@ export function RoleSelection() {
         <header className="mb-10 w-full min-w-0 space-y-6 text-center">
           <h1 className="font-mono text-2xl font-medium leading-8">Выберите роль:</h1>
           <p className="break-words text-sm leading-5 text-muted-foreground">
-            Выберите роль в соответствии с вашими целями. В будущем вы сможете
-            изменить свои роли.
+            Выберите одну или несколько ролей в соответствии с вашими целями.
+            В будущем вы сможете изменить их в профиле.
           </p>
         </header>
 
         <section className="grid w-full min-w-0 gap-6 md:grid-cols-3">
           {roles.map((role) => {
-            const isSelected = selected === role.key;
+            const isSelected = selected.includes(role.key);
 
             return (
               <Card
@@ -140,7 +147,7 @@ export function RoleSelection() {
                       "w-full",
                       isSelected && "justify-start bg-transparent hover:bg-transparent",
                     )}
-                    onClick={() => setSelected(role.key)}
+                    onClick={() => setSelected((current) => current.includes(role.key) ? current.filter((key) => key !== role.key) : [...current, role.key])}
                   >
                     {isSelected ? "Выбрана" : "Выбрать"}
                     <MorphIcon
@@ -160,10 +167,10 @@ export function RoleSelection() {
           type="button"
           className="mt-10 px-5"
           onClick={handleContinue}
-          disabled={pending}
+          disabled={pending || rolesLoading || selected.length === 0}
         >
-          {pending ? <Spinner /> : null}
-          {pending ? "Сохраняем…" : "Продолжить"}
+          {pending || rolesLoading ? <Spinner /> : null}
+          {rolesLoading ? "Загружаем роли…" : pending ? "Сохраняем…" : "Продолжить"}
         </Button>
       </section>
     </main>

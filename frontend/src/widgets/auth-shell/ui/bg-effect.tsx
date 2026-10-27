@@ -36,7 +36,7 @@ const float LAYERS = ${LAYERS.toFixed(1)};
 const float TWIST = ${TWIST.toFixed(3)};
 const float DRAG = ${DRAG.toFixed(3)};
 const float GAIN = 0.62;
-const vec2 CENTRE = vec2(-0.62, 0.24);
+const vec2 CENTRE = vec2(-0.2, -0.3);
 const float TILT = 0.6;
 const float ZOOM = 1.05;
 const float THETA = 2.13;
@@ -541,7 +541,7 @@ function OriginkitBaseRibbonGlow(props: RibbonGlowProps) {
 const __originkitPresetProps = {
   color1: "#402FFF",
   color2: "#ffffff",
-  speed: 23,
+  speed: 32,
   size: 200,
   hover: 0,
   reach: 10,

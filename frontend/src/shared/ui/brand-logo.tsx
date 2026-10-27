@@ -3,10 +3,10 @@ import Link from "next/link";
 
 import { cn } from "@/shared/lib/utils";
 
-export function BrandLogo({ className }: { className?: string, theme?: "light" | "dark" }) {
+export function BrandLogo({ className, href = "/" }: { className?: string; href?: string; theme?: "light" | "dark" }) {
   return (
     <Link
-      href="/"
+      href={href}
       className={cn("inline-flex h-6 items-center gap-2", className)}
       aria-label="Федерация спортивного программирования"
     >

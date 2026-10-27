@@ -164,7 +164,7 @@ export function WorkspaceShell() {
           >
             <SidebarHeader className="gap-2 px-5 py-2 ">
               <div className="flex h-10 items-center">
-                <BrandLogo className="h-6 w-auto group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:[&_img:last-child]:hidden" />
+                  <BrandLogo href="/workspace" className="h-6 w-auto group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:[&_img:last-child]:hidden" />
               </div>
             </SidebarHeader>
             <SidebarContent className="px-4">

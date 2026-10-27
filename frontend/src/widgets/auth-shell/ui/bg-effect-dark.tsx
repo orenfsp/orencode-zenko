@@ -466,7 +466,7 @@ function OriginkitBaseRibbonGlow(props: RibbonGlowProps) {
 const __originkitPresetProps = {
   "color1": "#402FFF",
   "color2": "#000000",
-  "speed": 23,
+  "speed": 32,
   "size": 200,
   "hover": 0,
   "reach": 10
