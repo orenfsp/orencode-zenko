@@ -14,4 +14,5 @@ type Repository interface {
 	DeleteDiscardable(ctx context.Context, fileID int64) error
 	DeleteUploadedByStorageKey(ctx context.Context, storageKey string) error
 	ListPendingCleanup(ctx context.Context, uploadedBefore time.Time, batchSize int32) ([]UploadedFile, error)
+	ListAll(ctx context.Context, limit, offset int32) ([]UploadedFile, error)
 }

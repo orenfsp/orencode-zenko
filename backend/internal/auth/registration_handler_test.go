@@ -60,6 +60,10 @@ func (r *registrationFileRepositoryStub) ListPendingCleanup(context.Context, tim
 	return nil, nil
 }
 
+func (r *registrationFileRepositoryStub) ListAll(context.Context, int32, int32) ([]filedomain.UploadedFile, error) {
+	return nil, nil
+}
+
 func TestRegisterAcceptsAdultMultipartWithPersonalConsent(t *testing.T) {
 	users := &userProviderStub{user: User{ID: 42, Email: "user@example.com", AccessStatus: true}}
 	authService := newTestService(users, &sessionProviderStub{})

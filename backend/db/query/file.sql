@@ -90,3 +90,11 @@ WHERE status = 'delete_pending'
    OR (status = 'uploaded' AND created_at < sqlc.arg(uploaded_before))
 ORDER BY created_at
 LIMIT sqlc.arg(batch_size);
+
+
+-- name: ListUploadedFiles :many
+SELECT *
+FROM uploaded_file
+ORDER BY created_at DESC, id DESC
+LIMIT sqlc.arg(page_limit)::integer
+OFFSET sqlc.arg(page_offset)::integer;

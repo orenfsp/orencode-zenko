@@ -73,6 +73,43 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, download.Content)
 }
 
+func (h *Handler) ListAll(w http.ResponseWriter, r *http.Request) {
+	limit, offset, err := pageParams(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "некорректные limit или offset")
+		return
+	}
+	files, err := h.service.ListAll(r.Context(), limit, offset)
+	if err != nil {
+		if errors.Is(err, ErrInvalidInput) {
+			writeError(w, http.StatusBadRequest, "limit должен быть от 1 до 100, offset не может быть отрицательным")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"data": files})
+}
+
+func pageParams(r *http.Request) (int32, int32, error) {
+	limit, offset := int64(50), int64(0)
+	var err error
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		limit, err = strconv.ParseInt(raw, 10, 32)
+		if err != nil {
+			return 0, 0, err
+		}
+	}
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		offset, err = strconv.ParseInt(raw, 10, 32)
+		if err != nil {
+			return 0, 0, err
+		}
+	}
+	return int32(limit), int32(offset), nil
+}
+
 func writeError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

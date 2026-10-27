@@ -243,6 +243,50 @@ func (q *Queries) ListFilesPendingCleanup(ctx context.Context, arg ListFilesPend
 	return items, nil
 }
 
+const listUploadedFiles = `-- name: ListUploadedFiles :many
+SELECT id, purpose_code, storage_key, original_filename, content_type, size_bytes, sha256, status, created_at, updated_at
+FROM uploaded_file
+ORDER BY created_at DESC, id DESC
+LIMIT $2::integer
+OFFSET $1::integer
+`
+
+type ListUploadedFilesParams struct {
+	PageOffset int32
+	PageLimit  int32
+}
+
+func (q *Queries) ListUploadedFiles(ctx context.Context, arg ListUploadedFilesParams) ([]UploadedFile, error) {
+	rows, err := q.db.Query(ctx, listUploadedFiles, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UploadedFile
+	for rows.Next() {
+		var i UploadedFile
+		if err := rows.Scan(
+			&i.ID,
+			&i.PurposeCode,
+			&i.StorageKey,
+			&i.OriginalFilename,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.Sha256,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markUploadedFileAttached = `-- name: MarkUploadedFileAttached :execrows
 UPDATE uploaded_file
 SET status = 'attached',

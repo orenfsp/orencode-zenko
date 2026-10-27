@@ -255,6 +255,7 @@ func main() {
 
 	// Files.
 	mux.Handle("GET /api/v1/files/{fileID}/download", rbacMiddleware.Authenticate(http.HandlerFunc(fileHandler.Download)))
+	mux.Handle("GET /api/v1/admin/files", protected(rbac.PermissionFilesRead, fileHandler.ListAll))
 
 	// RBAC administration.
 	mux.Handle("GET /api/v1/admin/roles", protected(rbac.PermissionRolesRead, rbacHandler.ListRoles))

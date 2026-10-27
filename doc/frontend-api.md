@@ -354,6 +354,36 @@ X-File-Path: personal_data_consent/<storage-key>.pdf
 - `404` — файл не существует или ещё не прикреплён к регистрации;
 - `500` — ошибка БД или файлового хранилища.
 
+### Список загруженных файлов
+
+```http
+GET /api/v1/admin/files?limit=50&offset=0
+Authorization: Bearer <access_token>
+```
+
+Требуется `files.read`. Метод возвращает метаданные всех файлов из `uploaded_file`, включая статусы `uploaded`, `attached` и `delete_pending`; содержимое файлов не передаётся. Поддерживаются `limit` от 1 до 100 (по умолчанию 50) и неотрицательный `offset`.
+
+```json
+{
+  "data": [
+    {
+      "id": 21,
+      "purpose": "personal_data_consent",
+      "storage_key": "personal_data_consent/4d2f...pdf",
+      "original_filename": "consent.pdf",
+      "content_type": "application/pdf",
+      "size_bytes": 12345,
+      "sha256": "...",
+      "status": "attached",
+      "created_at": "2026-10-27T09:30:00Z",
+      "updated_at": "2026-10-27T09:30:00Z"
+    }
+  ]
+}
+```
+
+Для получения содержимого используйте отдельный `GET /api/v1/files/{fileID}/download`.
+
 ## Заявки на спортивный разряд
 
 ### Подача заявки

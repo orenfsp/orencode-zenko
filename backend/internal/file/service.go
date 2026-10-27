@@ -212,6 +212,13 @@ func (s *Service) CleanupPending(
 	return result, errors.Join(cleanupErrors...)
 }
 
+func (s *Service) ListAll(ctx context.Context, limit, offset int32) ([]UploadedFile, error) {
+	if limit < 1 || limit > 100 || offset < 0 {
+		return nil, ErrInvalidInput
+	}
+	return s.repo.ListAll(ctx, limit, offset)
+}
+
 func (s *Service) cleanupStorage(ctx context.Context, storageKey string) error {
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
