@@ -1,0 +1,1 @@
+-- audit_log is owned by migration 008_audit_log.

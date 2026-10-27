@@ -39,7 +39,7 @@ func main() {
 	typeID := getOrCreateID("competition_type", "Чемпионат")
 	levelID := getOrCreateID("competition_level", "Региональный")
 	municipalityID := getOrCreateID("municipality", "г. Оренбург")
-	
+
 	// Организация (требует поле organization_type)
 	var orgID int64
 	err = pool.QueryRow(ctx, `SELECT id FROM organization WHERE name = 'Оренбургский государственный университет' LIMIT 1`).Scan(&orgID)
@@ -81,9 +81,33 @@ func main() {
 	coachID := createUser("Петр", "Тренеров", "1980-01-01", "coach@example.local")
 	_ = createUser("Сидор", "Судейкин", "1975-02-02", "judge@example.local")
 
-	// Админ (создан rbac-seed)
+	// Admin (created by rbac-seed)
 	var adminID int64
 	pool.QueryRow(ctx, `SELECT id FROM "user" WHERE email = 'admin@example.local'`).Scan(&adminID)
+
+	// The anti-doping migration requires a valid certificate before an application can be inserted.
+	var certificateFileID int64
+	err = pool.QueryRow(ctx, `
+		INSERT INTO uploaded_file (purpose_code, storage_key, original_filename, content_type, size_bytes, sha256, status)
+		VALUES ('anti_doping', 'demo/anti-doping-certificate.pdf', 'anti-doping-certificate.pdf', 'application/pdf', 1, repeat('0', 64), 'attached')
+		ON CONFLICT (storage_key) DO UPDATE SET status = 'attached'
+		RETURNING id`).Scan(&certificateFileID)
+	if err != nil {
+		log.Fatal("create demo anti-doping file:", err)
+	}
+	_, err = pool.Exec(ctx, `
+		INSERT INTO anti_doping (user_id, file_id, status, completed_at, valid_until, reviewed_by_user_id, reviewed_at)
+		VALUES ($1, $2, 'valid', CURRENT_DATE, make_date(EXTRACT(YEAR FROM CURRENT_DATE)::integer, 12, 31), $3, now())
+		ON CONFLICT (file_id) DO UPDATE SET
+			user_id = EXCLUDED.user_id,
+			status = EXCLUDED.status,
+			completed_at = EXCLUDED.completed_at,
+			valid_until = EXCLUDED.valid_until,
+			reviewed_by_user_id = EXCLUDED.reviewed_by_user_id,
+			reviewed_at = EXCLUDED.reviewed_at`, athleteID, certificateFileID, adminID)
+	if err != nil {
+		log.Fatal("create demo anti-doping certificate:", err)
+	}
 
 	// ========== 3. СОРЕВНОВАНИЕ И СОБЫТИЕ ==========
 	now := time.Now()
