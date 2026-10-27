@@ -106,6 +106,20 @@ type ResponseDTO struct {
 	RegulationURL        *string             `json:"regulation_url"`
 }
 
+type CalendarCompetitionDTO struct {
+	ID               int64               `json:"id"`
+	Name             string              `json:"name"`
+	Discipline       ReferenceDTO        `json:"discipline"`
+	CompetitionType  ReferenceDTO        `json:"competition_type"`
+	CompetitionLevel CompetitionLevelDTO `json:"competition_level"`
+	Format           string              `json:"format"`
+	StartAt          time.Time           `json:"start_at"`
+	EndAt            time.Time           `json:"end_at"`
+	VenueAddress     *string             `json:"venue_address"`
+	OnlineURL        *string             `json:"online_url"`
+	Status           string              `json:"status"`
+}
+
 type ErrorResponse struct {
 	Message string `json:"message"`
 }

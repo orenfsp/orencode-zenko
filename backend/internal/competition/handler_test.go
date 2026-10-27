@@ -51,9 +51,113 @@ func authenticatedRequest(t *testing.T, method, target string, body *bytes.Reade
 func competitionMux(repo Repository) *http.ServeMux {
 	handler := NewHandler(NewService(repo))
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/calendar/competitions", handler.Calendar)
 	mux.HandleFunc("GET /api/v1/competitions", handler.List)
 	mux.HandleFunc("GET /api/v1/competitions/{id}", handler.Get)
 	return mux
+}
+
+func TestHandlerCalendarIsPublicAndUsesDateOnlyBoundaries(t *testing.T) {
+	repo := &repositoryStub{}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/calendar/competitions?from=2026-11-01&to=2026-12-01", nil)
+	response := httptest.NewRecorder()
+	competitionMux(repo).ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", response.Code, response.Body.String())
+	}
+	wantFrom := time.Date(2026, time.November, 1, 0, 0, 0, 0, calendarLocation)
+	wantTo := time.Date(2026, time.December, 1, 0, 0, 0, 0, calendarLocation)
+	if !repo.seenCalendar.From.Equal(wantFrom) || !repo.seenCalendar.To.Equal(wantTo) {
+		t.Fatalf("calendar period = %s..%s, want %s..%s", repo.seenCalendar.From, repo.seenCalendar.To, wantFrom, wantTo)
+	}
+	if repo.seenCalendar.From.Location().String() != "Asia/Yekaterinburg" ||
+		repo.seenCalendar.To.Location().String() != "Asia/Yekaterinburg" {
+		t.Fatalf("date-only boundaries must use Asia/Yekaterinburg: %s..%s", repo.seenCalendar.From, repo.seenCalendar.To)
+	}
+	if repo.seenCalendar.Limit != DefaultLimit || repo.seenCalendar.Offset != 0 {
+		t.Fatalf("pagination = (%d, %d)", repo.seenCalendar.Limit, repo.seenCalendar.Offset)
+	}
+	var body struct {
+		Data []CalendarCompetitionDTO `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid JSON response: %v", err)
+	}
+	if body.Data == nil || len(body.Data) != 0 {
+		t.Fatalf("data = %#v, want []", body.Data)
+	}
+}
+
+func TestHandlerCalendarPreservesRFC3339OffsetsAndParsesFilters(t *testing.T) {
+	repo := &repositoryStub{}
+	target := "/api/v1/calendar/competitions?from=2026-02-01T00%3A00%3A00%2B05%3A00&to=2026-03-01T00%3A00%3A00%2B05%3A00&discipline_id=2&level_id=4&limit=25&offset=10"
+	response := httptest.NewRecorder()
+	competitionMux(repo).ServeHTTP(response, httptest.NewRequest(http.MethodGet, target, nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", response.Code, response.Body.String())
+	}
+	wantFrom := time.Date(2026, time.February, 1, 0, 0, 0, 0, time.FixedZone("", 5*60*60))
+	if !repo.seenCalendar.From.Equal(wantFrom) || repo.seenCalendar.From.Format("-07:00") != "+05:00" {
+		t.Fatalf("from = %s, want instant %s with +05:00 offset", repo.seenCalendar.From, wantFrom)
+	}
+	if repo.seenCalendar.DisciplineID == nil || *repo.seenCalendar.DisciplineID != 2 ||
+		repo.seenCalendar.LevelID == nil || *repo.seenCalendar.LevelID != 4 ||
+		repo.seenCalendar.Limit != 25 || repo.seenCalendar.Offset != 10 {
+		t.Fatalf("calendar filter = %#v", repo.seenCalendar)
+	}
+}
+
+func TestHandlerCalendarReturnsCompactJSON(t *testing.T) {
+	item := testCompetition()
+	item.Description = stringPointer("not for calendar")
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/calendar/competitions?from=2026-11-01&to=2026-12-01", nil)
+	competitionMux(&repositoryStub{calendarItems: []Competition{item}}).ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", response.Code, response.Body.String())
+	}
+	var body map[string][]map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid JSON response: %v", err)
+	}
+	if len(body["data"]) != 1 {
+		t.Fatalf("data = %#v", body["data"])
+	}
+	for _, field := range []string{"description", "registration_starts_at", "registration_ends_at", "calendar_plan", "regulation_url"} {
+		if _, exists := body["data"][0][field]; exists {
+			t.Fatalf("compact response unexpectedly contains %q", field)
+		}
+	}
+}
+
+func TestHandlerCalendarRejectsInvalidQuery(t *testing.T) {
+	tests := []struct {
+		name   string
+		query  string
+		status int
+	}{
+		{name: "missing period", query: "?from=2026-01-01", status: http.StatusBadRequest},
+		{name: "date without timezone", query: "?from=2026-01-01T12:00:00&to=2026-01-02T12:00:00Z", status: http.StatusBadRequest},
+		{name: "empty period", query: "?from=2026-02-01&to=2026-02-01", status: http.StatusBadRequest},
+		{name: "reversed period", query: "?from=2026-02-02&to=2026-02-01", status: http.StatusBadRequest},
+		{name: "invalid discipline", query: "?from=2026-01-01&to=2026-02-01&discipline_id=0", status: http.StatusBadRequest},
+		{name: "invalid level", query: "?from=2026-01-01&to=2026-02-01&level_id=many", status: http.StatusBadRequest},
+		{name: "invalid limit", query: "?from=2026-01-01&to=2026-02-01&limit=101", status: http.StatusBadRequest},
+		{name: "invalid offset", query: "?from=2026-01-01&to=2026-02-01&offset=-1", status: http.StatusBadRequest},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodGet, "/api/v1/calendar/competitions"+tt.query, nil)
+			competitionMux(&repositoryStub{}).ServeHTTP(response, request)
+			if response.Code != tt.status {
+				t.Fatalf("status = %d, want %d; body = %s", response.Code, tt.status, response.Body.String())
+			}
+		})
+	}
 }
 
 func TestHandlerListUsesDefaultsAndReturnsEmptyList(t *testing.T) {

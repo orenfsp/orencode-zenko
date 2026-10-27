@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
+	_ "time/tzdata"
 
 	competitionerrs "github.com/orenfsp/orencode-zenko.git/internal/competition/errs"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
@@ -16,6 +18,8 @@ import (
 type Handler struct {
 	service *Service
 }
+
+var calendarLocation, calendarLocationErr = time.LoadLocation("Asia/Yekaterinburg")
 
 func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
@@ -29,6 +33,21 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	items, err := h.service.List(r.Context(), limit, offset)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, items)
+}
+
+func (h *Handler) Calendar(w http.ResponseWriter, r *http.Request) {
+	filter, err := parseCalendarFilter(r)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+
+	items, err := h.service.Calendar(r.Context(), filter)
 	if err != nil {
 		handleServiceError(w, err)
 		return
@@ -114,6 +133,58 @@ func parsePagination(r *http.Request) (int32, int32, error) {
 	return int32(limit), int32(offset), nil
 }
 
+func parseCalendarFilter(r *http.Request) (CalendarFilter, error) {
+	from, err := parseCalendarBoundary(r.URL.Query().Get("from"))
+	if err != nil {
+		return CalendarFilter{}, competitionerrs.ErrInvalidCalendarPeriod
+	}
+	to, err := parseCalendarBoundary(r.URL.Query().Get("to"))
+	if err != nil {
+		return CalendarFilter{}, competitionerrs.ErrInvalidCalendarPeriod
+	}
+	disciplineID, err := parseOptionalPositiveID(r.URL.Query().Get("discipline_id"))
+	if err != nil {
+		return CalendarFilter{}, competitionerrs.ErrInvalidCalendarFilter
+	}
+	levelID, err := parseOptionalPositiveID(r.URL.Query().Get("level_id"))
+	if err != nil {
+		return CalendarFilter{}, competitionerrs.ErrInvalidCalendarFilter
+	}
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		return CalendarFilter{}, competitionerrs.ErrInvalidPagination
+	}
+
+	return CalendarFilter{
+		From: from, To: to, DisciplineID: disciplineID, LevelID: levelID,
+		Limit: limit, Offset: offset,
+	}, nil
+}
+
+func parseCalendarBoundary(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, competitionerrs.ErrInvalidCalendarPeriod
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return parsed, nil
+	}
+	if calendarLocationErr != nil {
+		return time.Time{}, calendarLocationErr
+	}
+	return time.ParseInLocation(time.DateOnly, value, calendarLocation)
+}
+
+func parseOptionalPositiveID(value string) (*int64, error) {
+	if value == "" {
+		return nil, nil
+	}
+	id, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || id <= 0 {
+		return nil, competitionerrs.ErrInvalidCalendarFilter
+	}
+	return &id, nil
+}
+
 func decodeJSON(w http.ResponseWriter, r *http.Request, destination any) error {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	decoder := json.NewDecoder(r.Body)
@@ -131,6 +202,10 @@ func handleServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, competitionerrs.ErrInvalidPagination):
 		writeError(w, http.StatusBadRequest, "limit должен быть от 1 до 100, offset не может быть отрицательным")
+	case errors.Is(err, competitionerrs.ErrInvalidCalendarPeriod):
+		writeError(w, http.StatusBadRequest, "from и to должны задавать корректный период в формате RFC3339 или YYYY-MM-DD")
+	case errors.Is(err, competitionerrs.ErrInvalidCalendarFilter):
+		writeError(w, http.StatusBadRequest, "discipline_id и level_id должны быть положительными целыми числами")
 	case errors.Is(err, competitionerrs.ErrInvalidID):
 		writeError(w, http.StatusBadRequest, "некорректный ID соревнования")
 	case errors.Is(err, competitionerrs.ErrNotFound):

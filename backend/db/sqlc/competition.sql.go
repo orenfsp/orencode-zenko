@@ -296,7 +296,7 @@ func (q *Queries) GetCompetitionStatus(ctx context.Context, id int64) (string, e
 	return status, err
 }
 
-const getPublishedCompetition = `-- name: GetPublishedCompetition :one
+const getPublicCompetition = `-- name: GetPublicCompetition :one
 SELECT
     c.id,
     c.name,
@@ -326,10 +326,16 @@ JOIN discipline AS d ON d.id = c.discipline_id
 JOIN competition_type AS ct ON ct.id = c.competition_type_id
 JOIN competition_level AS cl ON cl.id = c.competition_level_id
 LEFT JOIN calendar_plan AS cp ON cp.id = c.calendar_plan_id
-WHERE c.id = $1 AND c.status = 'published'
+WHERE c.id = $1
+  AND c.status = ANY($2::text[])
 `
 
-type GetPublishedCompetitionRow struct {
+type GetPublicCompetitionParams struct {
+	ID              int64
+	PPublicStatuses []string
+}
+
+type GetPublicCompetitionRow struct {
 	ID                   int64
 	Name                 string
 	Description          pgtype.Text
@@ -355,9 +361,9 @@ type GetPublishedCompetitionRow struct {
 	RegulationUrl        pgtype.Text
 }
 
-func (q *Queries) GetPublishedCompetition(ctx context.Context, id int64) (GetPublishedCompetitionRow, error) {
-	row := q.db.QueryRow(ctx, getPublishedCompetition, id)
-	var i GetPublishedCompetitionRow
+func (q *Queries) GetPublicCompetition(ctx context.Context, arg GetPublicCompetitionParams) (GetPublicCompetitionRow, error) {
+	row := q.db.QueryRow(ctx, getPublicCompetition, arg.ID, arg.PPublicStatuses)
+	var i GetPublicCompetitionRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -386,7 +392,115 @@ func (q *Queries) GetPublishedCompetition(ctx context.Context, id int64) (GetPub
 	return i, err
 }
 
-const listPublishedCompetitions = `-- name: ListPublishedCompetitions :many
+const listCalendarCompetitions = `-- name: ListCalendarCompetitions :many
+SELECT
+    c.id,
+    c.name,
+    c.discipline_id,
+    d.name AS discipline_name,
+    c.competition_type_id,
+    ct.name AS competition_type_name,
+    c.competition_level_id,
+    cl.code AS competition_level_code,
+    cl.name AS competition_level_name,
+    c.format,
+    c.start_at,
+    c.end_at,
+    c.venue_address,
+    c.online_url,
+    c.status
+FROM competition AS c
+JOIN discipline AS d ON d.id = c.discipline_id
+JOIN competition_type AS ct ON ct.id = c.competition_type_id
+JOIN competition_level AS cl ON cl.id = c.competition_level_id
+WHERE c.status = ANY($1::text[])
+  AND c.start_at < $2
+  AND c.end_at > $3
+  AND (
+      $4::bigint IS NULL
+      OR c.discipline_id = $4
+  )
+  AND (
+      $5::bigint IS NULL
+      OR c.competition_level_id = $5
+  )
+ORDER BY c.start_at, c.id
+LIMIT $7 OFFSET $6
+`
+
+type ListCalendarCompetitionsParams struct {
+	PPublicStatuses []string
+	PTo             pgtype.Timestamptz
+	PFrom           pgtype.Timestamptz
+	PDisciplineID   pgtype.Int8
+	PLevelID        pgtype.Int8
+	POffset         int32
+	PLimit          int32
+}
+
+type ListCalendarCompetitionsRow struct {
+	ID                   int64
+	Name                 string
+	DisciplineID         int64
+	DisciplineName       string
+	CompetitionTypeID    int64
+	CompetitionTypeName  string
+	CompetitionLevelID   int64
+	CompetitionLevelCode pgtype.Text
+	CompetitionLevelName pgtype.Text
+	Format               string
+	StartAt              pgtype.Timestamptz
+	EndAt                pgtype.Timestamptz
+	VenueAddress         pgtype.Text
+	OnlineUrl            pgtype.Text
+	Status               string
+}
+
+func (q *Queries) ListCalendarCompetitions(ctx context.Context, arg ListCalendarCompetitionsParams) ([]ListCalendarCompetitionsRow, error) {
+	rows, err := q.db.Query(ctx, listCalendarCompetitions,
+		arg.PPublicStatuses,
+		arg.PTo,
+		arg.PFrom,
+		arg.PDisciplineID,
+		arg.PLevelID,
+		arg.POffset,
+		arg.PLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCalendarCompetitionsRow
+	for rows.Next() {
+		var i ListCalendarCompetitionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.DisciplineID,
+			&i.DisciplineName,
+			&i.CompetitionTypeID,
+			&i.CompetitionTypeName,
+			&i.CompetitionLevelID,
+			&i.CompetitionLevelCode,
+			&i.CompetitionLevelName,
+			&i.Format,
+			&i.StartAt,
+			&i.EndAt,
+			&i.VenueAddress,
+			&i.OnlineUrl,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicCompetitions = `-- name: ListPublicCompetitions :many
 SELECT
     c.id,
     c.name,
@@ -416,17 +530,18 @@ JOIN discipline AS d ON d.id = c.discipline_id
 JOIN competition_type AS ct ON ct.id = c.competition_type_id
 JOIN competition_level AS cl ON cl.id = c.competition_level_id
 LEFT JOIN calendar_plan AS cp ON cp.id = c.calendar_plan_id
-WHERE c.status = 'published'
+WHERE c.status = ANY($3::text[])
 ORDER BY c.start_at, c.id
 LIMIT $1 OFFSET $2
 `
 
-type ListPublishedCompetitionsParams struct {
-	Limit  int32
-	Offset int32
+type ListPublicCompetitionsParams struct {
+	Limit           int32
+	Offset          int32
+	PPublicStatuses []string
 }
 
-type ListPublishedCompetitionsRow struct {
+type ListPublicCompetitionsRow struct {
 	ID                   int64
 	Name                 string
 	Description          pgtype.Text
@@ -452,15 +567,15 @@ type ListPublishedCompetitionsRow struct {
 	RegulationUrl        pgtype.Text
 }
 
-func (q *Queries) ListPublishedCompetitions(ctx context.Context, arg ListPublishedCompetitionsParams) ([]ListPublishedCompetitionsRow, error) {
-	rows, err := q.db.Query(ctx, listPublishedCompetitions, arg.Limit, arg.Offset)
+func (q *Queries) ListPublicCompetitions(ctx context.Context, arg ListPublicCompetitionsParams) ([]ListPublicCompetitionsRow, error) {
+	rows, err := q.db.Query(ctx, listPublicCompetitions, arg.Limit, arg.Offset, arg.PPublicStatuses)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListPublishedCompetitionsRow
+	var items []ListPublicCompetitionsRow
 	for rows.Next() {
-		var i ListPublishedCompetitionsRow
+		var i ListPublicCompetitionsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,

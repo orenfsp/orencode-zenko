@@ -27,7 +27,7 @@ func (s *Service) List(ctx context.Context, limit, offset int32) ([]ResponseDTO,
 		return nil, competitionerrs.ErrInvalidPagination
 	}
 
-	competitions, err := s.repo.ListPublished(ctx, limit, offset)
+	competitions, err := s.repo.ListPublic(ctx, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -39,12 +39,48 @@ func (s *Service) List(ctx context.Context, limit, offset int32) ([]ResponseDTO,
 	return result, nil
 }
 
+func (s *Service) Calendar(ctx context.Context, filter CalendarFilter) ([]CalendarCompetitionDTO, error) {
+	if filter.From.IsZero() || filter.To.IsZero() || !filter.From.Before(filter.To) {
+		return nil, competitionerrs.ErrInvalidCalendarPeriod
+	}
+	if (filter.DisciplineID != nil && *filter.DisciplineID <= 0) ||
+		(filter.LevelID != nil && *filter.LevelID <= 0) {
+		return nil, competitionerrs.ErrInvalidCalendarFilter
+	}
+	if filter.Limit < 1 || filter.Limit > MaxLimit || filter.Offset < 0 {
+		return nil, competitionerrs.ErrInvalidPagination
+	}
+
+	competitions, err := s.repo.ListCalendar(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]CalendarCompetitionDTO, 0, len(competitions))
+	for _, item := range competitions {
+		if !isPublicCompetitionStatus(item.Status) || !item.StartAt.Before(filter.To) || !item.EndAt.After(filter.From) {
+			continue
+		}
+		result = append(result, toCalendarResponse(item))
+	}
+	return result, nil
+}
+
+func isPublicCompetitionStatus(status string) bool {
+	for _, publicStatus := range publicCompetitionStatuses {
+		if status == publicStatus {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Service) Get(ctx context.Context, id int64) (ResponseDTO, error) {
 	if id <= 0 {
 		return ResponseDTO{}, competitionerrs.ErrInvalidID
 	}
 
-	item, err := s.repo.GetPublished(ctx, id)
+	item, err := s.repo.GetPublic(ctx, id)
 	if err != nil {
 		return ResponseDTO{}, err
 	}
@@ -311,4 +347,17 @@ func toResponse(item Competition) ResponseDTO {
 		}
 	}
 	return response
+}
+
+func toCalendarResponse(item Competition) CalendarCompetitionDTO {
+	return CalendarCompetitionDTO{
+		ID: item.ID, Name: item.Name,
+		Discipline:      ReferenceDTO{ID: item.DisciplineID, Name: item.DisciplineName},
+		CompetitionType: ReferenceDTO{ID: item.CompetitionTypeID, Name: item.CompetitionTypeName},
+		CompetitionLevel: CompetitionLevelDTO{
+			ID: item.CompetitionLevelID, Code: item.CompetitionLevelCode, Name: item.CompetitionLevelName,
+		},
+		Format: item.Format, StartAt: item.StartAt, EndAt: item.EndAt,
+		VenueAddress: item.VenueAddress, OnlineURL: item.OnlineURL, Status: item.Status,
+	}
 }
