@@ -363,6 +363,10 @@ func main() {
 	// Используем rbacMiddleware.Authenticate, чтобы проверить токен (когда друг подключит JWT)
 	mux.Handle("GET /api/v1/notifications", rbacMiddleware.Authenticate(http.HandlerFunc(notificationHandler.ListNotifications)))
 	mux.Handle("PATCH /api/v1/notifications/{id}/read", rbacMiddleware.Authenticate(http.HandlerFunc(notificationHandler.MarkAsRead)))
+	mux.Handle("GET /api/v1/profile/competitions",
+		rbacMiddleware.Authenticate(http.HandlerFunc(judgeHandler.ListByUser)))
+	mux.Handle("GET /api/v1/profile/assignments",
+		rbacMiddleware.Authenticate(http.HandlerFunc(judgeHandler.ListAssignments)))
 
 	address := ":" + cfg.HTTP.Port
 	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(auditMiddleware.Wrap(mux))
@@ -371,11 +375,6 @@ func main() {
 	if err := http.ListenAndServe(address, handler); err != nil {
 		logger.Log.Fatal("http server stopped", zap.Error(err))
 	}
-
-	competitionJudgeHandler := competition.NewJudgeHandler(competition.NewJudgeService(competition.NewJudgeRepository(queries)))
-
-	mux.Handle("GET /api/v1/profile/competitions",
-		rbacMiddleware.Authenticate(http.HandlerFunc(competitionJudgeHandler.ListByUser)))
 }
 
 func runAntiDopingExpiration(ctx context.Context, service *antidoping.Service) {

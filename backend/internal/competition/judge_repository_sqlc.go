@@ -132,6 +132,38 @@ func (r *sqlJudgeRepository) classifyAssignNoRows(
 	return pgx.ErrNoRows
 }
 
+func (r *sqlJudgeRepository) ListJudgeAssignments(
+	ctx context.Context, judgeUserID int64, limit, offset int32,
+) ([]JudgeAssignment, error) {
+	rows, err := r.queries.ListJudgeAssignments(ctx, db.ListJudgeAssignmentsParams{
+		JudgeUserID: judgeUserID,
+		Limit:       limit,
+		Offset:      offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]JudgeAssignment, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, JudgeAssignment{
+			AssignmentID:        row.AssignmentID,
+			PositionID:          row.PositionID,
+			PositionName:        row.PositionName,
+			AppointedAt:         row.AppointedAt.Time,
+			CompetitionID:       row.CompetitionID,
+			CompetitionName:     row.CompetitionName,
+			DisciplineID:        row.DisciplineID,
+			DisciplineName:      row.DisciplineName,
+			CompetitionTypeID:   row.CompetitionTypeID,
+			CompetitionTypeName: row.CompetitionTypeName,
+			Format:              row.Format,
+			StartAt:             row.StartAt.Time,
+			EndAt:               row.EndAt.Time,
+			Status:              row.Status,
+		})
+	}
+	return result, nil
+}
 func mapJudgeWriteError(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23503" {

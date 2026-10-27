@@ -33,6 +33,16 @@ func (routeJudgeRepository) AssignCompetitionJudge(context.Context, int64, int64
 func (routeJudgeRepository) RemoveCompetitionJudge(context.Context, int64, int64) (bool, error) {
 	return true, nil
 }
+func (routeJudgeRepository) ListCompetitionsByJudgeUser(
+	context.Context, int64, int32, int32,
+) ([]competition.JudgeCompetition, error) {
+	return []competition.JudgeCompetition{}, nil
+}
+func (routeJudgeRepository) ListJudgeAssignments(
+	context.Context, int64, int32, int32,
+) ([]competition.JudgeAssignment, error) {
+	return []competition.JudgeAssignment{}, nil
+}
 
 func TestCompetitionJudgeRoutesAreRegistered(t *testing.T) {
 	permissions := map[string]string{}

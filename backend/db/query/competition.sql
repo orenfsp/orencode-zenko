@@ -329,3 +329,29 @@ JOIN judge_position jp ON jp.id = cj.position_id
 WHERE cj.judge_user_id = $1
 ORDER BY c.start_at DESC, c.id DESC
 LIMIT $2 OFFSET $3;
+
+
+-- name: ListJudgeAssignments :many
+SELECT
+    cj.id              AS assignment_id,
+    cj.position_id,
+    jp.name            AS position_name,
+    cj.appointed_at,
+    c.id               AS competition_id,
+    c.name             AS competition_name,
+    c.discipline_id,
+    d.name             AS discipline_name,
+    c.competition_type_id,
+    ct.name            AS competition_type_name,
+    c.format,
+    c.start_at,
+    c.end_at,
+    c.status
+FROM competition_judge cj
+JOIN competition       c  ON c.id  = cj.competition_id
+JOIN discipline        d  ON d.id  = c.discipline_id
+JOIN competition_type  ct ON ct.id = c.competition_type_id
+JOIN judge_position    jp ON jp.id = cj.position_id
+WHERE cj.judge_user_id = $1
+ORDER BY c.start_at DESC, cj.id DESC
+LIMIT $2 OFFSET $3;

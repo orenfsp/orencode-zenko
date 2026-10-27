@@ -10,13 +10,15 @@ import (
 )
 
 type repositoryStub struct {
-	events []Event
-	err    error
-	limit  int32
-	offset int32
+	events  []Event
+	written []EventCreate
+	err     error
+	limit   int32
+	offset  int32
 }
 
-func (r *repositoryStub) Write(context.Context, EventCreate) error {
+func (r *repositoryStub) Write(_ context.Context, event EventCreate) error {
+	r.written = append(r.written, event)
 	return nil
 }
 

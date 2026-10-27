@@ -159,3 +159,37 @@ func (s *JudgeService) ListByJudgeUser(
 	}
 	return result, nil
 }
+
+func (s *JudgeService) ListAssignments(
+	ctx context.Context, judgeUserID int64, limit, offset int32,
+) ([]JudgeAssignmentDTO, error) {
+	if judgeUserID <= 0 {
+		return nil, ErrInvalidJudgeRequest
+	}
+	if limit < 1 || limit > MaxLimit || offset < 0 {
+		return nil, competitionerrs.ErrInvalidPagination
+	}
+	items, err := s.repository.ListJudgeAssignments(ctx, judgeUserID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]JudgeAssignmentDTO, 0, len(items))
+	for _, item := range items {
+		result = append(result, JudgeAssignmentDTO{
+			ID: item.AssignmentID,
+			Competition: JudgeCompetitionDTO{
+				ID:              item.CompetitionID,
+				Name:            item.CompetitionName,
+				Discipline:      ReferenceDTO{ID: item.DisciplineID, Name: item.DisciplineName},
+				CompetitionType: ReferenceDTO{ID: item.CompetitionTypeID, Name: item.CompetitionTypeName},
+				Format:          item.Format,
+				StartAt:         item.StartAt,
+				EndAt:           item.EndAt,
+				Status:          item.Status,
+			},
+			Position:    JudgePositionDTO{ID: item.PositionID, Name: item.PositionName},
+			AppointedAt: item.AppointedAt,
+		})
+	}
+	return result, nil
+}
