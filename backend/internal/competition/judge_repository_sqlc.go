@@ -45,6 +45,24 @@ func (r *sqlJudgeRepository) ListCompetitionJudges(
 	return result, nil
 }
 
+func (r *sqlJudgeRepository) ListAdminCompetitionJudges(
+	ctx context.Context, competitionID int64,
+) ([]CompetitionJudge, error) {
+	rows, err := r.queries.ListAdminCompetitionJudges(ctx, competitionID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]CompetitionJudge, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, CompetitionJudge{
+			ID: row.ID, CompetitionID: row.CompetitionID, JudgeUserID: row.JudgeUserID,
+			FirstName: row.FirstName, LastName: row.LastName, MiddleName: textPointer(row.MiddleName),
+			PositionID: row.PositionID, PositionName: row.PositionName, AppointedAt: row.AppointedAt.Time,
+		})
+	}
+	return result, nil
+}
+
 func (r *sqlJudgeRepository) ValidateCompetitionJudgeAssignment(
 	ctx context.Context, competitionID, judgeUserID, positionID int64,
 ) (JudgeAssignmentValidation, error) {

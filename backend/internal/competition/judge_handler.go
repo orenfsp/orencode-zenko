@@ -32,6 +32,20 @@ func (h *JudgeHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, items)
 }
 
+func (h *JudgeHandler) ListAdmin(w http.ResponseWriter, r *http.Request) {
+	competitionID, err := parseJudgeID(r.PathValue("id"))
+	if err != nil {
+		handleJudgeError(w, err)
+		return
+	}
+	items, err := h.service.ListAdmin(r.Context(), competitionID)
+	if err != nil {
+		handleJudgeError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, items)
+}
+
 func (h *JudgeHandler) Assign(w http.ResponseWriter, r *http.Request) {
 	identity, ok := rbac.IdentityFromContext(r.Context())
 	if !ok || identity.UserID <= 0 {

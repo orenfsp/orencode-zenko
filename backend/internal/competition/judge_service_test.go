@@ -32,6 +32,10 @@ func (r *judgeRepositoryStub) ListCompetitionJudges(_ context.Context, competiti
 	r.competitionID = competitionID
 	return r.items, r.listErr
 }
+
+func (r *judgeRepositoryStub) ListAdminCompetitionJudges(_ context.Context, competitionID int64) ([]CompetitionJudge, error) {
+	return r.ListCompetitionJudges(context.Background(), competitionID)
+}
 func (r *judgeRepositoryStub) ValidateCompetitionJudgeAssignment(
 	_ context.Context, competitionID, judgeUserID, positionID int64,
 ) (JudgeAssignmentValidation, error) {

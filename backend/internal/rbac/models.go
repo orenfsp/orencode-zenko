@@ -18,6 +18,11 @@ const (
 	PermissionMunicipalitiesRead        = "municipalities.read"
 	PermissionMunicipalitiesCreate      = "municipalities.create"
 	PermissionAntiDopingReview          = "anti_doping.review"
+	PermissionDashboardRead             = "dashboard.read"
+	PermissionRegistryRead              = "registry.read"
+	PermissionJudgeCategoriesReview     = "judge_categories.review"
+	PermissionRankApplicationsReview    = "rank_applications.review"
+	PermissionDeadlinesManage           = "deadlines.manage"
 
 	SuperAdminRoleCode = "super_admin"
 )
@@ -56,6 +61,11 @@ var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionMunicipalitiesRead, Description: "Просмотр муниципалитетов"},
 	{Code: PermissionMunicipalitiesCreate, Description: "Создание муниципалитетов"},
 	{Code: PermissionAntiDopingReview, Description: "Проверка антидопинговых сертификатов"},
+	{Code: PermissionDashboardRead, Description: "Просмотр дашборда федерации"},
+	{Code: PermissionRegistryRead, Description: "Просмотр единого реестра федерации"},
+	{Code: PermissionJudgeCategoriesReview, Description: "Рассмотрение заявок на судейские категории"},
+	{Code: PermissionRankApplicationsReview, Description: "Рассмотрение заявок на спортивные разряды"},
+	{Code: PermissionDeadlinesManage, Description: "Управление сроками федерации"},
 }
 
 type Role struct {
