@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="mYkBGJZpzXhqkc8hDffm" name="Page-1">
-        <mxGraphModel dx="1378" dy="645" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+        <mxGraphModel dx="1297" dy="310" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -822,6 +822,9 @@
                 </mxCell>
                 <mxCell id="1fra9144dIDWeq42q1MO-141" parent="1fra9144dIDWeq42q1MO-138" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" value="Item 3" vertex="1">
                     <mxGeometry height="30" width="140" y="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="Q74tUMbEuZ7qMAQwsXUE-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;roundedPerimeter=1;" value="доделать compitition application" vertex="1">
+                    <mxGeometry height="60" width="120" x="-300" y="540" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>
