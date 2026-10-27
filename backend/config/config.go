@@ -91,7 +91,7 @@ func Load() (*Config, error) {
 		}
 	}
 	var storageCleanupBatch int32 = 100
-	if value := os.Getenv("STORAGE_CLEANUP_INTERVAL"); value != "" {
+	if value := os.Getenv("STORAGE_CLEANUP_BATCH"); value != "" {
 		val, err := strconv.ParseInt(value, 10, 32)
 		if err != nil {
 			return nil, err
