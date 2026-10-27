@@ -51,7 +51,6 @@ func (s *sessionProviderStub) CreateSession(_ context.Context, data CreateSessio
 		ID:               10,
 		UserID:           data.UserID,
 		RefreshTokenHash: data.RefreshTokenHash,
-		DeviceID:         data.DeviceID,
 		ExpiresAt:        data.ExpiresAt,
 	}
 	return s.session, nil
@@ -81,13 +80,11 @@ func newTestService(users *userProviderStub, sessions *sessionProviderStub) *Ser
 
 func validRegisterRequest() RegisterRequest {
 	return RegisterRequest{
-		FirstName:           "Иван",
-		LastName:            "Иванов",
-		BirthDate:           "2000-05-10",
-		Email:               "USER@example.com",
-		Password:            "password123",
-		PersonalDataConsent: true,
-		DeviceID:            "browser-1",
+		FirstName: "Иван",
+		LastName:  "Иванов",
+		BirthDate: "2000-05-10",
+		Email:     "USER@example.com",
+		Password:  "password123",
 	}
 }
 
@@ -96,14 +93,17 @@ func TestRegisterAdultCreatesRolelessTokens(t *testing.T) {
 	sessions := &sessionProviderStub{}
 	service := newTestService(users, sessions)
 
-	response, err := service.Register(context.Background(), validRegisterRequest())
+	response, err := service.Register(context.Background(), validRegisterRequest(), 101, nil)
 	if err != nil {
 		t.Fatalf("Register() error = %v", err)
 	}
 	if users.createData.Email != "user@example.com" {
 		t.Fatalf("normalized email = %q", users.createData.Email)
 	}
-	if users.createData.ParentalConsentDocumentURL != nil {
+	if users.createData.PersonalDataConsentFileID != 101 {
+		t.Fatalf("personal consent file id = %d", users.createData.PersonalDataConsentFileID)
+	}
+	if users.createData.ParentalConsentFileID != nil {
 		t.Fatal("adult registration unexpectedly created parental consent")
 	}
 	claims, err := service.tokens.Parse(response.AccessToken)
@@ -113,9 +113,6 @@ func TestRegisterAdultCreatesRolelessTokens(t *testing.T) {
 	if claims.UserID != 42 || claims.RoleID != nil {
 		t.Fatalf("claims = user:%d role:%v, want user:42 and no role", claims.UserID, claims.RoleID)
 	}
-	if sessions.createData.DeviceID != "browser-1" {
-		t.Fatalf("device id = %q", sessions.createData.DeviceID)
-	}
 }
 
 func TestRegisterMinorRequiresParentalConsent(t *testing.T) {
@@ -124,19 +121,17 @@ func TestRegisterMinorRequiresParentalConsent(t *testing.T) {
 	req := validRegisterRequest()
 	req.BirthDate = "2008-10-27"
 
-	_, err := service.Register(context.Background(), req)
+	_, err := service.Register(context.Background(), req, 101, nil)
 	if !errors.Is(err, autherrs.ErrParentalConsentRequired) {
 		t.Fatalf("Register() error = %v, want ErrParentalConsentRequired", err)
 	}
 }
 
-func TestRegisterRequiresPersonalDataConsent(t *testing.T) {
+func TestRegisterRequiresPersonalDataConsentFile(t *testing.T) {
 	users := &userProviderStub{user: User{ID: 42}}
 	service := newTestService(users, &sessionProviderStub{})
-	req := validRegisterRequest()
-	req.PersonalDataConsent = false
 
-	_, err := service.Register(context.Background(), req)
+	_, err := service.Register(context.Background(), validRegisterRequest(), 0, nil)
 	if !errors.Is(err, autherrs.ErrConsentRequired) {
 		t.Fatalf("Register() error = %v, want ErrConsentRequired", err)
 	}
@@ -147,13 +142,24 @@ func TestRegisterMinorPersistsParentalDocument(t *testing.T) {
 	service := newTestService(users, &sessionProviderStub{})
 	req := validRegisterRequest()
 	req.BirthDate = "2010-01-01"
-	req.ParentalConsentDocumentURL = "uploads/parental/consent.pdf"
+	parentalFileID := int64(202)
 
-	if _, err := service.Register(context.Background(), req); err != nil {
+	if _, err := service.Register(context.Background(), req, 101, &parentalFileID); err != nil {
 		t.Fatalf("Register() error = %v", err)
 	}
-	if users.createData.ParentalConsentDocumentURL == nil || *users.createData.ParentalConsentDocumentURL != req.ParentalConsentDocumentURL {
-		t.Fatalf("parental document was not persisted: %#v", users.createData.ParentalConsentDocumentURL)
+	if users.createData.ParentalConsentFileID == nil || *users.createData.ParentalConsentFileID != parentalFileID {
+		t.Fatalf("parental file was not persisted: %#v", users.createData.ParentalConsentFileID)
+	}
+}
+
+func TestRegisterAdultRejectsParentalDocument(t *testing.T) {
+	users := &userProviderStub{user: User{ID: 42}}
+	service := newTestService(users, &sessionProviderStub{})
+	parentalFileID := int64(202)
+
+	_, err := service.Register(context.Background(), validRegisterRequest(), 101, &parentalFileID)
+	if !errors.Is(err, autherrs.ErrInvalidDocument) {
+		t.Fatalf("Register() error = %v, want ErrInvalidDocument", err)
 	}
 }
 
@@ -163,7 +169,7 @@ func TestRegisterUserTurning18TodayDoesNotRequireParentalConsent(t *testing.T) {
 	req := validRegisterRequest()
 	req.BirthDate = "2008-10-26"
 
-	if _, err := service.Register(context.Background(), req); err != nil {
+	if _, err := service.Register(context.Background(), req, 101, nil); err != nil {
 		t.Fatalf("Register() error = %v", err)
 	}
 }
@@ -172,7 +178,7 @@ func TestPatchProfileRoleRotatesTokensWithRole(t *testing.T) {
 	users := &userProviderStub{user: User{ID: 42, Email: "user@example.com", AccessStatus: true}}
 	sessions := &sessionProviderStub{}
 	service := newTestService(users, sessions)
-	initialTokens, err := service.createSession(context.Background(), users.user, "browser-1")
+	initialTokens, err := service.createSession(context.Background(), users.user)
 	if err != nil {
 		t.Fatalf("createSession() error = %v", err)
 	}

@@ -6,8 +6,11 @@ import (
 	"net/http"
 
 	"github.com/orenfsp/orencode-zenko.git/config"
+	dbsqlc "github.com/orenfsp/orencode-zenko.git/db/sqlc"
 	"github.com/orenfsp/orencode-zenko.git/internal/auth"
-	"github.com/orenfsp/orencode-zenko.git/pkg/db"
+	"github.com/orenfsp/orencode-zenko.git/internal/file"
+	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
+	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"github.com/orenfsp/orencode-zenko.git/pkg/token"
 	"go.uber.org/zap"
@@ -28,20 +31,49 @@ func main() {
 		logger.Log.Fatal("JWT_SECRET is required")
 	}
 
-	pool := db.NewPostgres(context.Background(), cfg.Database.URL)
+	pool := postgres.NewPostgres(context.Background(), cfg.Database.URL)
 	defer pool.Close()
+	queries := dbsqlc.New(pool)
 
 	jwtManager := token.New(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
-	repository := auth.NewPostgresRepository(pool)
-	service := auth.NewService(repository, jwtManager, repository)
-	handler := auth.NewHandler(service)
+	authRepository := auth.NewRepository(queries, pool)
+	service := auth.NewService(authRepository, jwtManager, authRepository)
+	rbacRepository := rbac.NewRepository(queries, pool)
+	rbacService := rbac.NewService(rbacRepository)
+	rbacHandler := rbac.NewHandler(rbacService)
+	rbacMiddleware := rbac.NewMiddleware(jwtManager, rbacRepository)
+	protected := func(permission string, handler http.HandlerFunc) http.Handler {
+		return rbacMiddleware.Authenticate(rbacMiddleware.Require(permission)(handler))
+	}
+	fileRepo, err := file.NewSQLCRepository(queries)
+	if err != nil {
+		logger.Log.Fatal("initialize file repository", zap.Error(err))
+	}
+	fileStorage, err := file.NewLocalStorage("./private_uploads")
+	if err != nil {
+		logger.Log.Fatal("initialize file storage", zap.Error(err))
+	}
+	fileService, err := file.NewService(fileRepo, fileStorage, file.DefaultPolicies())
+	if err != nil {
+		logger.Log.Fatal("initialize file service", zap.Error(err))
+	}
+	authHandler := auth.NewHandler(service, fileService)
+	fileHandler, err := file.NewHandler(fileService, rbacRepository)
+	if err != nil {
+		logger.Log.Fatal("initialize file handler", zap.Error(err))
+	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v1/auth/register", handler.Register)
-	mux.HandleFunc("POST /api/v1/auth/login", handler.Login)
-	mux.HandleFunc("POST /api/v1/auth/refresh", handler.Refresh)
-	mux.HandleFunc("POST /api/v1/auth/logout", handler.Logout)
-	mux.HandleFunc("PATCH /api/v1/profile", handler.PatchProfile)
+	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
+	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
+	mux.HandleFunc("POST /api/v1/auth/refresh", authHandler.Refresh)
+	mux.HandleFunc("POST /api/v1/auth/logout", authHandler.Logout)
+	mux.HandleFunc("PATCH /api/v1/profile", authHandler.PatchProfile)
+	mux.Handle("GET /api/v1/files/{fileID}/download", rbacMiddleware.Authenticate(http.HandlerFunc(fileHandler.Download)))
+	mux.Handle("GET /api/v1/admin/roles", protected(rbac.PermissionRolesRead, rbacHandler.ListRoles))
+	mux.Handle("POST /api/v1/admin/roles", protected(rbac.PermissionRolesCreate, rbacHandler.CreateRole))
+	mux.Handle("POST /api/v1/admin/users/{userID}/roles", protected(rbac.PermissionRolesAssign, rbacHandler.AssignRole))
+	mux.Handle("GET /api/v1/admin/permissions", protected(rbac.PermissionPermissionsRead, rbacHandler.ListPermissions))
 
 	address := ":" + cfg.HTTP.Port
 	logger.Log.Info("server started", zap.String("address", address))

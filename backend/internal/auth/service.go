@@ -15,9 +15,16 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/pkg/token"
 )
 
-const consentPolicyVersion = "1.0"
-
 var telegramUsernamePattern = regexp.MustCompile(`^[A-Za-z0-9_]{5,32}$`)
+
+type preparedRegistration struct {
+	firstName  string
+	lastName   string
+	middleName *string
+	birthDate  time.Time
+	email      string
+	minor      bool
+}
 
 type Service struct {
 	users    UserProvider
@@ -35,37 +42,32 @@ func NewService(users UserProvider, tokens *token.Manager, sessions SessionProvi
 	}
 }
 
-func (s *Service) Register(ctx context.Context, req RegisterRequest) (TokenResponse, error) {
-	firstName := strings.TrimSpace(req.FirstName)
-	lastName := strings.TrimSpace(req.LastName)
-	email := strings.ToLower(strings.TrimSpace(req.Email))
-	deviceID := strings.TrimSpace(req.DeviceID)
-
-	if firstName == "" || utf8.RuneCountInString(firstName) > 100 ||
-		lastName == "" || utf8.RuneCountInString(lastName) > 100 ||
-		utf8.RuneCountInString(strings.TrimSpace(req.MiddleName)) > 100 ||
-		deviceID == "" || len(deviceID) > 255 ||
-		len(req.Password) < 8 || len(req.Password) > 72 ||
-		len(email) > 255 || !validEmail(email) {
-		return TokenResponse{}, autherrs.ErrInvalidRegistrationData
+func (s *Service) ValidateRegistration(req RegisterRequest) (bool, error) {
+	prepared, err := s.prepareRegistration(req)
+	if err != nil {
+		return false, err
 	}
-	if !req.PersonalDataConsent {
+	return prepared.minor, nil
+}
+
+func (s *Service) Register(
+	ctx context.Context,
+	req RegisterRequest,
+	personalDataConsentFileID int64,
+	parentalConsentFileID *int64,
+) (TokenResponse, error) {
+	prepared, err := s.prepareRegistration(req)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	if personalDataConsentFileID <= 0 {
 		return TokenResponse{}, autherrs.ErrConsentRequired
 	}
-
-	birthDate, err := time.Parse("2006-01-02", req.BirthDate)
-	if err != nil {
-		return TokenResponse{}, autherrs.ErrInvalidRegistrationData
-	}
-	today := dateOnly(s.now())
-	if birthDate.After(today) || birthDate.Before(today.AddDate(-120, 0, 0)) {
-		return TokenResponse{}, autherrs.ErrInvalidRegistrationData
-	}
-
-	minor := birthDate.AddDate(18, 0, 0).After(today)
-	parentalDocument := strings.TrimSpace(req.ParentalConsentDocumentURL)
-	if minor && (parentalDocument == "" || len(parentalDocument) > 2048) {
+	if prepared.minor && (parentalConsentFileID == nil || *parentalConsentFileID <= 0) {
 		return TokenResponse{}, autherrs.ErrParentalConsentRequired
+	}
+	if !prepared.minor && parentalConsentFileID != nil {
+		return TokenResponse{}, autherrs.ErrInvalidDocument
 	}
 
 	passwordHash, err := password.Hash(req.Password)
@@ -73,36 +75,60 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (TokenRespo
 		return TokenResponse{}, err
 	}
 
-	var middleName *string
-	if value := strings.TrimSpace(req.MiddleName); value != "" {
-		middleName = &value
-	}
-	var parentalDocumentPtr *string
-	if minor {
-		parentalDocumentPtr = &parentalDocument
-	}
-
 	createdUser, err := s.users.CreateUser(ctx, CreateUser{
-		FirstName:                  firstName,
-		LastName:                   lastName,
-		MiddleName:                 middleName,
-		BirthDate:                  birthDate,
-		Email:                      email,
-		PasswordHash:               passwordHash,
-		ConsentPolicyVersion:       consentPolicyVersion,
-		ParentalConsentDocumentURL: parentalDocumentPtr,
+		FirstName:                 prepared.firstName,
+		LastName:                  prepared.lastName,
+		MiddleName:                prepared.middleName,
+		BirthDate:                 prepared.birthDate,
+		Email:                     prepared.email,
+		PasswordHash:              passwordHash,
+		PersonalDataConsentFileID: personalDataConsentFileID,
+		ParentalConsentFileID:     parentalConsentFileID,
 	})
 	if err != nil {
 		return TokenResponse{}, err
 	}
 
-	return s.createSession(ctx, createdUser, deviceID)
+	return s.createSession(ctx, createdUser)
+}
+
+func (s *Service) prepareRegistration(req RegisterRequest) (preparedRegistration, error) {
+	firstName := strings.TrimSpace(req.FirstName)
+	lastName := strings.TrimSpace(req.LastName)
+	middleNameValue := strings.TrimSpace(req.MiddleName)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if firstName == "" || utf8.RuneCountInString(firstName) > 100 ||
+		lastName == "" || utf8.RuneCountInString(lastName) > 100 ||
+		utf8.RuneCountInString(middleNameValue) > 100 ||
+		len(req.Password) < 8 || len(req.Password) > 72 ||
+		len(email) > 255 || !validEmail(email) {
+		return preparedRegistration{}, autherrs.ErrInvalidRegistrationData
+	}
+	birthDate, err := time.Parse("2006-01-02", req.BirthDate)
+	if err != nil {
+		return preparedRegistration{}, autherrs.ErrInvalidRegistrationData
+	}
+	today := dateOnly(s.now())
+	if birthDate.After(today) || birthDate.Before(today.AddDate(-120, 0, 0)) {
+		return preparedRegistration{}, autherrs.ErrInvalidRegistrationData
+	}
+	var middleName *string
+	if middleNameValue != "" {
+		middleName = &middleNameValue
+	}
+	return preparedRegistration{
+		firstName:  firstName,
+		lastName:   lastName,
+		middleName: middleName,
+		birthDate:  birthDate,
+		email:      email,
+		minor:      birthDate.AddDate(18, 0, 0).After(today),
+	}, nil
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (TokenResponse, error) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
-	deviceID := strings.TrimSpace(req.DeviceID)
-	if !validEmail(email) || req.Password == "" || deviceID == "" {
+	if !validEmail(email) || req.Password == "" {
 		return TokenResponse{}, autherrs.ErrInvalidCredentials
 	}
 
@@ -120,7 +146,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (TokenResponse, e
 		return TokenResponse{}, autherrs.ErrAccessDenied
 	}
 
-	return s.createSession(ctx, user, deviceID)
+	return s.createSession(ctx, user)
 }
 
 func (s *Service) Refresh(ctx context.Context, req RefreshTokenRequest) (TokenResponse, error) {
@@ -200,7 +226,7 @@ func (s *Service) PatchProfile(ctx context.Context, accessToken string, req Patc
 	return response, nil
 }
 
-func (s *Service) createSession(ctx context.Context, user User, deviceID string) (TokenResponse, error) {
+func (s *Service) createSession(ctx context.Context, user User) (TokenResponse, error) {
 	tokens, err := s.generateTokens(user)
 	if err != nil {
 		return TokenResponse{}, err
@@ -208,7 +234,6 @@ func (s *Service) createSession(ctx context.Context, user User, deviceID string)
 	_, err = s.sessions.CreateSession(ctx, CreateSession{
 		UserID:           user.ID,
 		RefreshTokenHash: token.HashRefresh(tokens.RefreshToken),
-		DeviceID:         deviceID,
 		ExpiresAt:        s.now().Add(s.tokens.RefreshTTL()),
 	})
 	if err != nil {

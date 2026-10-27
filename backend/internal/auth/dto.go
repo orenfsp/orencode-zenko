@@ -1,15 +1,12 @@
 package auth
 
 type RegisterRequest struct {
-	FirstName                  string `json:"first_name"`
-	LastName                   string `json:"last_name"`
-	MiddleName                 string `json:"middle_name,omitempty"`
-	BirthDate                  string `json:"birth_date"`
-	Email                      string `json:"email"`
-	Password                   string `json:"password"`
-	PersonalDataConsent        bool   `json:"personal_data_consent"`
-	ParentalConsentDocumentURL string `json:"parental_consent_document_url,omitempty"`
-	DeviceID                   string `json:"device_id"`
+	FirstName  string
+	LastName   string
+	MiddleName string
+	BirthDate  string
+	Email      string
+	Password   string
 }
 
 type TokenResponse struct {
@@ -20,7 +17,6 @@ type TokenResponse struct {
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
-	DeviceID string `json:"device_id"`
 }
 
 type RefreshTokenRequest struct {

@@ -1,0 +1,549 @@
+# API для фронтенда: Auth, профиль и RBAC
+
+Документ описывает фактически реализованный контракт backend на текущий момент.
+
+## Общие правила
+
+Базовый префикс API:
+
+```text
+/api/v1
+```
+
+Для JSON-запросов необходимо отправлять:
+
+```http
+Content-Type: application/json
+```
+
+Тело обычного JSON-запроса ограничено 1 МБ. Неизвестные JSON-поля считаются ошибкой и приводят к `400 Bad Request`. Регистрация является исключением: она принимает `multipart/form-data` общим размером до 22 МиБ.
+
+Успешный ответ с данными имеет форму:
+
+```json
+{
+  "data": {}
+}
+```
+
+Ответ с ошибкой:
+
+```json
+{
+  "message": "Описание ошибки"
+}
+```
+
+Для защищённых методов access-токен передаётся в заголовке:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+`401 Unauthorized` означает, что токен или сессия отсутствуют, недействительны либо истекли. `403 Forbidden` означает, что пользователь авторизован, но у его ролей нет необходимого permission.
+
+## Токены и сессия
+
+Backend выдаёт два JWT:
+
+- `access_token` — используется для запросов к защищённым endpoint’ам;
+- `refresh_token` — используется для продления сессии и ротации токенов.
+
+Срок жизни задаётся переменными backend `JWT_ACCESS_TTL` и `JWT_REFRESH_TTL`. Текущие значения из примера окружения: 15 минут и 720 часов.
+
+Основные JWT claims:
+
+```json
+{
+  "user_id": 42,
+  "role_id": 7,
+  "principal_type": "user",
+  "type": "access",
+  "exp": 1760000000,
+  "iat": 1759999100,
+  "jti": "..."
+}
+```
+
+Сразу после обычной регистрации у пользователя нет роли, поэтому `role_id` в JWT отсутствует. После выбора роли backend возвращает новую пару токенов с `role_id`.
+
+Frontend обязан заменять одновременно оба токена после успешного refresh или выбора роли. Старый refresh-токен после ротации больше не действует.
+
+## Регистрация
+
+```http
+POST /api/v1/auth/register
+```
+
+Авторизация не требуется.
+
+### Запрос
+
+Запрос отправляется одним `multipart/form-data`. Frontend не загружает документы заранее и не передаёт URL или внутренние ID файлов. При использовании браузерного `FormData` заголовок `Content-Type` вручную задавать нельзя: браузер сам добавит корректный `boundary`.
+
+Поля:
+
+| Поле | Обязательно | Правила |
+|---|---:|---|
+| `first_name` | да | 1–100 символов |
+| `last_name` | да | 1–100 символов |
+| `middle_name` | нет | до 100 символов |
+| `birth_date` | да | формат `YYYY-MM-DD`, не в будущем, возраст не более 120 лет |
+| `email` | да | корректный email, до 255 символов; backend приводит к нижнему регистру |
+| `password` | да | от 8 до 72 байт |
+| `personal_data_consent_file` | да | файл согласия на обработку персональных данных |
+| `parental_consent_document_file` | условно | письменное разрешение родителей; обязательно только для пользователя младше 18 лет |
+
+Возраст рассчитывается backend по полной дате рождения. Пользователь считается совершеннолетним непосредственно в день 18-летия.
+
+Для обоих файлов разрешены PDF, JPEG, PNG, XML и DOCX. Максимальный размер каждого файла — 10 МиБ. Backend проверяет фактическое содержимое, а не только имя или присланный MIME. Пустые файлы и ZIP-архивы, которые не являются корректной структурой DOCX, отклоняются.
+
+Пример для браузера:
+
+```ts
+const form = new FormData();
+form.append("first_name", values.firstName);
+form.append("last_name", values.lastName);
+if (values.middleName) form.append("middle_name", values.middleName);
+form.append("birth_date", values.birthDate);
+form.append("email", values.email);
+form.append("password", values.password);
+form.append("personal_data_consent_file", values.personalConsentFile);
+
+// Добавлять только если пользователю ещё нет 18 лет.
+if (values.parentalConsentFile) {
+  form.append("parental_consent_document_file", values.parentalConsentFile);
+}
+
+await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+  method: "POST",
+  body: form,
+});
+```
+
+Пример регистрации несовершеннолетнего через curl:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -F "first_name=Иван" \
+  -F "last_name=Иванов" \
+  -F "birth_date=2012-05-10" \
+  -F "email=minor@example.com" \
+  -F "password=strong-password" \
+  -F "personal_data_consent_file=@./personal-consent.pdf" \
+  -F "parental_consent_document_file=@./parental-consent.docx"
+```
+
+Для совершеннолетнего поле `parental_consent_document_file` передавать не нужно: лишний родительский документ будет отклонён с `400`.
+
+Сначала backend проверяет текстовые поля и возраст, затем сохраняет файлы, а после этого одной транзакцией создаёт пользователя, записи согласий и привязывает файлы. Если регистрация не удалась, незакреплённые файлы удаляются компенсацией.
+
+### Успешный ответ
+
+Статус `201 Created`:
+
+```json
+{
+  "data": {
+    "access_token": "...",
+    "refresh_token": "..."
+  }
+}
+```
+
+Первый токен обычного пользователя не содержит `role_id`.
+
+Возможные ошибки:
+
+- `400` — некорректные/повторяющиеся/неизвестные поля, отсутствует обязательный файл или состав файлов не соответствует возрасту;
+- `409` — email уже зарегистрирован;
+- `413` — отдельный файл больше 10 МиБ либо вся multipart-форма больше 22 МиБ;
+- `415` — содержимое файла имеет неподдерживаемый формат;
+- `500` — внутренняя ошибка.
+
+## Вход
+
+```http
+POST /api/v1/auth/login
+```
+
+### Запрос
+
+```json
+{
+  "email": "user@example.com",
+  "password": "strong-password"
+}
+```
+
+### Ответ
+
+Статус `200 OK`:
+
+```json
+{
+  "data": {
+    "access_token": "...",
+    "refresh_token": "..."
+  }
+}
+```
+
+Ошибки:
+
+- `401` — неверный email/пароль либо доступ пользователя отключён;
+- `500` — внутренняя ошибка.
+
+## Обновление токенов
+
+```http
+POST /api/v1/auth/refresh
+```
+
+### Запрос
+
+```json
+{
+  "refresh_token": "..."
+}
+```
+
+### Ответ
+
+Статус `200 OK`:
+
+```json
+{
+  "data": {
+    "access_token": "new-access-token",
+    "refresh_token": "new-refresh-token"
+  }
+}
+```
+
+После ответа необходимо удалить старую пару токенов и сохранить новую. Желательно использовать на фронте единый refresh-lock: при нескольких одновременных `401` выполнять только один refresh, а остальные запросы ставить в очередь.
+
+Ошибки:
+
+- `400` — `refresh_token` не передан;
+- `401` — refresh-токен или сессия недействительны/истекли.
+
+## Выход
+
+```http
+POST /api/v1/auth/logout
+```
+
+### Запрос
+
+```json
+{
+  "refresh_token": "..."
+}
+```
+
+Успешный ответ: `204 No Content` без тела. После ответа фронт удаляет оба токена и локальные данные текущего пользователя.
+
+## Изменение профиля и выбор роли
+
+```http
+PATCH /api/v1/profile
+Authorization: Bearer <access_token>
+```
+
+Метод принимает хотя бы одно из полей `tg_username` или `role_id`.
+
+### Установка Telegram username
+
+```json
+{
+  "tg_username": "ivan_ivanov"
+}
+```
+
+Допускается значение с начальным `@`, backend его удалит. После нормализации username должен содержать 5–32 символа: латинские буквы, цифры и `_`.
+
+Для удаления username отправляется пустая строка:
+
+```json
+{
+  "tg_username": ""
+}
+```
+
+Ответ:
+
+```json
+{
+  "data": {
+    "tg_username": "ivan_ivanov"
+  }
+}
+```
+
+### Выбор роли
+
+```json
+{
+  "role_id": 7,
+  "refresh_token": "..."
+}
+```
+
+Пользователь может самостоятельно выбрать только роль с `self_assignable: true`. Системную роль главного администратора выбрать нельзя.
+
+Текущая реализация перед выбором удаляет все прежние связи пользователя с ролями, назначает выбранную роль и ротирует токены. Поэтому этот пользовательский endpoint пока нельзя применять для переключения активной роли у аккаунта, которому администратор назначил несколько ролей.
+
+```json
+{
+  "data": {
+    "role_id": 7,
+    "access_token": "new-access-token",
+    "refresh_token": "new-refresh-token"
+  }
+}
+```
+
+Frontend должен сразу сохранить новую пару токенов. Если `refresh_token` не передан, роль не будет изменена.
+
+Можно одновременно изменить Telegram username и выбрать роль:
+
+```json
+{
+  "tg_username": "ivan_ivanov",
+  "role_id": 7,
+  "refresh_token": "..."
+}
+```
+
+Ошибки:
+
+- `400` — пустой PATCH, неверный username, роль недоступна для самостоятельного выбора или не передан refresh-токен;
+- `401` — access/refresh-токен недействителен;
+- `409` — Telegram username уже занят.
+
+## Скачивание документа
+
+```http
+GET /api/v1/files/{fileID}/download
+Authorization: Bearer <access_token>
+```
+
+Endpoint возвращает бинарное содержимое файла, а не JSON. Скачать документ может:
+
+- пользователь-владелец документа;
+- пользователь с permission `files.read` (в seed он есть у главного администратора).
+
+Основные заголовки ответа:
+
+```http
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="consent.pdf"
+Content-Length: 12345
+Cache-Control: no-store
+X-File-Path: personal_data_consent/<storage-key>.pdf
+```
+
+`X-File-Path` содержит внутренний относительный путь файла. Для скачивания во frontend удобно получать ответ как `Blob` и брать имя из `Content-Disposition`. Публичной раздачи каталога с файлами нет.
+
+Ошибки:
+
+- `400` — неверный `fileID`;
+- `401` — отсутствует или недействителен access-токен;
+- `403` — документ принадлежит другому пользователю и нет `files.read`;
+- `404` — файл не существует или ещё не прикреплён к регистрации;
+- `500` — ошибка БД или файлового хранилища.
+
+## Permissions
+
+Сейчас определены следующие permissions:
+
+| Permission | Назначение |
+|---|---|
+| `roles.read` | просмотр ролей |
+| `roles.create` | создание ролей |
+| `roles.assign` | назначение ролей пользователям |
+| `permissions.read` | просмотр справочника permissions |
+| `files.read` | просмотр документов любых пользователей |
+
+Главный администратор из seed получает все эти permissions. Backend проверяет их по актуальным данным БД, поэтому назначение или удаление роли влияет на доступ независимо от `role_id` в старом JWT.
+
+## Admin API
+
+Все admin endpoint’ы требуют access-токен и соответствующий permission.
+
+### Получение permissions
+
+```http
+GET /api/v1/admin/permissions
+Authorization: Bearer <access_token>
+```
+
+Требуется `permissions.read`.
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "code": "roles.read",
+      "description": "Просмотр ролей"
+    }
+  ]
+}
+```
+
+### Получение ролей
+
+```http
+GET /api/v1/admin/roles
+Authorization: Bearer <access_token>
+```
+
+Требуется `roles.read`.
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "code": "super_admin",
+      "name": "Главный администратор",
+      "is_system": true,
+      "self_assignable": false,
+      "permissions": [
+        "permissions.read",
+        "roles.assign",
+        "roles.create",
+        "roles.read"
+      ]
+    }
+  ]
+}
+```
+
+### Создание роли
+
+```http
+POST /api/v1/admin/roles
+Authorization: Bearer <access_token>
+```
+
+Требуется `roles.create`.
+
+```json
+{
+  "code": "coach",
+  "name": "Тренер",
+  "self_assignable": true,
+  "permission_codes": [
+    "roles.read"
+  ]
+}
+```
+
+Правила:
+
+- `code` приводится к нижнему регистру;
+- формат `code`: от 3 до 100 символов, первый символ — латинская буква, затем допустимы латинские буквы, цифры, `.`, `_`, `-`;
+- `name` обязателен, максимум 100 символов;
+- повторяющиеся permission-коды удаляются;
+- все permission-коды должны существовать;
+- `self_assignable: true` разрешает обычному пользователю выбрать роль через профиль.
+
+Успешный ответ: `201 Created` с созданной ролью.
+
+### Назначение роли пользователю
+
+```http
+POST /api/v1/admin/users/{userID}/roles
+Authorization: Bearer <access_token>
+```
+
+Требуется `roles.assign`.
+
+```json
+{
+  "role_id": 7
+}
+```
+
+Успешный ответ: `204 No Content`. Повторное назначение той же роли безопасно и не создаёт дубликат. Admin API может назначить пользователю несколько ролей; итоговые permissions объединяются.
+
+Ошибки admin API:
+
+- `400` — неверный JSON, user ID, role ID или permission-код;
+- `401` — отсутствует или недействителен access-токен;
+- `403` — нет требуемого permission;
+- `404` — пользователь или роль не найдены;
+- `409` — роль с таким `code` или `name` уже существует;
+- `500` — внутренняя ошибка.
+
+## Рекомендуемые TypeScript-типы
+
+```ts
+export interface TokenPair {
+  access_token: string;
+  refresh_token: string;
+}
+
+export interface ApiSuccess<T> {
+  data: T;
+}
+
+export interface ApiError {
+  message: string;
+}
+
+export interface RegisterFormFields {
+  first_name: string;
+  last_name: string;
+  middle_name?: string;
+  birth_date: string;
+  email: string;
+  password: string;
+  personal_data_consent_file: File;
+  parental_consent_document_file?: File;
+}
+
+export interface Role {
+  id: number;
+  code: string;
+  name: string;
+  is_system: boolean;
+  self_assignable: boolean;
+  permissions: string[];
+}
+
+export interface Permission {
+  id: number;
+  code: string;
+  description: string;
+}
+```
+
+## Рекомендуемый сценарий фронтенда
+
+1. Собрать текстовые поля и документы регистрации в один `FormData`.
+2. Рассчитать возраст на UI для показа поля родительского согласия, но окончательное решение оставить backend.
+3. После регистрации или входа сохранить пару токенов.
+4. Если в access-токене нет `role_id`, показать экран выбора роли.
+5. При выборе роли отправить `role_id` вместе с актуальным refresh-токеном.
+6. Заменить токены значениями из ответа PATCH.
+7. Для admin-раздела ориентироваться на ответы API и `403`, а не только на декодированный JWT.
+8. При истечении access-токена один раз выполнить refresh и повторить исходный запрос.
+9. Если refresh вернул `401`, очистить сессию и отправить пользователя на страницу входа.
+
+## Текущие ограничения контракта
+
+- Нет endpoint’а `GET /api/v1/profile` или `/me`.
+- Нет публичного endpoint’а списка ролей с `self_assignable: true`.
+- Нет отдельных публичных upload/delete endpoint’ов: документы загружаются только внутри регистрации.
+- Пока нет API, которое отдаёт frontend ID прикреплённых документов; download endpoint готов для использования будущим profile/admin API.
+- Refresh-токен возвращается в JSON, HttpOnly-cookie пока не используется.
+- Нет CORS middleware для отдельного frontend-origin.
+- Нет изменения/удаления ролей и снятия роли с пользователя.
+- Пользовательский выбор роли сейчас заменяет все назначенные роли; отдельного понятия «активная роль» пока нет.
+- Нет списка пользователей для admin-интерфейса.
+- Нет стабильного машинного `error_code`; фронт пока получает только текст `message`.
+- OpenAPI/Swagger-схема ещё не подготовлена.

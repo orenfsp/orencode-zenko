@@ -14,9 +14,9 @@ migrate-down:
 sqlc:
 	sqlc generate
 
-# Opt-in: writes synthetic records and prints new credentials once.
-seed-demo:
-	go run ./cmd/seed-demo -allow-demo-data
+# Idempotently creates RBAC permissions, the super-admin role and one admin user.
+seed-rbac:
+	go run ./cmd/seed-rbac
 
 # Testing commands
 test:

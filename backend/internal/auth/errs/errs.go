@@ -9,6 +9,7 @@ var (
 	ErrConsentRequired         = errors.New("personal data consent is required")
 	ErrParentalConsentRequired = errors.New("parental consent document is required for users under 18")
 	ErrInvalidRegistrationData = errors.New("invalid registration data")
+	ErrInvalidDocument         = errors.New("invalid registration document")
 	ErrInvalidSession          = errors.New("invalid or expired session")
 	ErrRoleNotFound            = errors.New("role not found")
 	ErrTelegramUsernameInvalid = errors.New("invalid telegram username")

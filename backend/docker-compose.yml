@@ -30,7 +30,7 @@ services:
   rbac-seed:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     image: vera-backend:local
     env_file:
       - .env
@@ -45,7 +45,7 @@ services:
   server:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     image: vera-backend:local
     env_file:
       - .env

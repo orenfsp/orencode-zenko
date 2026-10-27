@@ -8,8 +8,295 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Test struct {
-	ID       pgtype.UUID
-	Username string
-	Password string
+type AgeGroup struct {
+	ID     int64
+	Name   string
+	MinAge pgtype.Int2
+	MaxAge pgtype.Int2
+}
+
+type AntiDoping struct {
+	ID          int64
+	UserID      int64
+	Url         pgtype.Text
+	Ttl         pgtype.Date
+	CompletedAt pgtype.Date
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+type AthleteCoach struct {
+	ID            int64
+	AthleteUserID int64
+	CoachUserID   int64
+	DisciplineID  int64
+	// pending, active, suspended, completed, rejected
+	Status      string
+	RequestedAt pgtype.Timestamptz
+	ConfirmedAt pgtype.Timestamptz
+	EndedAt     pgtype.Timestamptz
+}
+
+type CalendarPlan struct {
+	ID   int64
+	Name string
+	Year int16
+}
+
+type Competition struct {
+	ID                 int64
+	Name               string
+	Description        pgtype.Text
+	DisciplineID       int64
+	CompetitionTypeID  int64
+	CompetitionLevelID int64
+	// offline, online, mixed
+	Format               string
+	StartAt              pgtype.Timestamptz
+	EndAt                pgtype.Timestamptz
+	RegistrationStartsAt pgtype.Timestamptz
+	RegistrationEndsAt   pgtype.Timestamptz
+	VenueAddress         pgtype.Text
+	OnlineUrl            pgtype.Text
+	CreatedBy            int64
+	// draft — черновик; under_review — на проверке; published — опубликовано; registration_open — регистрация открыта; registration_closed — регистрация закрыта; ongoing — проводится; results_pending — подведение итогов; completed — завершено
+	Status             string
+	CalendarPlanID     pgtype.Int8
+	CalendarPlanNumber pgtype.Text
+	RegulationUrl      pgtype.Text
+	UpdatedAt          pgtype.Timestamptz
+	CreatedAt          pgtype.Timestamptz
+}
+
+type CompetitionApplication struct {
+	ID            int64
+	EventID       int64
+	AthleteUserID int64
+	// Сам спортсмен или его тренер
+	SubmittedByUserID int64
+	// pending, approved, rejected, withdrawn
+	Status           string
+	SubmittedAt      pgtype.Timestamptz
+	ReviewedByUserID pgtype.Int8
+	ReviewedAt       pgtype.Timestamptz
+}
+
+type CompetitionEvent struct {
+	ID            int64
+	CompetitionID int64
+	DisciplineID  int64
+	AgeGroupID    pgtype.Int8
+	ProtocolUrl   pgtype.Text
+}
+
+type CompetitionJudge struct {
+	ID            int64
+	CompetitionID int64
+	JudgeUserID   int64
+	PositionID    int64
+	AppointedAt   pgtype.Timestamptz
+}
+
+type CompetitionLevel struct {
+	ID        int64
+	Code      pgtype.Text
+	Name      pgtype.Text
+	UpdatedAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
+type CompetitionResult struct {
+	ID            int64
+	ApplicationID int64
+	Place         pgtype.Int4
+	Score         pgtype.Numeric
+	// finished, did_not_start, disqualified
+	ResultStatus pgtype.Text
+}
+
+type CompetitionType struct {
+	ID        int64
+	Name      string
+	UpdatedAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
+type ConsentDatum struct {
+	ID          int64
+	UserID      int64
+	DocumentUrl pgtype.Text
+	AcceptedAt  pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	FileID      pgtype.Int8
+}
+
+type Discipline struct {
+	ID        int64
+	Name      string
+	UpdatedAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
+type JudgeCategory struct {
+	ID   int64
+	Name string
+}
+
+// Предложенная структура: на скриншоте поля справочника ещё не определены.
+type JudgePosition struct {
+	ID int64
+	// Например: главный судья, главный секретарь, судья
+	Name string
+}
+
+type Municipality struct {
+	ID   int64
+	Name string
+}
+
+type Organization struct {
+	ID               int64
+	Name             string
+	OrganizationType string
+	MunicipalityID   pgtype.Int8
+}
+
+// Письменное согласие законного представителя для пользователя младше 18 лет.
+type ParentalConsent struct {
+	ID          int64
+	UserID      int64
+	DocumentUrl pgtype.Text
+	Status      string
+	SubmittedAt pgtype.Timestamptz
+	ReviewedAt  pgtype.Timestamptz
+	FileID      pgtype.Int8
+}
+
+type Permission struct {
+	ID          int64
+	Code        string
+	Description string
+	CreatedAt   pgtype.Timestamptz
+}
+
+type Rank struct {
+	ID        int64
+	Name      string
+	Ttl       pgtype.Text
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+type Role struct {
+	ID int64
+	// Спортсмен, тренер, судья, сотрудник федерации
+	Name           string
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+	Code           string
+	IsSystem       bool
+	SelfAssignable bool
+}
+
+type RolePermission struct {
+	RoleID       int64
+	PermissionID int64
+	GrantedAt    pgtype.Timestamptz
+}
+
+type RoleUser struct {
+	ID        int64
+	UserID    int64
+	RoleID    int64
+	GrantedAt pgtype.Timestamptz
+}
+
+type Team struct {
+	ID   int64
+	Name string
+	// competition либо regional_squad: уточнить при проработке командных зачётов
+	TeamType  string
+	CreatedAt pgtype.Timestamptz
+}
+
+type TeamCoach struct {
+	ID          int64
+	TeamID      int64
+	CoachUserID int64
+}
+
+type TeamMember struct {
+	ID       int64
+	TeamID   int64
+	UserID   int64
+	JoinedAt pgtype.Date
+	LeftAt   pgtype.Date
+}
+
+type UploadedFile struct {
+	ID               int64
+	PurposeCode      string
+	StorageKey       string
+	OriginalFilename string
+	ContentType      string
+	SizeBytes        int64
+	Sha256           string
+	Status           string
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
+type User struct {
+	ID         int64
+	FirstName  string
+	LastName   string
+	MiddleName pgtype.Text
+	Birth      pgtype.Date
+	// Email используется для входа и сравнивается без учёта регистра на уровне приложения.
+	Email        string
+	PasswordHash string
+	// Необязательное поле, заполняется позднее через PATCH профиля.
+	TgUsername     pgtype.Text
+	AccessStatus   bool
+	MunicipalityID pgtype.Int8
+	// NULL = без организации
+	OrganizationID pgtype.Int8
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
+type UserDiscipline struct {
+	UserID       int64
+	DisciplineID int64
+	StartYear    pgtype.Int2
+}
+
+type UserJudgeCategory struct {
+	ID          int64
+	UserID      int64
+	CategoryID  int64
+	AssignedAt  pgtype.Date
+	ExpiresAt   pgtype.Date
+	OrderNumber pgtype.Text
+}
+
+type UserRankDiscipline struct {
+	ID           int64
+	UserID       int64
+	RankID       int64
+	DisciplineID int64
+	ResultID     pgtype.Int8
+	AwardedAt    pgtype.Date
+	ExpiresAt    pgtype.Date
+	OrderNumber  pgtype.Text
+}
+
+type UserSession struct {
+	ID               int64
+	UserID           int64
+	RefreshTokenHash string
+	ExpiresAt        pgtype.Timestamptz
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
 }

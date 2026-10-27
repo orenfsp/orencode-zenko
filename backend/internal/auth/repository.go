@@ -5,41 +5,6 @@ import (
 	"time"
 )
 
-type User struct {
-	ID               int64
-	Email            string
-	PasswordHash     string
-	TelegramUsername *string
-	RoleID           *int64
-	AccessStatus     bool
-}
-
-type CreateUser struct {
-	FirstName                  string
-	LastName                   string
-	MiddleName                 *string
-	BirthDate                  time.Time
-	Email                      string
-	PasswordHash               string
-	ConsentPolicyVersion       string
-	ParentalConsentDocumentURL *string
-}
-
-type Session struct {
-	ID               int64
-	UserID           int64
-	RefreshTokenHash string
-	DeviceID         string
-	ExpiresAt        time.Time
-}
-
-type CreateSession struct {
-	UserID           int64
-	RefreshTokenHash string
-	DeviceID         string
-	ExpiresAt        time.Time
-}
-
 type UserProvider interface {
 	CreateUser(ctx context.Context, data CreateUser) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -53,4 +18,9 @@ type SessionProvider interface {
 	GetSessionByRefreshHash(ctx context.Context, hash string) (Session, error)
 	RotateSession(ctx context.Context, id int64, refreshHash string, expiresAt time.Time) error
 	DeleteSession(ctx context.Context, id int64) error
+}
+
+type Repository interface {
+	UserProvider
+	SessionProvider
 }
