@@ -9,6 +9,7 @@ import (
 
 	"github.com/orenfsp/orencode-zenko.git/config"
 	dbsqlc "github.com/orenfsp/orencode-zenko.git/db/sqlc"
+	"github.com/orenfsp/orencode-zenko.git/internal/audit"
 	"github.com/orenfsp/orencode-zenko.git/internal/auth"
 	"github.com/orenfsp/orencode-zenko.git/internal/calendarplan"
 	"github.com/orenfsp/orencode-zenko.git/internal/competition"
@@ -18,7 +19,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/rank"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/internal/reference"
-	"github.com/orenfsp/orencode-zenko.git/internal/usercoach"
+	usercoach "github.com/orenfsp/orencode-zenko.git/internal/user_coach"
 	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"github.com/orenfsp/orencode-zenko.git/pkg/token"
@@ -68,6 +69,10 @@ func main() {
 	}
 
 	jwtManager := token.New(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
+	auditRepository := audit.NewRepository(queries)
+	auditService := audit.NewService(auditRepository)
+	auditHandler := audit.NewHandler(auditService)
+	auditMiddleware := audit.NewMiddleware(auditRepository, jwtManager)
 	authRepository := auth.NewRepository(queries, pool)
 	authService := auth.NewService(authRepository, jwtManager, authRepository)
 
@@ -135,7 +140,7 @@ func main() {
 					}
 				}
 			}
-		}(cleanupCtx, fileService, cfg.Storage)
+		}(cleanupCtx, fileService, &cfg.Storage)
 	}
 
 	authHandler := auth.NewHandler(authService, fileService)
@@ -164,7 +169,7 @@ func main() {
 	// User-coach relations.
 	userCoachRepo := usercoach.NewSQLRepository(queries)
 
-	var roleChecker usercoach.RoleChecker = rbacRepository
+	var roleChecker usercoach.RoleChecker = rbac.NewRoleChecker(queries)
 	userCoachService, err := usercoach.NewService(userCoachRepo, roleChecker)
 	if err != nil {
 		logger.Log.Fatal("initialize user coach service", zap.Error(err))
@@ -235,7 +240,7 @@ func main() {
 	mux.Handle("GET /api/v1/participant/coaches", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.ListByParticipant)))
 	mux.Handle("PATCH /api/v1/user-coaches/{id}/confirm", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.Confirm)))
 	mux.Handle("PATCH /api/v1/user-coaches/{id}/end", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.End)))
-
+	mux.Handle("GET /api/v1/admin/audit-logs", protected(rbac.PermissionRolesRead, auditHandler.List))
 	// Competition, calendar plans and reference data.
 	registerCompetitionRoutes(mux, competitionHandler, protected)
 	registerCompetitionJudgeRoutes(mux, judgeHandler, protected)
@@ -252,7 +257,7 @@ func main() {
 	mux.Handle("POST /api/v1/admin/municipalities",
 		protected(rbac.PermissionMunicipalitiesCreate, municipalityHandler.Create))
 	address := ":" + cfg.HTTP.Port
-	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(mux)
+	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(auditMiddleware.Wrap(mux))
 
 	logger.Log.Info("server started", zap.String("address", address))
 	if err := http.ListenAndServe(address, handler); err != nil {

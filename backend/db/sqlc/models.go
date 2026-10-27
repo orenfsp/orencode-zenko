@@ -25,6 +25,18 @@ type AntiDoping struct {
 	UpdatedAt   pgtype.Timestamptz
 }
 
+type AuditLog struct {
+	ID          int64
+	EventType   string
+	ActorUserID int64
+	EntityType  string
+	EntityID    pgtype.Int8
+	Method      string
+	Route       string
+	Status      int16
+	OccurredAt  pgtype.Timestamptz
+}
+
 type CalendarPlan struct {
 	ID   int64
 	Name string
@@ -142,6 +154,14 @@ type Municipality struct {
 	Name string
 }
 
+type NotificationOutbox struct {
+	ID           int64
+	RecipientID  int64
+	Payload      []byte
+	TelegramSent bool
+	CreatedAt    pgtype.Timestamptz
+}
+
 type Organization struct {
 	ID               int64
 	Name             string
@@ -218,6 +238,12 @@ type TeamMember struct {
 	UserID   int64
 	JoinedAt pgtype.Date
 	LeftAt   pgtype.Date
+}
+
+type TelegramLink struct {
+	UserID   int64
+	ChatID   int64
+	LinkedAt pgtype.Timestamptz
 }
 
 type UploadedFile struct {

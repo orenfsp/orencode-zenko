@@ -114,6 +114,28 @@ func (q *Queries) HasPermission(ctx context.Context, arg HasPermissionParams) (b
 	return exists, err
 }
 
+const hasRole = `-- name: HasRole :one
+SELECT EXISTS (
+    SELECT 1
+    FROM role_user
+    JOIN role ON role.id = role_user.role_id
+    WHERE role_user.user_id = $1
+      AND role.code = $2
+)
+`
+
+type HasRoleParams struct {
+	UserID int64
+	Code   string
+}
+
+func (q *Queries) HasRole(ctx context.Context, arg HasRoleParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasRole, arg.UserID, arg.Code)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listPermissionCodesByRole = `-- name: ListPermissionCodesByRole :many
 SELECT p.code
 FROM permission p

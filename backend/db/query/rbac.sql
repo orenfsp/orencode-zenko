@@ -10,6 +10,15 @@ SELECT EXISTS (
       AND p.code = $2
 );
 
+-- name: HasRole :one
+SELECT EXISTS (
+    SELECT 1
+    FROM role_user
+    JOIN role ON role.id = role_user.role_id
+    WHERE role_user.user_id = sqlc.arg(user_id)
+      AND role.code = sqlc.arg(code)
+);
+
 -- name: CreateRole :one
 INSERT INTO role (code, name, self_assignable)
 VALUES ($1, $2, $3)

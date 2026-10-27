@@ -470,6 +470,35 @@ Authorization: Bearer <access_token>
 
 Успешный ответ: `204 No Content`. Повторное назначение той же роли безопасно и не создаёт дубликат. Admin API может назначить пользователю несколько ролей; итоговые permissions объединяются.
 
+### Журнал аудита
+
+```http
+GET /api/v1/admin/audit-logs?limit=50&offset=0
+Authorization: Bearer <access_token>
+```
+
+Требуется `roles.read`. Поддерживаются `limit` от 1 до 100 (по умолчанию 50) и неотрицательный `offset` (по умолчанию 0). События отсортированы от новых к старым.
+
+```json
+{
+  "data": [
+    {
+      "id": 15,
+      "event_type": "role.created",
+      "actor_user_id": 1,
+      "entity_type": "role",
+      "entity_id": null,
+      "method": "POST",
+      "route": "/api/v1/admin/roles",
+      "status": 201,
+      "occurred_at": "2026-10-27T09:30:00Z"
+    }
+  ]
+}
+```
+
+Сейчас записываются только успешные (`2xx`) операции: создание роли, назначение роли пользователю и изменение профиля. Ошибочные запросы и запросы без корректного access-токена не попадают в журнал.
+
 Ошибки admin API:
 
 - `400` — неверный JSON, user ID, role ID или permission-код;
