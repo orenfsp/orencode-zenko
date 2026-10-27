@@ -451,6 +451,29 @@ func TestServiceUpdateClearsNullableField(t *testing.T) {
 	}
 }
 
+func TestServiceUpdateClearsCalendarPlanNumberWhenPlanIsRemoved(t *testing.T) {
+	current := testCompetition()
+	current.Status = "draft"
+	planID := int64(3)
+	planNumber := "12"
+	current.CalendarPlanID = &planID
+	current.CalendarPlanNumber = &planNumber
+	repo := &repositoryStub{item: current}
+
+	updated, err := NewService(repo).Update(context.Background(), current.ID, UpdateRequest{
+		CalendarPlanID: PatchField[int64]{Present: true, Null: true},
+	})
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if repo.seenUpdate.CalendarPlanID != nil || repo.seenUpdate.CalendarPlanNumber != nil {
+		t.Fatalf("calendar plan link was not fully cleared: %#v", repo.seenUpdate)
+	}
+	if updated.CalendarPlan != nil {
+		t.Fatalf("response calendar_plan = %#v, want nil", updated.CalendarPlan)
+	}
+}
+
 func TestServiceUpdateRejectsEmptyPatch(t *testing.T) {
 	_, err := NewService(&repositoryStub{}).Update(context.Background(), 7, UpdateRequest{})
 	if !errors.Is(err, competitionerrs.ErrInvalidUpdate) {
