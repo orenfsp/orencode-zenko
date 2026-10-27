@@ -16,6 +16,8 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"github.com/orenfsp/orencode-zenko.git/internal/municipality"
+	"github.com/orenfsp/orencode-zenko.git/internal/notification" // <-- ДОБАВЛЕНО
+	"github.com/orenfsp/orencode-zenko.git/internal/notifier"
 	"github.com/orenfsp/orencode-zenko.git/internal/rank"
 	rankuser "github.com/orenfsp/orencode-zenko.git/internal/rank_user"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
@@ -30,7 +32,6 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/orenfsp/orencode-zenko.git/internal/notifier"
 )
 
 func main() {
@@ -214,7 +215,7 @@ func main() {
 	rankApplicationService := rankuser.NewService(rankApplicationRepository)
 	rankApplicationHandler := rankuser.NewHandler(rankApplicationService)
 
-	// Adds the authenticated user's ID to the context expected by usercoach.Handler.
+		// Adds the authenticated user's ID to the context expected by usercoach.Handler.
 	// The token is verified by the existing RBAC middleware first.
 	withUserCoachIdentity := func(next http.Handler) http.Handler {
 		return rbacMiddleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -246,6 +247,10 @@ func main() {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}))
 	}
+
+	// --- Инициализация уведомлений для фронта ---
+	notificationRepo := notification.NewRepository(queries)
+	notificationHandler := notification.NewHandler(notificationRepo)
 
 	// HTTP routes.
 	mux := http.NewServeMux()
@@ -294,6 +299,12 @@ func main() {
 	mux.HandleFunc("GET /api/v1/municipalities/{id}", municipalityHandler.Get)
 	mux.Handle("POST /api/v1/admin/municipalities",
 		protected(rbac.PermissionMunicipalitiesCreate, municipalityHandler.Create))
+
+	// --- Роуты для уведомлений ---
+	// Используем rbacMiddleware.Authenticate, чтобы проверить токен (когда друг подключит JWT)
+	mux.Handle("GET /api/v1/notifications", rbacMiddleware.Authenticate(http.HandlerFunc(notificationHandler.ListNotifications)))
+	mux.Handle("PATCH /api/v1/notifications/{id}/read", rbacMiddleware.Authenticate(http.HandlerFunc(notificationHandler.MarkAsRead)))
+
 	address := ":" + cfg.HTTP.Port
 	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(auditMiddleware.Wrap(mux))
 

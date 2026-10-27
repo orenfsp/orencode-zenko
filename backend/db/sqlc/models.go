@@ -181,6 +181,15 @@ type Discipline struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type InappNotification struct {
+	ID        int64
+	UserID    int64
+	Title     string
+	Message   string
+	IsRead    bool
+	CreatedAt pgtype.Timestamptz
+}
+
 type JudgeCategory struct {
 	ID   int64
 	Name string
