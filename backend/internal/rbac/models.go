@@ -1,19 +1,22 @@
 package rbac
 
 const (
-	PermissionRolesRead               = "roles.read"
-	PermissionRolesCreate             = "roles.create"
-	PermissionRolesAssign             = "roles.assign"
-	PermissionPermissionsRead         = "permissions.read"
-	PermissionFilesRead               = "files.read"
-	PermissionCompetitionsCreate      = "competitions.create"
-	PermissionCompetitionsUpdate      = "competitions.update"
-	PermissionCompetitionJudgesManage = "competition_judges.manage"
-	PermissionCalendarPlansRead       = "calendar_plans.read"
-	PermissionCalendarPlansCreate     = "calendar_plans.create"
-	PermissionCalendarPlansUpdate     = "calendar_plans.update"
-	PermissionMunicipalitiesRead      = "municipalities.read"
-	PermissionMunicipalitiesCreate    = "municipalities.create"
+	PermissionRolesRead                 = "roles.read"
+	PermissionRolesCreate               = "roles.create"
+	PermissionRolesAssign               = "roles.assign"
+	PermissionPermissionsRead           = "permissions.read"
+	PermissionFilesRead                 = "files.read"
+	PermissionCompetitionsCreate        = "competitions.create"
+	PermissionCompetitionsUpdate        = "competitions.update"
+	PermissionCompetitionJudgesManage   = "competition_judges.manage"
+	PermissionCompetitionResultsRead    = "competition_results.read"
+	PermissionCompetitionResultsManage  = "competition_results.manage"
+	PermissionCompetitionResultsApprove = "competition_results.approve"
+	PermissionCalendarPlansRead         = "calendar_plans.read"
+	PermissionCalendarPlansCreate       = "calendar_plans.create"
+	PermissionCalendarPlansUpdate       = "calendar_plans.update"
+	PermissionMunicipalitiesRead        = "municipalities.read"
+	PermissionMunicipalitiesCreate      = "municipalities.create"
 
 	SuperAdminRoleCode = "super_admin"
 )
@@ -32,6 +35,9 @@ var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionCompetitionsCreate, Description: "Создание соревнований"},
 	{Code: PermissionCompetitionsUpdate, Description: "Изменение соревнований"},
 	{Code: PermissionCompetitionJudgesManage, Description: "Назначение и снятие судей соревнования"},
+	{Code: PermissionCompetitionResultsRead, Description: "Просмотр таблиц результатов соревнований"},
+	{Code: PermissionCompetitionResultsManage, Description: "Ввод и расчёт результатов соревнований"},
+	{Code: PermissionCompetitionResultsApprove, Description: "Утверждение результатов соревнований"},
 	{Code: PermissionCalendarPlansRead, Description: "Просмотр календарных планов"},
 	{Code: PermissionCalendarPlansCreate, Description: "Создание календарных планов"},
 	{Code: PermissionCalendarPlansUpdate, Description: "Изменение календарных планов"},

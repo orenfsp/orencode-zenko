@@ -19,6 +19,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/rank"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/internal/reference"
+	"github.com/orenfsp/orencode-zenko.git/internal/result"
 	usercoach "github.com/orenfsp/orencode-zenko.git/internal/user_coach"
 	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
@@ -157,6 +158,9 @@ func main() {
 	judgeRepository := competition.NewJudgeRepository(queries)
 	judgeService := competition.NewJudgeService(judgeRepository)
 	judgeHandler := competition.NewJudgeHandler(judgeService)
+	resultRepository := result.NewRepository(queries, pool)
+	resultService := result.NewService(resultRepository, fileStorage, result.NewPDFProtocolGenerator())
+	resultHandler := result.NewHandler(resultService)
 	calendarPlanRepository := calendarplan.NewRepository(queries)
 	calendarPlanService := calendarplan.NewService(calendarPlanRepository)
 	calendarPlanHandler := calendarplan.NewHandler(calendarPlanService)
@@ -244,6 +248,8 @@ func main() {
 	// Competition, calendar plans and reference data.
 	registerCompetitionRoutes(mux, competitionHandler, protected)
 	registerCompetitionJudgeRoutes(mux, judgeHandler, protected)
+	registerCompetitionResultRoutes(mux, resultHandler, protected)
+	mux.Handle("GET /api/v1/profile/competition-results", rbacMiddleware.Authenticate(http.HandlerFunc(resultHandler.History)))
 	registerCalendarPlanRoutes(mux, calendarPlanHandler, protected)
 	registerReferenceRoutes(mux, referenceHandler)
 

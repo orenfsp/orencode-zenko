@@ -75,6 +75,14 @@ type routeRule struct {
 
 func auditedRoute(method, path string) (routeRule, bool) {
 	switch {
+	case method == http.MethodPut && strings.HasSuffix(path, "/results/settings"):
+		return resultRouteRule(path, EventResultConfigured, "/api/v1/admin/competitions/{competitionID}/events/{eventID}/results/settings")
+	case method == http.MethodPut && strings.HasSuffix(path, "/results"):
+		return resultRouteRule(path, EventResultUpdated, "/api/v1/admin/competitions/{competitionID}/events/{eventID}/results")
+	case method == http.MethodPost && strings.HasSuffix(path, "/results/calculate"):
+		return resultRouteRule(path, EventResultCalculated, "/api/v1/admin/competitions/{competitionID}/events/{eventID}/results/calculate")
+	case method == http.MethodPost && strings.HasSuffix(path, "/results/approve"):
+		return resultRouteRule(path, EventResultApproved, "/api/v1/admin/competitions/{competitionID}/events/{eventID}/results/approve")
 	case method == http.MethodPost && path == "/api/v1/admin/roles":
 		return routeRule{eventType: EventRoleCreated, entityType: "role", route: path}, true
 	case method == http.MethodPatch && path == "/api/v1/profile":
@@ -92,6 +100,24 @@ func auditedRoute(method, path string) (routeRule, bool) {
 	default:
 		return routeRule{}, false
 	}
+}
+
+func resultRouteRule(path, eventType, route string) (routeRule, bool) {
+	const prefix = "/api/v1/admin/competitions/"
+	if !strings.HasPrefix(path, prefix) {
+		return routeRule{}, false
+	}
+	parts := strings.Split(strings.TrimPrefix(path, prefix), "/")
+	if len(parts) < 4 || parts[1] != "events" || parts[3] != "results" {
+		return routeRule{}, false
+	}
+	eventID, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil || eventID <= 0 {
+		return routeRule{}, false
+	}
+	return routeRule{
+		eventType: eventType, entityType: "competition_event", entityID: &eventID, route: route,
+	}, true
 }
 
 type statusWriter struct {
