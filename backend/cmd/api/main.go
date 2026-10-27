@@ -14,6 +14,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
+	"github.com/orenfsp/orencode-zenko.git/internal/reference"
 	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"github.com/orenfsp/orencode-zenko.git/pkg/token"
@@ -99,6 +100,9 @@ func main() {
 	calendarPlanRepository := calendarplan.NewRepository(queries)
 	calendarPlanService := calendarplan.NewService(calendarPlanRepository)
 	calendarPlanHandler := calendarplan.NewHandler(calendarPlanService)
+	referenceRepository := reference.NewRepository(queries)
+	referenceService := reference.NewService(referenceRepository)
+	referenceHandler := reference.NewHandler(referenceService)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
@@ -113,6 +117,7 @@ func main() {
 	mux.Handle("GET /api/v1/admin/permissions", protected(rbac.PermissionPermissionsRead, rbacHandler.ListPermissions))
 	registerCompetitionRoutes(mux, competitionHandler, protected)
 	registerCalendarPlanRoutes(mux, calendarPlanHandler, protected)
+	registerReferenceRoutes(mux, referenceHandler)
 
 	mux.Handle("GET /api/v1/roles/self-assignable", rbacMiddleware.Authenticate(http.HandlerFunc(rbacHandler.ListSelfAssignableRoles)))
 
