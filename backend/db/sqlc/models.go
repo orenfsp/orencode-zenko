@@ -201,6 +201,21 @@ type JudgeCategory struct {
 	Name string
 }
 
+type JudgeCategoryApplication struct {
+	ID               int64
+	JudgeUserID      int64
+	CategoryID       int64
+	ApplicationType  string
+	Status           string
+	SubmittedAt      pgtype.Timestamptz
+	ReviewedByUserID pgtype.Int8
+	ReviewedAt       pgtype.Timestamptz
+	AssignedAt       pgtype.Date
+	ExpiresAt        pgtype.Date
+	OrderNumber      pgtype.Text
+	RejectionReason  pgtype.Text
+}
+
 // Предложенная структура: на скриншоте поля справочника ещё не определены.
 type JudgePosition struct {
 	ID int64
@@ -265,6 +280,22 @@ type RankApplication struct {
 	RejectionReason   pgtype.Text
 	CreatedAt         pgtype.Timestamptz
 	UpdatedAt         pgtype.Timestamptz
+	ApplicationType   string
+	CompetitionID     pgtype.Int8
+	ResultID          pgtype.Int8
+	AssignedAt        pgtype.Date
+	ExpiresAt         pgtype.Date
+	OrderNumber       pgtype.Text
+}
+
+type ReportDeadline struct {
+	ID              int64
+	Name            string
+	DueAt           pgtype.Timestamptz
+	Status          string
+	CreatedByUserID int64
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
 }
 
 type Role struct {

@@ -11,6 +11,10 @@ func registerCompetitionJudgeRoutes(
 ) {
 	mux.HandleFunc("GET /api/v1/competitions/{id}/judges", handler.List)
 	mux.Handle(
+		"GET /api/v1/admin/competitions/{id}/judges",
+		protected(competition.PermissionManageJudges, handler.ListAdmin),
+	)
+	mux.Handle(
 		"POST /api/v1/competitions/{id}/judges",
 		protected(competition.PermissionManageJudges, handler.Assign),
 	)

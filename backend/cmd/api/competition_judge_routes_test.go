@@ -21,6 +21,9 @@ func (routeJudgeRepository) GetCompetitionStatus(context.Context, int64) (string
 func (routeJudgeRepository) ListCompetitionJudges(context.Context, int64) ([]competition.CompetitionJudge, error) {
 	return []competition.CompetitionJudge{}, nil
 }
+func (routeJudgeRepository) ListAdminCompetitionJudges(context.Context, int64) ([]competition.CompetitionJudge, error) {
+	return []competition.CompetitionJudge{}, nil
+}
 func (routeJudgeRepository) ValidateCompetitionJudgeAssignment(context.Context, int64, int64, int64) (competition.JudgeAssignmentValidation, error) {
 	return competition.JudgeAssignmentValidation{}, nil
 }

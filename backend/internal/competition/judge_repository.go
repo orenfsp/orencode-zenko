@@ -36,6 +36,7 @@ type JudgeAssignmentValidation struct {
 type JudgeRepository interface {
 	GetCompetitionStatus(ctx context.Context, competitionID int64) (string, error)
 	ListCompetitionJudges(ctx context.Context, competitionID int64) ([]CompetitionJudge, error)
+	ListAdminCompetitionJudges(ctx context.Context, competitionID int64) ([]CompetitionJudge, error)
 	ValidateCompetitionJudgeAssignment(
 		ctx context.Context, competitionID, judgeUserID, positionID int64,
 	) (JudgeAssignmentValidation, error)
