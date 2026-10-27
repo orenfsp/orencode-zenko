@@ -305,14 +305,14 @@ func main() {
 		},
 		protected,
 	)
-
+	
 	// RBAC administration.
 	mux.Handle("GET /api/v1/admin/roles", protected(rbac.PermissionRolesRead, rbacHandler.ListRoles))
 	mux.Handle("POST /api/v1/admin/roles", protected(rbac.PermissionRolesCreate, rbacHandler.CreateRole))
 	mux.Handle("POST /api/v1/admin/users/{userID}/roles", protected(rbac.PermissionRolesAssign, rbacHandler.AssignRole))
 	mux.Handle("GET /api/v1/admin/permissions", protected(rbac.PermissionPermissionsRead, rbacHandler.ListPermissions))
 	mux.Handle("GET /api/v1/roles/self-assignable", rbacMiddleware.Authenticate(http.HandlerFunc(rbacHandler.ListSelfAssignableRoles)))
-
+	
 	// User-coach relations.
 	mux.Handle("POST /api/v1/coach/user-coaches", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.Create)))
 	mux.Handle("GET /api/v1/coach/user-coaches", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.ListByCoach)))
@@ -376,6 +376,16 @@ func main() {
 		logger.Log.Fatal("http server stopped", zap.Error(err))
 	}
 }
+func registerReferenceRoutes(mux *http.ServeMux, handler *reference.Handler) {
+	mux.HandleFunc("GET /api/v1/disciplines", handler.ListDisciplines)
+	mux.HandleFunc("GET /api/v1/competition-types", handler.ListCompetitionTypes)
+	mux.HandleFunc("GET /api/v1/competition-levels", handler.ListCompetitionLevels)
+	mux.HandleFunc("GET /api/v1/age-groups", handler.ListAgeGroups)
+}
+func registerRegistryRoutes(mux *http.ServeMux, handler *registry.Handler, protected protectedHandler) {
+		mux.Handle("GET /api/v1/admin/registry/users", protected(registry.PermissionRead, handler.ListUsers))
+		mux.Handle("GET /api/v1/admin/registry/organizations", protected(registry.PermissionRead, handler.ListOrganizations))
+	}
 
 func runAntiDopingExpiration(ctx context.Context, service *antidoping.Service) {
 	expire := func() {
