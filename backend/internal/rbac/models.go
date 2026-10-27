@@ -1,16 +1,18 @@
 package rbac
 
 const (
-	PermissionRolesRead           = "roles.read"
-	PermissionRolesCreate         = "roles.create"
-	PermissionRolesAssign         = "roles.assign"
-	PermissionPermissionsRead     = "permissions.read"
-	PermissionFilesRead           = "files.read"
-	PermissionCompetitionsCreate  = "competitions.create"
-	PermissionCompetitionsUpdate  = "competitions.update"
-	PermissionCalendarPlansRead   = "calendar_plans.read"
-	PermissionCalendarPlansCreate = "calendar_plans.create"
-	PermissionCalendarPlansUpdate = "calendar_plans.update"
+	PermissionRolesRead            = "roles.read"
+	PermissionRolesCreate          = "roles.create"
+	PermissionRolesAssign          = "roles.assign"
+	PermissionPermissionsRead      = "permissions.read"
+	PermissionFilesRead            = "files.read"
+	PermissionCompetitionsCreate   = "competitions.create"
+	PermissionCompetitionsUpdate   = "competitions.update"
+	PermissionCalendarPlansRead    = "calendar_plans.read"
+	PermissionCalendarPlansCreate  = "calendar_plans.create"
+	PermissionCalendarPlansUpdate  = "calendar_plans.update"
+	PermissionMunicipalitiesRead   = "municipalities.read"
+	PermissionMunicipalitiesCreate = "municipalities.create"
 
 	SuperAdminRoleCode = "super_admin"
 )

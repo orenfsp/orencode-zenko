@@ -13,6 +13,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/competition"
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
+	"github.com/orenfsp/orencode-zenko.git/internal/municipality"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
@@ -45,6 +46,10 @@ func main() {
 	rbacRepository := rbac.NewRepository(queries, pool)
 	rbacService := rbac.NewService(rbacRepository)
 	rbacHandler := rbac.NewHandler(rbacService)
+
+	municipalityRepo := municipality.NewRepository(queries)
+	municipalityService := municipality.NewService(municipalityRepo)
+	municipalityHandler := municipality.NewHandler(municipalityService)
 	rbacMiddleware := rbac.NewMiddleware(jwtManager, rbacRepository)
 	protected := func(permission string, handler http.HandlerFunc) http.Handler {
 		return rbacMiddleware.Authenticate(rbacMiddleware.Require(permission)(handler))
@@ -116,6 +121,10 @@ func main() {
 
 	mux.Handle("GET /api/v1/roles/self-assignable", rbacMiddleware.Authenticate(http.HandlerFunc(rbacHandler.ListSelfAssignableRoles)))
 
+	mux.HandleFunc("GET /api/v1/municipalities", municipalityHandler.List)
+	mux.HandleFunc("GET /api/v1/municipalities/{id}", municipalityHandler.Get)
+	mux.Handle("POST /api/v1/admin/municipalities",
+		protected(rbac.PermissionMunicipalitiesCreate, municipalityHandler.Create))
 	address := ":" + cfg.HTTP.Port
 	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(mux)
 	logger.Log.Info("server started", zap.String("address", address))
