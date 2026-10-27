@@ -63,6 +63,9 @@ func (denyingRBACRepository) ListRoles(context.Context) ([]rbac.Role, error) { r
 func (denyingRBACRepository) ListPermissions(context.Context) ([]rbac.Permission, error) {
 	return nil, nil
 }
+func (denyingRBACRepository) ListSelfAssignableRoles(context.Context) ([]rbac.Role, error) {
+	return nil, nil
+}
 
 func TestRegisterCompetitionRoutes(t *testing.T) {
 	permissions := map[string]string{}

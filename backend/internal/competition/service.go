@@ -198,6 +198,7 @@ func mergeUpdate(current Competition, req UpdateRequest) (UpdateCompetition, err
 	if req.CalendarPlanID.Present {
 		if req.CalendarPlanID.Null {
 			input.CalendarPlanID = nil
+			input.CalendarPlanNumber = nil
 		} else {
 			input.CalendarPlanID = &req.CalendarPlanID.Value
 		}
