@@ -12,8 +12,7 @@ migrate-down:
 	down 1
 
 sqlc:
-	sqlc generate
-
+	go run github.com/sqlc-dev/sqlc/cmd/sqlc@latest generate
 # Idempotently creates RBAC permissions, the super-admin role and one admin user.
 seed-rbac:
 	go run ./cmd/seed-rbac

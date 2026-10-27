@@ -137,3 +137,19 @@ func mapPostgresError(err error) error {
 	}
 	return err
 }
+func (r *sqlRepository) ListSelfAssignableRoles(ctx context.Context) ([]Role, error) {
+	rows, err := r.queries.ListSelfAssignableRoles(ctx)
+	if err != nil {
+		return nil, err
+	}
+	roles := make([]Role, 0, len(rows))
+	for _, row := range rows {
+		codes, err := r.queries.ListPermissionCodesByRole(ctx, row.ID)
+		if err != nil {
+			return nil, err
+		}
+		roles = append(roles, Role{ID: row.ID, Code: row.Code, Name: row.Name,
+			IsSystem: row.IsSystem, SelfAssignable: row.SelfAssignable, Permissions: codes})
+	}
+	return roles, nil
+}

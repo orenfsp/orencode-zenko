@@ -8,4 +8,5 @@ type Repository interface {
 	AssignRole(ctx context.Context, userID, roleID int64) error
 	ListRoles(ctx context.Context) ([]Role, error)
 	ListPermissions(ctx context.Context) ([]Permission, error)
+	ListSelfAssignableRoles(ctx context.Context) ([]Role, error)
 }

@@ -66,6 +66,15 @@ func (h *Handler) ListPermissions(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, permissions)
 }
 
+func (h *Handler) ListSelfAssignableRoles(w http.ResponseWriter, r *http.Request) {
+	roles, err := h.service.ListSelfAssignableRoles(r.Context())
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, roles)
+}
+
 func decodeJSON(w http.ResponseWriter, r *http.Request, destination any) error {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	decoder := json.NewDecoder(r.Body)

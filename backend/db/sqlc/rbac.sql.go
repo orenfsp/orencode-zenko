@@ -214,6 +214,47 @@ func (q *Queries) ListRoles(ctx context.Context) ([]ListRolesRow, error) {
 	return items, nil
 }
 
+const listSelfAssignableRoles = `-- name: ListSelfAssignableRoles :many
+SELECT id, code, name, is_system, self_assignable
+FROM role
+WHERE self_assignable = true AND is_system = false
+ORDER BY name
+`
+
+type ListSelfAssignableRolesRow struct {
+	ID             int64
+	Code           string
+	Name           string
+	IsSystem       bool
+	SelfAssignable bool
+}
+
+func (q *Queries) ListSelfAssignableRoles(ctx context.Context) ([]ListSelfAssignableRolesRow, error) {
+	rows, err := q.db.Query(ctx, listSelfAssignableRoles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSelfAssignableRolesRow
+	for rows.Next() {
+		var i ListSelfAssignableRolesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Name,
+			&i.IsSystem,
+			&i.SelfAssignable,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const roleExists = `-- name: RoleExists :one
 SELECT EXISTS (
     SELECT 1

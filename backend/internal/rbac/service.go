@@ -60,3 +60,7 @@ func uniqueStrings(values []string) []string {
 	sort.Strings(result)
 	return result
 }
+
+func (s *Service) ListSelfAssignableRoles(ctx context.Context) ([]Role, error) {
+	return s.repository.ListSelfAssignableRoles(ctx)
+}

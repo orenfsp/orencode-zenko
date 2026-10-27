@@ -92,3 +92,8 @@ SET access_status = true,
     updated_at = now()
 RETURNING id;
 
+-- name: ListSelfAssignableRoles :many
+SELECT id, code, name, is_system, self_assignable
+FROM role
+WHERE self_assignable = true AND is_system = false
+ORDER BY name;

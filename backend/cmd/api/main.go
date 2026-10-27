@@ -104,6 +104,8 @@ func main() {
 	mux.Handle("POST /api/v1/admin/users/{userID}/roles", protected(rbac.PermissionRolesAssign, rbacHandler.AssignRole))
 	mux.Handle("GET /api/v1/admin/permissions", protected(rbac.PermissionPermissionsRead, rbacHandler.ListPermissions))
 
+	mux.Handle("GET /api/v1/roles/self-assignable", rbacMiddleware.Authenticate(http.HandlerFunc(rbacHandler.ListSelfAssignableRoles)))
+
 	address := ":" + cfg.HTTP.Port
 	logger.Log.Info("server started", zap.String("address", address))
 	if err := http.ListenAndServe(address, mux); err != nil {
