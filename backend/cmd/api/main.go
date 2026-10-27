@@ -97,6 +97,9 @@ func main() {
 	competitionRepository := competition.NewRepository(queries)
 	competitionService := competition.NewService(competitionRepository)
 	competitionHandler := competition.NewHandler(competitionService)
+	judgeRepository := competition.NewJudgeRepository(queries)
+	judgeService := competition.NewJudgeService(judgeRepository)
+	judgeHandler := competition.NewJudgeHandler(judgeService)
 	calendarPlanRepository := calendarplan.NewRepository(queries)
 	calendarPlanService := calendarplan.NewService(calendarPlanRepository)
 	calendarPlanHandler := calendarplan.NewHandler(calendarPlanService)
@@ -116,6 +119,7 @@ func main() {
 	mux.Handle("POST /api/v1/admin/users/{userID}/roles", protected(rbac.PermissionRolesAssign, rbacHandler.AssignRole))
 	mux.Handle("GET /api/v1/admin/permissions", protected(rbac.PermissionPermissionsRead, rbacHandler.ListPermissions))
 	registerCompetitionRoutes(mux, competitionHandler, protected)
+	registerCompetitionJudgeRoutes(mux, judgeHandler, protected)
 	registerCalendarPlanRoutes(mux, calendarPlanHandler, protected)
 	registerReferenceRoutes(mux, referenceHandler)
 

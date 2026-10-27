@@ -1,16 +1,17 @@
 package rbac
 
 const (
-	PermissionRolesRead           = "roles.read"
-	PermissionRolesCreate         = "roles.create"
-	PermissionRolesAssign         = "roles.assign"
-	PermissionPermissionsRead     = "permissions.read"
-	PermissionFilesRead           = "files.read"
-	PermissionCompetitionsCreate  = "competitions.create"
-	PermissionCompetitionsUpdate  = "competitions.update"
-	PermissionCalendarPlansRead   = "calendar_plans.read"
-	PermissionCalendarPlansCreate = "calendar_plans.create"
-	PermissionCalendarPlansUpdate = "calendar_plans.update"
+	PermissionRolesRead               = "roles.read"
+	PermissionRolesCreate             = "roles.create"
+	PermissionRolesAssign             = "roles.assign"
+	PermissionPermissionsRead         = "permissions.read"
+	PermissionFilesRead               = "files.read"
+	PermissionCompetitionsCreate      = "competitions.create"
+	PermissionCompetitionsUpdate      = "competitions.update"
+	PermissionCompetitionJudgesManage = "competition_judges.manage"
+	PermissionCalendarPlansRead       = "calendar_plans.read"
+	PermissionCalendarPlansCreate     = "calendar_plans.create"
+	PermissionCalendarPlansUpdate     = "calendar_plans.update"
 
 	SuperAdminRoleCode = "super_admin"
 )
@@ -28,6 +29,7 @@ var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionFilesRead, Description: "Просмотр документов пользователей"},
 	{Code: PermissionCompetitionsCreate, Description: "Создание соревнований"},
 	{Code: PermissionCompetitionsUpdate, Description: "Изменение соревнований"},
+	{Code: PermissionCompetitionJudgesManage, Description: "Назначение и снятие судей соревнования"},
 	{Code: PermissionCalendarPlansRead, Description: "Просмотр календарных планов"},
 	{Code: PermissionCalendarPlansCreate, Description: "Создание календарных планов"},
 	{Code: PermissionCalendarPlansUpdate, Description: "Изменение календарных планов"},
