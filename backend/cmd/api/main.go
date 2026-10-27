@@ -12,6 +12,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/competition"
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
+	"github.com/orenfsp/orencode-zenko.git/internal/rank"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
@@ -96,7 +97,15 @@ func main() {
 	competitionService := competition.NewService(competitionRepository)
 	competitionHandler := competition.NewHandler(competitionService)
 
+	rankRepository := rank.NewRepository(queries)
+	rankService := rank.NewService(rankRepository)
+	rankHandler := rank.NewHandler(rankService)
+
+
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/v1/admin/rank", rankHandler.CreateRank)
+	mux.HandleFunc("GET /api/v1/rank/{id}", rankHandler.GetRank)
+	mux.HandleFunc("GET /api/v1/rank/", rankHandler.ListRank)
 	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
 	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
 	mux.HandleFunc("POST /api/v1/auth/refresh", authHandler.Refresh)
