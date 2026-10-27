@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/orenfsp/orencode-zenko.git/config"
@@ -16,6 +17,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/rank"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/internal/reference"
+	"github.com/orenfsp/orencode-zenko.git/internal/usercoach"
 	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"github.com/orenfsp/orencode-zenko.git/pkg/token"
@@ -39,99 +41,188 @@ func main() {
 
 	pool := postgres.NewPostgres(context.Background(), cfg.Database.URL)
 	defer pool.Close()
+
 	queries := dbsqlc.New(pool)
 
+	// Authentication.
 	jwtManager := token.New(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
 	authRepository := auth.NewRepository(queries, pool)
-	service := auth.NewService(authRepository, jwtManager, authRepository)
+	authService := auth.NewService(authRepository, jwtManager, authRepository)
+
+	// RBAC.
 	rbacRepository := rbac.NewRepository(queries, pool)
 	rbacService := rbac.NewService(rbacRepository)
 	rbacHandler := rbac.NewHandler(rbacService)
 	rbacMiddleware := rbac.NewMiddleware(jwtManager, rbacRepository)
+
 	protected := func(permission string, handler http.HandlerFunc) http.Handler {
 		return rbacMiddleware.Authenticate(rbacMiddleware.Require(permission)(handler))
 	}
+
+	// File service.
 	fileRepo, err := file.NewSQLCRepository(queries)
 	if err != nil {
 		logger.Log.Fatal("initialize file repository", zap.Error(err))
 	}
+
 	fileStorage, err := file.NewLocalStorage(cfg.Storage.Path)
 	if err != nil {
 		logger.Log.Fatal("initialize file storage", zap.Error(err))
 	}
+
 	fileService, err := file.NewService(fileRepo, fileStorage, file.DefaultPolicies())
 	if err != nil {
 		logger.Log.Fatal("initialize file service", zap.Error(err))
 	}
 
+	// Periodic cleanup of pending file deletions.
 	cleanupCtx, cancelCleanup := context.WithCancel(context.Background())
 	defer cancelCleanup()
 
-	go func(ctx context.Context, svc *file.Service, cfg config.StorageConfig) {
-		ticker := time.NewTicker(cfg.CleanupInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				cutoff := time.Now().Add(-cfg.CleanupRetention)
-				result, err := svc.CleanupPending(ctx, cutoff, cfg.CleanupBatch)
-				if err != nil {
-					logger.Log.Error("file cleanup failed", zap.Error(err),
-						zap.Int("processed", result.Processed), zap.Int("failed", result.Failed))
-					continue
-				}
-				if result.Processed > 0 {
-					logger.Log.Info("file cleanup finished",
-						zap.Int("processed", result.Processed), zap.Int("failed", result.Failed))
+	if cfg.Storage.CleanupInterval > 0 {
+		go func(ctx context.Context, svc *file.Service, storageCfg *config.StorageConfig) {
+			ticker := time.NewTicker(storageCfg.CleanupInterval)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					cutoff := time.Now().Add(-storageCfg.CleanupRetention)
+					result, err := svc.CleanupPending(ctx, cutoff, storageCfg.CleanupBatch)
+					if err != nil {
+						logger.Log.Error(
+							"file cleanup failed",
+							zap.Error(err),
+							zap.Int("processed", result.Processed),
+							zap.Int("failed", result.Failed),
+						)
+						continue
+					}
+					if result.Processed > 0 || result.Failed > 0 {
+						logger.Log.Info(
+							"file cleanup finished",
+							zap.Int("processed", result.Processed),
+							zap.Int("failed", result.Failed),
+						)
+					}
 				}
 			}
-		}
-	}(cleanupCtx, fileService, cfg.Storage)
+		}(cleanupCtx, fileService, cfg.Storage)
+	}
 
-	authHandler := auth.NewHandler(service, fileService)
+	authHandler := auth.NewHandler(authService, fileService)
+
 	fileHandler, err := file.NewHandler(fileService, rbacRepository)
 	if err != nil {
 		logger.Log.Fatal("initialize file handler", zap.Error(err))
 	}
+
+	// Competition.
 	competitionRepository := competition.NewRepository(queries)
 	competitionService := competition.NewService(competitionRepository)
 	competitionHandler := competition.NewHandler(competitionService)
+
+	// Calendar plans.
 	calendarPlanRepository := calendarplan.NewRepository(queries)
 	calendarPlanService := calendarplan.NewService(calendarPlanRepository)
 	calendarPlanHandler := calendarplan.NewHandler(calendarPlanService)
+
+	// Reference data.
 	referenceRepository := reference.NewRepository(queries)
 	referenceService := reference.NewService(referenceRepository)
 	referenceHandler := reference.NewHandler(referenceService)
 
+	// User-coach relations.
+	userCoachRepo := usercoach.NewSQLRepository(queries)
+
+	var roleChecker usercoach.RoleChecker = rbacRepository
+	userCoachService, err := usercoach.NewService(userCoachRepo, roleChecker)
+	if err != nil {
+		logger.Log.Fatal("initialize user coach service", zap.Error(err))
+	}
+	userCoachHandler := usercoach.NewHandler(userCoachService)
+
+	// Rankings.
 	rankRepository := rank.NewRepository(queries)
 	rankService := rank.NewService(rankRepository)
 	rankHandler := rank.NewHandler(rankService)
 
+	// Adds the authenticated user's ID to the context expected by usercoach.Handler.
+	// The token is verified by the existing RBAC middleware first.
+	withUserCoachIdentity := func(next http.Handler) http.Handler {
+		return rbacMiddleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			const bearerPrefix = "Bearer "
+			authorization := strings.TrimSpace(r.Header.Get("Authorization"))
 
+			if len(authorization) <= len(bearerPrefix) ||
+				!strings.EqualFold(authorization[:len(bearerPrefix)], bearerPrefix) {
+				http.Error(w, "требуется авторизация", http.StatusUnauthorized)
+				return
+			}
+
+			rawToken := strings.TrimSpace(authorization[len(bearerPrefix):])
+			if rawToken == "" || strings.ContainsAny(rawToken, " \t\r\n") {
+				http.Error(w, "недействительный токен", http.StatusUnauthorized)
+				return
+			}
+
+			claims, err := jwtManager.Parse(rawToken)
+			if err != nil || claims == nil ||
+				claims.Type != "access" ||
+				claims.PrincipalType != "user" ||
+				claims.UserID <= 0 {
+				http.Error(w, "недействительный токен", http.StatusUnauthorized)
+				return
+			}
+
+			ctx := usercoach.WithAuthenticatedUser(r.Context(), claims.UserID)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		}))
+	}
+
+	// HTTP routes.
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v1/admin/rank", rankHandler.CreateRank)
-	mux.HandleFunc("GET /api/v1/rank/{id}", rankHandler.GetRank)
-	mux.HandleFunc("GET /api/v1/rank/", rankHandler.ListRank)
+
+	// Authentication.
 	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
 	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
 	mux.HandleFunc("POST /api/v1/auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /api/v1/auth/logout", authHandler.Logout)
 	mux.HandleFunc("PATCH /api/v1/profile", authHandler.PatchProfile)
+
+	// Files.
 	mux.Handle("GET /api/v1/files/{fileID}/download", rbacMiddleware.Authenticate(http.HandlerFunc(fileHandler.Download)))
+
+	// RBAC administration.
 	mux.Handle("GET /api/v1/admin/roles", protected(rbac.PermissionRolesRead, rbacHandler.ListRoles))
 	mux.Handle("POST /api/v1/admin/roles", protected(rbac.PermissionRolesCreate, rbacHandler.CreateRole))
 	mux.Handle("POST /api/v1/admin/users/{userID}/roles", protected(rbac.PermissionRolesAssign, rbacHandler.AssignRole))
 	mux.Handle("GET /api/v1/admin/permissions", protected(rbac.PermissionPermissionsRead, rbacHandler.ListPermissions))
+	mux.Handle("GET /api/v1/roles/self-assignable", rbacMiddleware.Authenticate(http.HandlerFunc(rbacHandler.ListSelfAssignableRoles)))
+
+	// User-coach relations.
+	mux.Handle("POST /api/v1/coach/user-coaches", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.Create)))
+	mux.Handle("GET /api/v1/coach/user-coaches", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.ListByCoach)))
+	mux.Handle("GET /api/v1/participant/coaches", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.ListByParticipant)))
+	mux.Handle("PATCH /api/v1/user-coaches/{id}/confirm", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.Confirm)))
+	mux.Handle("PATCH /api/v1/user-coaches/{id}/end", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.End)))
+
+	// Competition, calendar plans and reference data.
 	registerCompetitionRoutes(mux, competitionHandler, protected)
 	registerCalendarPlanRoutes(mux, calendarPlanHandler, protected)
 	registerReferenceRoutes(mux, referenceHandler)
 
-	mux.Handle("GET /api/v1/roles/self-assignable", rbacMiddleware.Authenticate(http.HandlerFunc(rbacHandler.ListSelfAssignableRoles)))
+	// Rankings.
+	mux.HandleFunc("POST /api/v1/admin/rank", rankHandler.CreateRank)
+	mux.HandleFunc("GET /api/v1/rank/{id}", rankHandler.GetRank)
+	mux.HandleFunc("GET /api/v1/rank/", rankHandler.ListRank)
 
+	// Start server.
 	address := ":" + cfg.HTTP.Port
 	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(mux)
+
 	logger.Log.Info("server started", zap.String("address", address))
 	if err := http.ListenAndServe(address, handler); err != nil {
 		logger.Log.Fatal("http server stopped", zap.Error(err))

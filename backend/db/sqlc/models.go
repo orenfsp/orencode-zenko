@@ -25,18 +25,6 @@ type AntiDoping struct {
 	UpdatedAt   pgtype.Timestamptz
 }
 
-type AthleteCoach struct {
-	ID            int64
-	AthleteUserID int64
-	CoachUserID   int64
-	DisciplineID  int64
-	// pending, active, suspended, completed, rejected
-	Status      string
-	RequestedAt pgtype.Timestamptz
-	ConfirmedAt pgtype.Timestamptz
-	EndedAt     pgtype.Timestamptz
-}
-
 type CalendarPlan struct {
 	ID   int64
 	Name string
@@ -264,6 +252,18 @@ type User struct {
 	UpdatedAt      pgtype.Timestamptz
 }
 
+type UserCoach struct {
+	ID           int64
+	UserID       int64
+	CoachUserID  int64
+	DisciplineID int64
+	// pending, active, suspended, completed, rejected
+	Status      string
+	RequestedAt pgtype.Timestamptz
+	ConfirmedAt pgtype.Timestamptz
+	EndedAt     pgtype.Timestamptz
+}
+
 type UserDiscipline struct {
 	UserID       int64
 	DisciplineID int64
@@ -277,6 +277,14 @@ type UserJudgeCategory struct {
 	AssignedAt  pgtype.Date
 	ExpiresAt   pgtype.Date
 	OrderNumber pgtype.Text
+}
+
+type UserRank struct {
+	ID        int64
+	RankID    int64
+	UserID    int64
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
 }
 
 type UserRankDiscipline struct {
