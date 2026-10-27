@@ -1,11 +1,16 @@
 package rbac
 
 const (
-	PermissionRolesRead       = "roles.read"
-	PermissionRolesCreate     = "roles.create"
-	PermissionRolesAssign     = "roles.assign"
-	PermissionPermissionsRead = "permissions.read"
-	PermissionFilesRead       = "files.read"
+	PermissionRolesRead           = "roles.read"
+	PermissionRolesCreate         = "roles.create"
+	PermissionRolesAssign         = "roles.assign"
+	PermissionPermissionsRead     = "permissions.read"
+	PermissionFilesRead           = "files.read"
+	PermissionCompetitionsCreate  = "competitions.create"
+	PermissionCompetitionsUpdate  = "competitions.update"
+	PermissionCalendarPlansRead   = "calendar_plans.read"
+	PermissionCalendarPlansCreate = "calendar_plans.create"
+	PermissionCalendarPlansUpdate = "calendar_plans.update"
 
 	SuperAdminRoleCode = "super_admin"
 )
@@ -21,6 +26,11 @@ var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionRolesAssign, Description: "Назначение ролей пользователям"},
 	{Code: PermissionPermissionsRead, Description: "Просмотр доступных разрешений"},
 	{Code: PermissionFilesRead, Description: "Просмотр документов пользователей"},
+	{Code: PermissionCompetitionsCreate, Description: "Создание соревнований"},
+	{Code: PermissionCompetitionsUpdate, Description: "Изменение соревнований"},
+	{Code: PermissionCalendarPlansRead, Description: "Просмотр календарных планов"},
+	{Code: PermissionCalendarPlansCreate, Description: "Создание календарных планов"},
+	{Code: PermissionCalendarPlansUpdate, Description: "Изменение календарных планов"},
 }
 
 type Role struct {
