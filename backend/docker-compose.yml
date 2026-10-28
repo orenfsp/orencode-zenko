@@ -28,9 +28,6 @@ services:
     restart: "no"
 
   rbac-seed:
-    build:
-      context: .
-      dockerfile: dockerfile
     image: vera-backend:local
     env_file:
       - .env
@@ -43,9 +40,6 @@ services:
     restart: "no"
 
   seed-demo:
-    build:
-      context: .
-      dockerfile: dockerfile
     image: vera-backend:local
     env_file:
       - .env

@@ -286,7 +286,7 @@ func (q *Queries) ListUserRankHistory(ctx context.Context, userID int64) ([]List
 const reviewRankApplication = `-- name: ReviewRankApplication :one
 UPDATE rank_application
 SET
-    status = $1,
+    status = $1::varchar,
     reviewed_by_user_id = $2,
     reviewed_at = now(),
     rejection_reason = $3,
@@ -294,7 +294,7 @@ SET
     expires_at = COALESCE(
         $5,
         CASE
-            WHEN $1 = 'approved' AND rank.ttl IS NOT NULL
+            WHEN $1::varchar = 'approved'::varchar AND rank.ttl IS NOT NULL
             THEN (COALESCE($4, CURRENT_DATE) + make_interval(years => rank.ttl))::date
             ELSE NULL
         END

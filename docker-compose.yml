@@ -30,9 +30,6 @@ services:
     restart: "no"
 
   rbac-seed:
-    build:
-      context: ./backend
-      dockerfile: dockerfile
     image: orencode-zenko-backend:local
     env_file:
       - ./backend/.env
@@ -45,9 +42,6 @@ services:
     restart: "no"
 
   seed-demo:
-    build:
-      context: ./backend
-      dockerfile: dockerfile
     image: orencode-zenko-backend:local
     env_file:
       - ./backend/.env
