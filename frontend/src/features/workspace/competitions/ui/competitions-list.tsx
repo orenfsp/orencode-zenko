@@ -1,11 +1,12 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, LoaderCircle, MapPin, Plus, Search, Video } from "lucide-react";
+import { ArrowRight, CalendarDays, LoaderCircle, MapPin } from "lucide-react";
 import Link from "next/link";
 
 import { competitionApi } from "@/entities/competition";
 import type { Competition } from "@/entities/competition/model/types";
+import { calendarPlanApi } from "@/entities/calendar-plan";
 import { referenceDataApi } from "@/entities/reference-data";
 import { useAuth } from "@/entities/session";
 import { formatDate, StatusBadge } from "@/features/workspace/common";
@@ -19,12 +20,28 @@ import { DateTimePicker } from "@/shared/ui/date-time-picker";
 import { Label } from "@/shared/ui/label";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { WorkspaceToolbar } from "@/shared/ui/workspace-toolbar";
+
+const competitionFormats: Record<string, string> = { offline: "Очно", online: "Онлайн", mixed: "Смешанный формат" };
+
+function registrationLabel(startsAt: string, endsAt: string) {
+  const now = Date.now();
+  const start = new Date(startsAt).getTime();
+  const end = new Date(endsAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return "Срок регистрации уточняется";
+  if (now < start) return `Регистрация с ${formatDate(startsAt)}`;
+  if (now >= end) return "Регистрация завершена";
+  const days = Math.max(1, Math.ceil((end - now) / 86_400_000));
+  return `Осталось ${days} дн. регистрации`;
+}
 
 export function CompetitionsList() {
   const { identity } = useAuth();
   const notify = useNotifications();
   const canCreate = identity?.permissions?.includes("competitions.create") ?? false;
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [formatFilter, setFormatFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [format, setFormat] = useState("offline");
   const [pending, setPending] = useState(false);
@@ -49,26 +66,25 @@ export function CompetitionsList() {
   }, [draftStorageKey]);
   const loadList = useCallback(() => competitionApi.list({ limit: 100 }), []);
   const loadReferences = useCallback(async () => {
-    const [disciplines, types, levels] = await Promise.all([
+    const [disciplines, types, levels, calendarPlans] = await Promise.all([
       referenceDataApi.disciplines(),
       referenceDataApi.competitionTypes(),
       referenceDataApi.competitionLevels(),
+      identity?.permissions?.includes("calendar_plans.read")
+        ? calendarPlanApi.list({ limit: 100 })
+        : Promise.resolve([]),
     ]);
-    return { disciplines, types, levels };
-  }, []);
+    return { disciplines, types, levels, calendarPlans };
+  }, [identity?.permissions]);
   const state = useAsyncData(loadList);
   const references = useAsyncData(loadReferences);
   const competitions = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("ru");
-    return (state.data ?? []).filter((competition) =>
-      !query
-        ? true
-        : [competition.name, competition.discipline.name, competition.competition_type.name]
-            .join(" ")
-            .toLocaleLowerCase("ru")
-            .includes(query),
-    );
-  }, [search, state.data]);
+    return (state.data ?? []).filter((competition) => {
+      const matchesSearch = !query || [competition.name, competition.discipline.name, competition.competition_type.name].join(" ").toLocaleLowerCase("ru").includes(query);
+      return matchesSearch && (statusFilter === "all" || competition.status === statusFilter) && (formatFilter === "all" || competition.format === formatFilter);
+    });
+  }, [formatFilter, search, state.data, statusFilter]);
   const visibleDrafts = recentDrafts.filter((competition) =>
     competition.name.toLocaleLowerCase("ru").includes(search.trim().toLocaleLowerCase("ru")),
   );
@@ -101,6 +117,9 @@ export function CompetitionsList() {
         registration_ends_at: new Date(String(form.get("registration_ends_at"))).toISOString(),
         venue_address: nullable("venue_address"),
         online_url: nullable("online_url"),
+        calendar_plan_id: Number(form.get("calendar_plan_id")) || null,
+        calendar_plan_number: nullable("calendar_plan_number"),
+        regulation_url: nullable("regulation_url"),
       });
       if (draftStorageKey) {
         const drafts = [created, ...recentDrafts.filter((draft) => draft.id !== created.id)];
@@ -118,7 +137,7 @@ export function CompetitionsList() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      {canCreate ? <div className="mb-4 flex justify-end"><Button onClick={() => setCreateOpen(true)}><Plus />Создать</Button></div> : null}
+      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти соревнование" filterContent={<><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все статусы</SelectItem><SelectItem value="published">Опубликовано</SelectItem><SelectItem value="registration_open">Регистрация открыта</SelectItem><SelectItem value="completed">Завершено</SelectItem></SelectContent></Select><Select value={formatFilter} onValueChange={setFormatFilter}><SelectTrigger><SelectValue placeholder="Формат" /></SelectTrigger><SelectContent><SelectItem value="all">Все форматы</SelectItem><SelectItem value="offline">Очно</SelectItem><SelectItem value="online">Онлайн</SelectItem><SelectItem value="mixed">Смешанный</SelectItem></SelectContent></Select></>} createLabel="Создать соревнование" onCreate={canCreate ? () => setCreateOpen(true) : undefined} />
       {visibleDrafts.length ? (
         <section className="mb-6" aria-label="Черновики, созданные в этой вкладке">
           <h2 className="mb-2 text-sm font-medium">Созданные черновики</h2>
@@ -139,16 +158,6 @@ export function CompetitionsList() {
           </p>
         </section>
       ) : null}
-      <div className="relative mb-4 max-w-md">
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Найти соревнование"
-          className="bg-white/75 pl-9 shadow-none"
-        />
-      </div>
-
       {state.loading ? <DataLoading rows={5} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !competitions.length && !visibleDrafts.length ? (
@@ -158,35 +167,20 @@ export function CompetitionsList() {
         />
       ) : null}
 
-      <div className="grid gap-3">
+      <div className="grid gap-4 lg:grid-cols-2">
         {competitions.map((competition) => (
-          <Card key={competition.id} className="bg-white/75 p-5 shadow-none">
-            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-              <div className="min-w-0">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <StatusBadge status={competition.status} />
-                  <span className="text-xs text-muted-foreground">{competition.discipline.name}</span>
-                </div>
-                <h3 className="text-base font-medium">{competition.name}</h3>
-                {competition.description ? (
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{competition.description}</p>
-                ) : null}
-              </div>
-              <div className="grid shrink-0 gap-2 text-sm text-muted-foreground md:min-w-72">
-                <p className="flex items-center gap-2"><CalendarDays className="size-4" />{formatDate(competition.start_at)} — {formatDate(competition.end_at)}</p>
-                {competition.venue_address ? <p className="flex items-center gap-2"><MapPin className="size-4" />{competition.venue_address}</p> : null}
-                {competition.online_url ? <p className="flex items-center gap-2"><Video className="size-4" />Онлайн-формат</p> : null}
-                <Button asChild variant="outline" size="sm" className="mt-1 w-fit">
-                  <Link href={`/workspace/competitions/${competition.id}`}>Подробнее</Link>
-                </Button>
-              </div>
+          <Card key={competition.id} className="min-h-[250px] justify-between gap-8 rounded-[20px] bg-white p-5 shadow-none sm:p-6">
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-wrap items-start justify-between gap-3 text-xs text-muted-foreground sm:text-sm"><span className="max-w-[260px]">{competition.discipline.name}</span><span>{formatDate(competition.start_at)} — {formatDate(competition.end_at)}</span></div>
+              <div><div className="mb-3 flex flex-wrap gap-2"><StatusBadge status={competition.status} /><span className="text-xs text-muted-foreground">{competition.competition_type.name}</span></div><h3 className="max-w-[540px] text-2xl font-medium leading-tight tracking-tight">{competition.name}</h3>{competition.description ? <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{competition.description}</p> : null}</div>
             </div>
+            <div className="flex flex-col gap-5"><div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground sm:text-sm"><span className="flex items-center gap-2"><MapPin className="size-4" />{competition.venue_address || (competition.format === "online" ? "Онлайн-площадка" : "Место уточняется")}</span><span className="flex items-center gap-2"><CalendarDays className="size-4" />{competitionFormats[competition.format] ?? competition.format}</span></div><div className="flex flex-wrap items-center justify-between gap-3"><Button asChild className="w-full rounded-xl sm:w-auto"><Link href={`/workspace/competitions/${competition.id}`}>Подробнее <ArrowRight /></Link></Button><span className="text-xs text-muted-foreground">{registrationLabel(competition.registration_starts_at, competition.registration_ends_at)}</span></div></div>
           </Card>
         ))}
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>Новое соревнование</DialogTitle><DialogDescription>Заполните основные параметры. Новый объект будет создан как черновик.</DialogDescription></DialogHeader>
+        <DialogContent className="max-h-[90vh] overflow-y-auto scroll-mask-y sm:max-w-2xl"><DialogHeader><DialogTitle>Новое соревнование</DialogTitle><DialogDescription>Заполните основные параметры. Новый объект будет создан как черновик.</DialogDescription></DialogHeader>
           <form className="grid gap-3" onSubmit={create}>
             <Label htmlFor="competition-name">Название</Label><Input id="competition-name" name="name" required />
             <Label htmlFor="competition-description">Описание</Label><Input id="competition-description" name="description" />
@@ -195,6 +189,20 @@ export function CompetitionsList() {
               <Select name="competition_type_id"><SelectTrigger><SelectValue placeholder="Тип" /></SelectTrigger><SelectContent>{references.data?.types.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
               <Select name="competition_level_id"><SelectTrigger><SelectValue placeholder="Уровень" /></SelectTrigger><SelectContent>{references.data?.levels.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name ?? item.code ?? `#${item.id}`}</SelectItem>)}</SelectContent></Select>
             </div>
+            <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
+              <div className="grid gap-2">
+                <Label htmlFor="calendar-plan-id">Календарный план</Label>
+                <Select name="calendar_plan_id">
+                  <SelectTrigger id="calendar-plan-id"><SelectValue placeholder={references.data?.calendarPlans.length ? "Выберите план" : "Без календарного плана"} /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Без календарного плана</SelectItem>
+                    {references.data?.calendarPlans.map((plan) => <SelectItem key={plan.id} value={String(plan.id)}>{plan.name} · {plan.year}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2"><Label htmlFor="calendar-plan-number">Номер в плане</Label><Input id="calendar-plan-number" name="calendar_plan_number" placeholder="Например, 12" /></div>
+            </div>
+            <Label htmlFor="regulation-url">Ссылка на положение</Label><Input id="regulation-url" name="regulation_url" type="url" placeholder="https://…" />
             <Label htmlFor="competition-format">Формат</Label><Select name="format" value={format} onValueChange={setFormat}><SelectTrigger id="competition-format"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="offline">Очно</SelectItem><SelectItem value="online">Онлайн</SelectItem><SelectItem value="mixed">Смешанный</SelectItem></SelectContent></Select>
             <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="start-at">Начало</Label><DateTimePicker id="start-at" name="start_at" required /></div><div><Label htmlFor="end-at">Окончание</Label><DateTimePicker id="end-at" name="end_at" required /></div><div><Label htmlFor="registration-starts-at">Начало регистрации</Label><DateTimePicker id="registration-starts-at" name="registration_starts_at" required /></div><div><Label htmlFor="registration-ends-at">Конец регистрации</Label><DateTimePicker id="registration-ends-at" name="registration_ends_at" required /></div></div>
             <Label htmlFor="venue-address">Адрес площадки{format !== "online" ? " *" : ""}</Label><Input id="venue-address" name="venue_address" required={format !== "online"} placeholder="Адрес площадки…" /><Label htmlFor="online-url">Ссылка на онлайн-площадку{format !== "offline" ? " *" : ""}</Label><Input id="online-url" name="online_url" type="url" required={format !== "offline"} placeholder="https://…" />

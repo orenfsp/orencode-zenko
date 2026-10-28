@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback } from "react";
-import { Gavel } from "lucide-react";
 
 import { competitionJudgeApi } from "@/entities/competition-judge";
 import { formatDate, StatusBadge } from "@/features/workspace/common";
@@ -17,7 +16,7 @@ export function JudgeAssignments() {
   const state = useAsyncData(load);
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-6xl">
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !state.data?.length ? (
@@ -28,7 +27,6 @@ export function JudgeAssignments() {
           <Card key={assignment.id} className="bg-white/75 p-5 shadow-none">
             <div className="flex items-start justify-between gap-4">
               <div className="flex gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary"><Gavel className="size-5" /></span>
                 <div>
                   <p className="font-medium">{assignment.competition.name}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{assignment.position.name}</p>

@@ -1,11 +1,11 @@
 "use client";
 
-import { FormEvent, useCallback, useState } from "react";
-import { CalendarClock, Check, LoaderCircle, Plus } from "lucide-react";
+import { FormEvent, useCallback, useMemo, useState } from "react";
+import { LoaderCircle } from "lucide-react";
 
 import { deadlineApi } from "@/entities/deadline";
 import { useAuth } from "@/entities/session";
-import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
+import { formatDate, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Card } from "@/shared/ui/card";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
@@ -14,12 +14,17 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { DatePicker } from "@/shared/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { WorkspaceToolbar } from "@/shared/ui/workspace-toolbar";
 
 export function DeadlinesList() {
   const { identity } = useAuth();
   const notify = useNotifications();
   const canManage = identity?.permissions?.includes("deadlines.manage") ?? false;
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const load = useCallback(async () => ({
     personal: await deadlineApi.list(),
     reports: canManage ? await deadlineApi.reports() : [],
@@ -33,6 +38,7 @@ export function DeadlinesList() {
     try {
       await deadlineApi.createReport({ name: String(form.get("name") ?? ""), due_at: String(form.get("due_at") ?? ""), type: String(form.get("type")) as "report" | "governor_award", status: "planned" });
       notify.success("Срок добавлен");
+      setCreateOpen(false);
       event.currentTarget.reset();
       state.reload();
     } catch (cause) {
@@ -40,40 +46,27 @@ export function DeadlinesList() {
     } finally { setPendingId(null); }
   }
 
-  async function completeReport(id: number) {
-    setPendingId(id);
-    try {
-      await deadlineApi.updateReport(id, { status: "completed" });
-      notify.success("Срок отмечен выполненным");
-      state.reload();
-    } catch (cause) {
-      notify.error(cause instanceof Error ? cause.message : "Не удалось обновить срок");
-    } finally { setPendingId(null); }
-  }
+  const personal = useMemo(() => (state.data?.personal ?? []).filter((item) => item.title.toLocaleLowerCase("ru").includes(search.trim().toLocaleLowerCase("ru")) && (statusFilter === "all" || item.status === statusFilter)), [search, state.data, statusFilter]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
-      {canManage ? (
-        <Card className="mb-4 bg-white/75 p-4 shadow-none">
-          <form className="grid gap-2 sm:grid-cols-[1fr_180px_180px_auto]" onSubmit={createReport}>
+    <div className="mx-auto w-full max-w-6xl">
+      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти срок" filterContent={<Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все статусы</SelectItem><SelectItem value="planned">Запланированные</SelectItem><SelectItem value="completed">Выполненные</SelectItem></SelectContent></Select>} createLabel="Добавить срок" onCreate={canManage ? () => setCreateOpen(true) : undefined} />
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>Новый отчётный срок</DialogTitle><DialogDescription>Добавьте срок, который будет отображаться федерации и ответственным пользователям.</DialogDescription></DialogHeader><form className="grid gap-3" onSubmit={createReport}>
             <Input name="name" placeholder="Название отчётного срока" required />
             <Select name="type" defaultValue="report"><SelectTrigger aria-label="Тип срока"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="report">Обычный отчёт</SelectItem><SelectItem value="governor_award">Губернаторская премия</SelectItem></SelectContent></Select>
             <DatePicker id="report-due-at" name="due_at" required allowFuture />
-            <Button disabled={pendingId !== null}>{pendingId === 0 ? <LoaderCircle className="animate-spin" /> : <Plus />}Добавить</Button>
-          </form>
-        </Card>
-      ) : null}
+            <DialogFooter><Button disabled={pendingId !== null}>{pendingId === 0 ? <LoaderCircle className="animate-spin" /> : null}Добавить</Button></DialogFooter>
+          </form></DialogContent></Dialog>
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
-      {!state.loading && !state.error && !state.data?.personal.length ? (
+      {!state.loading && !state.error && !personal.length ? (
         <DataEmpty title="Активных сроков нет" description="Новые сроки появятся автоматически." />
       ) : null}
       <div className="grid gap-3">
-        {state.data?.personal.map((deadline) => (
+        {personal.map((deadline) => (
           <Card key={`${deadline.type}-${deadline.id}`} className="bg-white/75 p-5 shadow-none">
             <div className="flex items-start justify-between gap-4">
               <div className="flex gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary"><CalendarClock className="size-5" /></span>
                 <div>
                   <p className="font-medium">{deadline.title}</p>
                   <p className="mt-1 text-sm text-muted-foreground">До {formatDate(deadline.due_at, true)}</p>
@@ -85,10 +78,6 @@ export function DeadlinesList() {
           </Card>
         ))}
       </div>
-      {canManage && state.data?.reports.length ? <>
-        <SectionHeading title="Отчётные сроки" description="Сроки, созданные федерацией." />
-        <div className="grid gap-3">{state.data.reports.map((report) => <Card key={report.id} className="bg-white/75 p-4 shadow-none"><div className="flex items-center justify-between gap-3"><div><p className="font-medium">{report.name}</p><p className="mt-1 text-xs text-muted-foreground">{report.type === "governor_award" ? "Губернаторская премия" : "Отчёт"}</p><p className="mt-1 text-sm text-muted-foreground">До {formatDate(report.due_at, true)}</p></div><div className="flex items-center gap-2"><StatusBadge status={report.status} />{report.status === "planned" ? <Button size="sm" variant="outline" disabled={pendingId !== null} onClick={() => void completeReport(report.id)}>{pendingId === report.id ? <LoaderCircle className="animate-spin" /> : <Check />}Выполнено</Button> : null}</div></div></Card>)}</div>
-      </> : null}
     </div>
   );
 }

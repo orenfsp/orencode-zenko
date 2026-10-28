@@ -51,7 +51,7 @@ export function ParticipantPicker({ value, onChange }: { value: RegistryUser | n
           maxLength={100}
           autoComplete="off"
         />
-        <div className="mt-2 max-h-60 overflow-y-auto" aria-live="polite">
+        <div className="mt-2 max-h-60 overflow-y-auto scroll-mask-y" aria-live="polite">
           {loading ? <p className="px-2 py-3 text-sm text-muted-foreground">Ищем спортсменов…</p> : error ? (
             <div className="px-2 py-3 text-sm text-destructive">Не удалось загрузить список. <Button type="button" variant="link" className="h-auto p-0" onClick={() => { setLoading(true); setError(false); setRevision((current) => current + 1); }}>Повторить</Button></div>
           ) : users.length ? users.map((user, index) => (

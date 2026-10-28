@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useCallback, useState } from "react";
+import { type FormEvent, useCallback, useMemo, useState } from "react";
 import { rankStandardApi } from "@/entities/rank-standard";
 import { rankApi } from "@/entities/rank";
 import { referenceDataApi } from "@/entities/reference-data";
@@ -13,15 +13,30 @@ import { Input } from "@/shared/ui/input";
 import { DatePicker } from "@/shared/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { WorkspaceToolbar } from "@/shared/ui/workspace-toolbar";
 
 export function RankStandardsView() {
   const notify = useNotifications();
   const [pending, setPending] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [rankFilter, setRankFilter] = useState("all");
+  const [disciplineFilter, setDisciplineFilter] = useState("all");
   const load = useCallback(async () => {
     const [standards, ranks, disciplines] = await Promise.all([rankStandardApi.list(), rankApi.list(), referenceDataApi.disciplines()]);
     return { standards, ranks, disciplines };
   }, []);
   const state = useAsyncData(load);
+  const standards = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("ru");
+    const rankName = (rankId: number) => state.data?.ranks.find((rank) => rank.id === rankId)?.name ?? `Разряд #${rankId}`;
+    const disciplineName = (disciplineId: number) => state.data?.disciplines.find((discipline) => discipline.id === disciplineId)?.name ?? `Дисциплина #${disciplineId}`;
+    return (state.data?.standards ?? []).filter((standard) => {
+      const matchesSearch = !query || `${rankName(standard.rank_id)} ${disciplineName(standard.discipline_id)}`.toLocaleLowerCase("ru").includes(query);
+      return matchesSearch && (rankFilter === "all" || String(standard.rank_id) === rankFilter) && (disciplineFilter === "all" || String(standard.discipline_id) === disciplineFilter);
+    });
+  }, [disciplineFilter, rankFilter, search, state.data]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,13 +56,22 @@ export function RankStandardsView() {
         valid_to: optional("valid_to"),
       });
       notify.success("Норматив сохранён");
+      setCreateOpen(false);
       state.reload();
     } catch (cause) { notify.error(cause instanceof Error ? cause.message : "Не удалось сохранить норматив"); }
     finally { setPending(false); }
   }
 
   return <div className="mx-auto w-full max-w-6xl">
-    <Card className="mb-5 bg-white/75 p-5 shadow-none"><form className="grid gap-3" onSubmit={(event) => void submit(event)}>
+    <WorkspaceToolbar
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder="Найти норматив"
+      filterContent={<div className="grid gap-3"><Select value={rankFilter} onValueChange={setRankFilter}><SelectTrigger><SelectValue placeholder="Все разряды" /></SelectTrigger><SelectContent><SelectItem value="all">Все разряды</SelectItem>{state.data?.ranks.map((rank) => <SelectItem key={rank.id} value={String(rank.id)}>{rank.name}</SelectItem>)}</SelectContent></Select><Select value={disciplineFilter} onValueChange={setDisciplineFilter}><SelectTrigger><SelectValue placeholder="Все дисциплины" /></SelectTrigger><SelectContent><SelectItem value="all">Все дисциплины</SelectItem>{state.data?.disciplines.map((discipline) => <SelectItem key={discipline.id} value={String(discipline.id)}>{discipline.name}</SelectItem>)}</SelectContent></Select></div>}
+      createLabel="Добавить норматив"
+      onCreate={() => setCreateOpen(true)}
+    />
+    <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>Новый норматив</DialogTitle><DialogDescription>Укажите разряд, дисциплину и минимальные требования для его получения.</DialogDescription></DialogHeader><form className="grid gap-4" onSubmit={(event) => void submit(event)}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Select name="rank_id" required><SelectTrigger><SelectValue placeholder="Разряд" /></SelectTrigger><SelectContent>{state.data?.ranks.map((rank) => <SelectItem key={rank.id} value={String(rank.id)}>{rank.name}</SelectItem>)}</SelectContent></Select>
         <Select name="discipline_id" required><SelectTrigger><SelectValue placeholder="Дисциплина" /></SelectTrigger><SelectContent>{state.data?.disciplines.map((discipline) => <SelectItem key={discipline.id} value={String(discipline.id)}>{discipline.name}</SelectItem>)}</SelectContent></Select>
@@ -56,11 +80,11 @@ export function RankStandardsView() {
         <div><p className="mb-1 text-sm">Действует с</p><DatePicker id="standard-valid-from" name="valid_from" allowFuture /></div>
         <div><p className="mb-1 text-sm">Действует до</p><DatePicker id="standard-valid-to" name="valid_to" allowFuture /></div>
       </div>
-      <Button disabled={pending || !state.data} className="w-fit">{pending ? "Сохранение…" : "Сохранить норматив"}</Button>
-    </form></Card>
+      <DialogFooter><Button type="submit" disabled={pending || !state.data}>{pending ? "Сохранение…" : "Сохранить норматив"}</Button></DialogFooter>
+    </form></DialogContent></Dialog>
     {state.loading ? <DataLoading rows={4} /> : null}
     {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
-    {!state.loading && !state.error && !state.data?.standards.length ? <DataEmpty title="Нормативов пока нет" /> : null}
-    <div className="grid gap-2">{state.data?.standards.map((standard) => <Card key={standard.id} className="bg-white/75 p-4 shadow-none"><p className="font-medium">{state.data?.ranks.find((item) => item.id === standard.rank_id)?.name ?? `Разряд #${standard.rank_id}`} · {state.data?.disciplines.find((item) => item.id === standard.discipline_id)?.name ?? `Дисциплина #${standard.discipline_id}`}</p><p className="mt-1 text-sm text-muted-foreground">{standard.minimum_place != null ? `Место до ${standard.minimum_place}` : ""}{standard.minimum_place != null && standard.minimum_score != null ? " · " : ""}{standard.minimum_score != null ? `От ${standard.minimum_score} баллов` : ""}</p><p className="mt-1 text-xs text-muted-foreground">{standard.valid_from ? formatDate(standard.valid_from) : "Без даты начала"} — {standard.valid_to ? formatDate(standard.valid_to) : "бессрочно"}</p></Card>)}</div>
+    {!state.loading && !state.error && !standards.length ? <DataEmpty title={search || rankFilter !== "all" || disciplineFilter !== "all" ? "Нормативы не найдены" : "Нормативов пока нет"} description={search || rankFilter !== "all" || disciplineFilter !== "all" ? "Измените поисковый запрос или фильтры." : "Добавьте первый норматив кнопкой в toolbar."} /> : null}
+    <div className="grid gap-3">{standards.map((standard) => <Card key={standard.id} className="border-0 bg-white/75 p-4 shadow-none sm:p-5"><p className="font-medium">{state.data?.ranks.find((item) => item.id === standard.rank_id)?.name ?? `Разряд #${standard.rank_id}`} · {state.data?.disciplines.find((item) => item.id === standard.discipline_id)?.name ?? `Дисциплина #${standard.discipline_id}`}</p><p className="mt-1 text-sm text-muted-foreground">{standard.minimum_place != null ? `Место до ${standard.minimum_place}` : ""}{standard.minimum_place != null && standard.minimum_score != null ? " · " : ""}{standard.minimum_score != null ? `От ${standard.minimum_score} баллов` : ""}</p><p className="mt-1 text-xs text-muted-foreground">{standard.valid_from ? formatDate(standard.valid_from) : "Без даты начала"} — {standard.valid_to ? formatDate(standard.valid_to) : "бессрочно"}</p></Card>)}</div>
   </div>;
 }

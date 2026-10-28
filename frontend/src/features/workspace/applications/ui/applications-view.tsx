@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useState } from "react";
-import { Gavel, LoaderCircle, Medal, Plus } from "lucide-react";
+import { LoaderCircle, Plus } from "lucide-react";
 import Link from "next/link";
 
 import { competitionApi } from "@/entities/competition";
@@ -176,7 +176,7 @@ export function ApplicationsView() {
         {state.data?.rank.map((application) => (
           <Card key={`rank-${application.id}`} className="bg-white/75 p-5 shadow-none">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-              <div className="flex min-w-0 gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary"><Medal className="size-5" /></span><div><p className="font-medium">Заявка на спортивный разряд</p><p className="mt-1 text-sm text-muted-foreground">Спортсмен #{application.athlete_user_id} · разряд #{application.rank_id} · дисциплина #{application.discipline_id}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.created_at, true)} · {application.application_type}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
+              <div className="flex min-w-0 gap-3"><div><p className="font-medium">Заявка на спортивный разряд</p><p className="mt-1 text-sm text-muted-foreground">Спортсмен #{application.athlete_user_id} · разряд #{application.rank_id} · дисциплина #{application.discipline_id}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.created_at, true)} · {application.application_type}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
               <div className="flex shrink-0 items-center gap-2"><StatusBadge status={application.status} />{state.data?.mode === "review" ? <><Button size="sm" onClick={() => setReviewTarget({ kind: "rank", id: application.id, status: "approved" })}>Одобрить</Button><Button size="sm" variant="outline" onClick={() => setReviewTarget({ kind: "rank", id: application.id, status: "rejected" })}>Отклонить</Button></> : null}</div>
             </div>
           </Card>
@@ -185,7 +185,7 @@ export function ApplicationsView() {
         {state.data?.judge.map((application) => (
           <Card key={`judge-${application.id}`} className="bg-white/75 p-5 shadow-none">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-              <div className="flex min-w-0 gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary"><Gavel className="size-5" /></span><div><p className="font-medium">{application.category_name ?? `Судейская категория #${application.category_id}`}</p><p className="mt-1 text-sm text-muted-foreground">{application.judge_name ? `${application.judge_name} · ` : ""}{application.application_type}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.submitted_at, true)}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
+              <div className="flex min-w-0 gap-3"><div><p className="font-medium">{application.category_name ?? `Судейская категория #${application.category_id}`}</p><p className="mt-1 text-sm text-muted-foreground">{application.judge_name ? `${application.judge_name} · ` : ""}{application.application_type}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.submitted_at, true)}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
               <div className="flex shrink-0 items-center gap-2"><StatusBadge status={application.status} />{state.data?.mode === "review" ? <><Button size="sm" onClick={() => setReviewTarget({ kind: "judge", id: application.id, status: "approved" })}>Одобрить</Button><Button size="sm" variant="outline" onClick={() => setReviewTarget({ kind: "judge", id: application.id, status: "rejected" })}>Отклонить</Button></> : null}</div>
             </div>
           </Card>

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useCallback, useState } from "react";
-import { FileCheck2, LoaderCircle, Upload } from "lucide-react";
+import { LoaderCircle, Upload } from "lucide-react";
 
 import { antiDopingApi } from "@/entities/anti-doping";
 import { formatDate, StatusBadge } from "@/features/workspace/common";
@@ -35,7 +35,7 @@ export function AntiDopingDocuments() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-6xl">
       <div className="mb-4 flex justify-end">
         <Button asChild>
           <label aria-disabled={uploading}>
@@ -53,7 +53,6 @@ export function AntiDopingDocuments() {
           <Card key={certificate.id} className="bg-white/75 p-5 shadow-none">
             <div className="flex items-start justify-between gap-4">
               <div className="flex gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary"><FileCheck2 className="size-5" /></span>
                 <div>
                   <p className="font-medium">Сертификат #{certificate.id}</p>
                   <p className="mt-1 text-sm text-muted-foreground">Загружен {formatDate(certificate.created_at, true)}</p>

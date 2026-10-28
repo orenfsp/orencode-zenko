@@ -75,9 +75,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex min-w-0 items-start gap-3 py-3.5">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-        <Icon className="size-4" />
-      </span>
+      <Icon className="mt-1 size-4 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1">
         <span className="block text-xs text-muted-foreground">{label}</span>
         <span className="mt-0.5 block break-words text-sm font-medium">
@@ -89,7 +87,7 @@ function InfoRow({
 }
 
 function ProfileMetric({
-  icon: Icon,
+  icon: _Icon,
   label,
   value,
 }: {
@@ -99,9 +97,6 @@ function ProfileMetric({
 }) {
   return (
     <Card className="flex-row items-center gap-3 border-0 bg-muted/50 p-4">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background text-primary">
-        <Icon className="size-4" />
-      </span>
       <span className="min-w-0">
         <span className="block text-lg leading-none font-semibold">{value}</span>
         <span className="mt-1.5 block text-xs text-muted-foreground">
@@ -268,7 +263,7 @@ export function ProfileView(props: ProfileViewProps) {
 
   if (loading)
     return (
-      <div className="mx-auto w-full max-w-4xl pb-24 md:pb-0">
+      <div className="mx-auto w-full max-w-6xl pb-24 md:pb-0">
         <Skeleton className="h-[720px] rounded-2xl" />
       </div>
     );
@@ -290,7 +285,7 @@ export function ProfileView(props: ProfileViewProps) {
     : false;
   return (
     <Dialog open={editOpen} onOpenChange={changeEditOpen}>
-      <div className="mx-auto w-full max-w-4xl pb-24 md:pb-0">
+      <div className="mx-auto w-full max-w-6xl pb-24 md:pb-0">
         <Card className="border-white/70 bg-white/90 backdrop-blur-xl">
           <header className="relative p-5 sm:p-6">
             <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-center sm:text-left">
@@ -506,7 +501,7 @@ export function ProfileView(props: ProfileViewProps) {
       </div>
 
       {ownProfile ? (
-        <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-xl">
+        <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto scroll-mask-y sm:max-w-xl">
           <form onSubmit={saveProfile} className="grid gap-5">
             <DialogHeader>
               <DialogTitle>Редактирование профиля</DialogTitle>
