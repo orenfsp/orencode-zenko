@@ -1,2 +1,2 @@
 export { rankApi } from "./api/rank";
-export type { Rank } from "./model/types";
+export type { CreateRankPayload, Rank } from "./model/types";

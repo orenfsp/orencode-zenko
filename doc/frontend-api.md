@@ -937,7 +937,6 @@ export interface Permission {
 
 ## Текущие ограничения контракта
 
-- Нет endpoint’а `GET /api/v1/profile` или `/me`.
 - Нет публичного endpoint’а списка ролей с `self_assignable: true`.
 - Нет отдельных публичных upload/delete endpoint’ов: документы загружаются только внутри регистрации.
 - Пока нет API, которое отдаёт frontend ID прикреплённых документов; download endpoint готов для использования будущим profile/admin API.

@@ -11,7 +11,7 @@ import { useAuth } from "@/entities/session";
 import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
 import { Button } from "@/shared/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { DataEmpty, DataLoading } from "@/shared/ui/data-state";
+import { DataEmpty } from "@/shared/ui/data-state";
 
 type OverviewData =
   | { kind: "federation"; dashboard: DashboardData }
@@ -91,8 +91,11 @@ export function WorkspaceOverview() {
       }
     };
 
-    setLoading(true);
-    setData(null);
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setData(null);
+    });
 
     void fetchData();
 
