@@ -2,6 +2,7 @@ package team
 
 import (
 	"encoding/json"
+	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"net/http"
 )
 
@@ -14,7 +15,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		write(w, http.StatusBadRequest, map[string]string{"message": "некорректный JSON"})
 		return
 	}
-	squad, err := h.service.Create(r.Context(), req)
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok {
+		write(w, http.StatusUnauthorized, map[string]string{"message": "требуется авторизация"})
+		return
+	}
+	squad, err := h.service.Create(r.Context(), identity.UserID, req)
 	if err != nil {
 		write(w, http.StatusBadRequest, map[string]string{"message": err.Error()})
 		return
@@ -22,7 +28,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	write(w, http.StatusCreated, map[string]any{"data": squad})
 }
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	items, err := h.service.List(r.Context())
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok {
+		write(w, http.StatusUnauthorized, map[string]string{"message": "требуется авторизация"})
+		return
+	}
+	items, err := h.service.List(r.Context(), identity.UserID)
 	if err != nil {
 		write(w, http.StatusInternalServerError, map[string]string{"message": "внутренняя ошибка сервера"})
 		return

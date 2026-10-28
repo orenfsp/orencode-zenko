@@ -57,6 +57,18 @@ func (r *sqlRepository) List(ctx context.Context) ([]Squad, error) {
 	}
 	return result, nil
 }
+
+func (r *sqlRepository) ListByCoach(ctx context.Context, coachID int64) ([]Squad, error) {
+	rows, err := r.queries.ListTeamsByCoach(ctx, coachID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Squad, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, r.load(ctx, row.ID, row.Name, row.CreatedAt))
+	}
+	return result, nil
+}
 func (r *sqlRepository) load(ctx context.Context, id int64, name string, created pgtype.Timestamptz) Squad {
 	s := Squad{ID: id, Name: name, Members: []Member{}, Coaches: []Member{}, CreatedAt: created.Time}
 	members, err := r.queries.ListTeamMembers(ctx, id)

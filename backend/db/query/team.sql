@@ -33,3 +33,11 @@ FROM team_coach AS tc
 JOIN "user" AS u ON u.id = tc.coach_user_id
 WHERE tc.team_id = sqlc.arg(team_id)
 ORDER BY u.last_name, u.first_name, tc.coach_user_id;
+
+-- name: ListTeamsByCoach :many
+SELECT DISTINCT t.id, t.name, t.team_type, t.created_at
+FROM team AS t
+JOIN team_coach AS tc ON tc.team_id = t.id
+WHERE t.team_type = 'regional_squad'
+  AND tc.coach_user_id = sqlc.arg(coach_user_id)
+ORDER BY t.created_at DESC, t.id DESC;

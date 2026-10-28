@@ -200,10 +200,8 @@ func main() {
 	ratingRepository := rating.NewRepository(queries)
 	ratingService := rating.NewService(ratingRepository)
 	ratingHandler := rating.NewHandler(ratingService)
-	teamRepository := team.NewRepository(queries, pool)
-	teamService := team.NewService(teamRepository)
-	teamHandler := team.NewHandler(teamService)
 	roleChecker := rbac.NewRoleChecker(queries)
+	teamRepository := team.NewRepository(queries, pool)
 	judgeCategoryRepository := judgecategory.NewRepository(queries, pool)
 	judgeCategoryService := judgecategory.NewService(judgeCategoryRepository, roleChecker)
 	judgeCategoryHandler := judgecategory.NewHandler(judgeCategoryService)
@@ -221,6 +219,8 @@ func main() {
 
 	// User-coach relations.
 	userCoachRepo := usercoach.NewSQLRepository(queries)
+	teamService := team.NewService(teamRepository, roleChecker, userCoachRepo)
+	teamHandler := team.NewHandler(teamService)
 
 	userCoachService, err := usercoach.NewService(userCoachRepo, roleChecker)
 	if err != nil {

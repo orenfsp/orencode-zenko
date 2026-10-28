@@ -173,3 +173,37 @@ func (q *Queries) ListTeams(ctx context.Context) ([]Team, error) {
 	}
 	return items, nil
 }
+
+const listTeamsByCoach = `-- name: ListTeamsByCoach :many
+SELECT DISTINCT t.id, t.name, t.team_type, t.created_at
+FROM team AS t
+JOIN team_coach AS tc ON tc.team_id = t.id
+WHERE t.team_type = 'regional_squad'
+  AND tc.coach_user_id = $1
+ORDER BY t.created_at DESC, t.id DESC
+`
+
+func (q *Queries) ListTeamsByCoach(ctx context.Context, coachUserID int64) ([]Team, error) {
+	rows, err := q.db.Query(ctx, listTeamsByCoach, coachUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Team
+	for rows.Next() {
+		var i Team
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.TeamType,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
