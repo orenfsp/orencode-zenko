@@ -292,6 +292,29 @@ func (q *Queries) RoleExists(ctx context.Context, id int64) (bool, error) {
 	return exists, err
 }
 
+const upsertAdminRole = `-- name: UpsertAdminRole :one
+INSERT INTO role (code, name, is_system, self_assignable)
+VALUES ($1, $2, true, false)
+ON CONFLICT (code) DO UPDATE
+SET name = EXCLUDED.name,
+    is_system = true,
+    self_assignable = false,
+    updated_at = now()
+RETURNING id
+`
+
+type UpsertAdminRoleParams struct {
+	Code string
+	Name string
+}
+
+func (q *Queries) UpsertAdminRole(ctx context.Context, arg UpsertAdminRoleParams) (int64, error) {
+	row := q.db.QueryRow(ctx, upsertAdminRole, arg.Code, arg.Name)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const upsertPermission = `-- name: UpsertPermission :one
 INSERT INTO permission (code, description)
 VALUES ($1, $2)

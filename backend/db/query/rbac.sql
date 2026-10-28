@@ -87,6 +87,16 @@ SET name = EXCLUDED.name,
     updated_at = now()
 RETURNING id;
 
+-- name: UpsertAdminRole :one
+INSERT INTO role (code, name, is_system, self_assignable)
+VALUES ($1, $2, true, false)
+ON CONFLICT (code) DO UPDATE
+SET name = EXCLUDED.name,
+    is_system = true,
+    self_assignable = false,
+    updated_at = now()
+RETURNING id;
+
 -- name: UpsertSelfAssignableRole :one
 INSERT INTO role (code, name, is_system, self_assignable)
 VALUES ($1, $2, false, true)

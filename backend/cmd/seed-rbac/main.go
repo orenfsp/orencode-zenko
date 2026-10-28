@@ -128,6 +128,13 @@ func seed(ctx context.Context, pool *pgxpool.Pool, config adminSeedConfig) error
 	if err != nil {
 		return err
 	}
+	adminRoleID, err := queries.UpsertAdminRole(ctx, db.UpsertAdminRoleParams{
+		Code: rbac.AdminRoleCode,
+		Name: "Администратор",
+	})
+	if err != nil {
+		return err
+	}
 	for _, role := range rbac.DefaultSelfAssignableRoles {
 		if _, err := queries.UpsertSelfAssignableRole(ctx, db.UpsertSelfAssignableRoleParams{
 			Code: role.Code,
@@ -140,6 +147,12 @@ func seed(ctx context.Context, pool *pgxpool.Pool, config adminSeedConfig) error
 	for _, permissionID := range permissionIDs {
 		if err := queries.AssignRolePermission(ctx, db.AssignRolePermissionParams{
 			RoleID:       roleID,
+			PermissionID: permissionID,
+		}); err != nil {
+			return err
+		}
+		if err := queries.AssignRolePermission(ctx, db.AssignRolePermissionParams{
+			RoleID:       adminRoleID,
 			PermissionID: permissionID,
 		}); err != nil {
 			return err
@@ -158,6 +171,9 @@ func seed(ctx context.Context, pool *pgxpool.Pool, config adminSeedConfig) error
 	}
 
 	if err := queries.AssignRole(ctx, db.AssignRoleParams{UserID: userID, RoleID: roleID}); err != nil {
+		return err
+	}
+	if err := queries.AssignRole(ctx, db.AssignRoleParams{UserID: userID, RoleID: adminRoleID}); err != nil {
 		return err
 	}
 

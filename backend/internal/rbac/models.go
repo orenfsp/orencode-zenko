@@ -29,6 +29,7 @@ const (
 	PermissionDeadlinesManage           = "deadlines.manage"
 
 	SuperAdminRoleCode = "super_admin"
+	AdminRoleCode      = "admin"
 )
 
 type PermissionDefinition struct {
