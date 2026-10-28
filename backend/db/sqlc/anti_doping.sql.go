@@ -158,6 +158,46 @@ func (q *Queries) GetAntiDopingFileForAttachment(ctx context.Context, fileID int
 	return i, err
 }
 
+const listAllAntiDopingCertificates = `-- name: ListAllAntiDopingCertificates :many
+SELECT id, user_id, url, ttl, completed_at, created_at, updated_at, file_id, status, valid_until, reviewed_by_user_id, reviewed_at, rejection_reason
+FROM anti_doping
+ORDER BY created_at DESC, id DESC
+`
+
+func (q *Queries) ListAllAntiDopingCertificates(ctx context.Context) ([]AntiDoping, error) {
+	rows, err := q.db.Query(ctx, listAllAntiDopingCertificates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AntiDoping
+	for rows.Next() {
+		var i AntiDoping
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Url,
+			&i.Ttl,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FileID,
+			&i.Status,
+			&i.ValidUntil,
+			&i.ReviewedByUserID,
+			&i.ReviewedAt,
+			&i.RejectionReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAntiDopingCertificatesByUser = `-- name: ListAntiDopingCertificatesByUser :many
 SELECT id, user_id, url, ttl, completed_at, created_at, updated_at, file_id, status, valid_until, reviewed_by_user_id, reviewed_at, rejection_reason
 FROM anti_doping

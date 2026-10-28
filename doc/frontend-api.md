@@ -998,3 +998,22 @@ This endpoint is public and does not require an access token. It returns only sa
 ```
 
 For an invalid or unknown `userId`, the API returns `404 Not Found`.
+## Anti-doping certificates
+
+The current user's certificates are loaded with:
+
+```http
+GET /api/v1/anti-doping/self
+Authorization: Bearer <access_token>
+```
+
+This returns certificate metadata (`id`, `file_id`, `status`, dates and rejection reason). The binary document is downloaded separately through `GET /api/v1/files/{fileID}/download`.
+
+Administrators with `anti_doping.review` can load all certificates:
+
+```http
+GET /api/v1/admin/anti-doping
+Authorization: Bearer <access_token>
+```
+
+The response uses the same certificate structure and is ordered from newest to oldest. Review is performed with `PATCH /api/v1/admin/anti-doping/{certificateID}`.

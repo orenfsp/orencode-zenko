@@ -76,6 +76,18 @@ func (r *SQLCRepository) ListByUser(ctx context.Context, userID int64) ([]Certif
 	return result, nil
 }
 
+func (r *SQLCRepository) ListAll(ctx context.Context) ([]Certificate, error) {
+	rows, err := r.queries.ListAllAntiDopingCertificates(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list all anti-doping certificates: %w", err)
+	}
+	result := make([]Certificate, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, mapCertificate(row))
+	}
+	return result, nil
+}
+
 func (r *SQLCRepository) Review(
 	ctx context.Context,
 	reviewerUserID, certificateID int64,

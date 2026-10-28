@@ -15,6 +15,11 @@ FROM anti_doping
 WHERE user_id = sqlc.arg(user_id)
 ORDER BY created_at DESC, id DESC;
 
+-- name: ListAllAntiDopingCertificates :many
+SELECT *
+FROM anti_doping
+ORDER BY created_at DESC, id DESC;
+
 -- name: GetAntiDopingCertificateForReview :one
 SELECT *
 FROM anti_doping

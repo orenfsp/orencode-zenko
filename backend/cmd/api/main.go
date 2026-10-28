@@ -340,6 +340,7 @@ func main() {
 	mux.Handle("GET /api/v1/admin/files", protected(rbac.PermissionFilesRead, fileHandler.ListAll))
 	mux.Handle("POST /api/v1/anti-doping/self", authenticated(antiDopingHandler.Upload))
 	mux.Handle("GET /api/v1/anti-doping/self", authenticated(antiDopingHandler.ListMine))
+	mux.Handle("GET /api/v1/admin/anti-doping", protected(rbac.PermissionAntiDopingReview, antiDopingHandler.ListAll))
 	mux.Handle("PATCH /api/v1/admin/anti-doping/{certificateID}", protected(rbac.PermissionAntiDopingReview, antiDopingHandler.Review))
 
 	// RBAC administration.

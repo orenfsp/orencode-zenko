@@ -29,6 +29,16 @@ func (s *Service) ListByUser(ctx context.Context, userID int64) ([]Certificate, 
 	return s.repo.ListByUser(ctx, userID)
 }
 
+func (s *Service) ListAll(ctx context.Context) ([]Certificate, error) {
+	repo, ok := s.repo.(interface {
+		ListAll(context.Context) ([]Certificate, error)
+	})
+	if !ok {
+		return nil, ErrInvalidInput
+	}
+	return repo.ListAll(ctx)
+}
+
 func (s *Service) Review(
 	ctx context.Context,
 	reviewerUserID, certificateID int64,

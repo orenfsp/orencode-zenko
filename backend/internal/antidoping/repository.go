@@ -17,3 +17,8 @@ type Repository interface {
 	Review(ctx context.Context, reviewerUserID, certificateID int64, input ReviewInput) (Certificate, error)
 	Expire(ctx context.Context) (int64, error)
 }
+
+type AllRepository interface {
+	Repository
+	ListAll(ctx context.Context) ([]Certificate, error)
+}

@@ -92,6 +92,15 @@ func (h *Handler) ListMine(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, certificates)
 }
 
+func (h *Handler) ListAll(w http.ResponseWriter, r *http.Request) {
+	certificates, err := h.service.ListAll(r.Context())
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, certificates)
+}
+
 func (h *Handler) Review(w http.ResponseWriter, r *http.Request) {
 	identity, ok := rbac.IdentityFromContext(r.Context())
 	if !ok {
