@@ -93,6 +93,7 @@ type CompetitionEvent struct {
 	DisciplineID  int64
 	AgeGroupID    pgtype.Int8
 	ProtocolUrl   pgtype.Text
+	Name          string
 }
 
 type CompetitionEventResultEntry struct {

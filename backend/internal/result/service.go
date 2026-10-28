@@ -467,7 +467,7 @@ func toTableResponse(table Table) TableResponse {
 	}
 	return TableResponse{
 		Competition: CompetitionResponse{ID: table.Context.CompetitionID, Name: table.Context.CompetitionName},
-		Event: EventResponse{ID: table.Context.EventID, DisciplineID: table.Context.DisciplineID,
+		Event: EventResponse{ID: table.Context.EventID, Name: table.Context.EventName, DisciplineID: table.Context.DisciplineID,
 			DisciplineName: table.Context.DisciplineName, AgeGroupName: table.Context.AgeGroupName},
 		Mode: table.Sheet.Mode, TaskCount: table.Sheet.TaskCount, Status: table.Sheet.Status,
 		CalculatedAt: table.Sheet.CalculatedAt, ApprovedAt: table.Sheet.ApprovedAt,

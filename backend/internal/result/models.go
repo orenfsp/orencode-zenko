@@ -26,6 +26,7 @@ const (
 
 type EventContext struct {
 	EventID           int64
+	EventName         string
 	CompetitionID     int64
 	CompetitionName   string
 	CompetitionStatus string

@@ -1,6 +1,10 @@
 package competitionevent
 
-import "context"
+import (
+	"context"
+	"strings"
+	"unicode/utf8"
+)
 
 type Service struct {
 	repo Repository
@@ -58,10 +62,11 @@ func (s *Service) Create(ctx context.Context, competitionID int64, request Creat
 	if competitionID <= 0 {
 		return ResponseDTO{}, ErrInvalidID
 	}
-	if request.AgeGroupID != nil && *request.AgeGroupID <= 0 {
+	name := strings.TrimSpace(request.Name)
+	if name == "" || utf8.RuneCountInString(name) > 250 || request.AgeGroupID != nil && *request.AgeGroupID <= 0 {
 		return ResponseDTO{}, ErrInvalidCreate
 	}
-	created, err := s.repo.CreateDraft(ctx, competitionID, request.AgeGroupID)
+	created, err := s.repo.CreateDraft(ctx, competitionID, name, request.AgeGroupID)
 	if err != nil {
 		return ResponseDTO{}, err
 	}
@@ -72,14 +77,33 @@ func (s *Service) Update(ctx context.Context, competitionID, eventID int64, requ
 	if competitionID <= 0 || eventID <= 0 {
 		return ResponseDTO{}, ErrInvalidID
 	}
-	if !request.AgeGroupID.Present || (!request.AgeGroupID.Null && request.AgeGroupID.Value <= 0) {
+	if !request.Name.Present && !request.AgeGroupID.Present {
 		return ResponseDTO{}, ErrInvalidUpdate
 	}
-	var ageGroupID *int64
-	if !request.AgeGroupID.Null {
-		ageGroupID = &request.AgeGroupID.Value
+	if request.Name.Present && (request.Name.Null || strings.TrimSpace(request.Name.Value) == "" || utf8.RuneCountInString(strings.TrimSpace(request.Name.Value)) > 250) {
+		return ResponseDTO{}, ErrInvalidUpdate
 	}
-	updated, err := s.repo.UpdateDraft(ctx, competitionID, eventID, ageGroupID)
+	if request.AgeGroupID.Present && !request.AgeGroupID.Null && request.AgeGroupID.Value <= 0 {
+		return ResponseDTO{}, ErrInvalidUpdate
+	}
+	current, err := s.repo.GetAdmin(ctx, competitionID, eventID)
+	if err != nil {
+		return ResponseDTO{}, err
+	}
+	name := current.Name
+	if request.Name.Present {
+		name = strings.TrimSpace(request.Name.Value)
+	}
+	ageGroupID := current.AgeGroupID
+	if request.AgeGroupID.Present {
+		if request.AgeGroupID.Null {
+			ageGroupID = nil
+		} else {
+			value := request.AgeGroupID.Value
+			ageGroupID = &value
+		}
+	}
+	updated, err := s.repo.UpdateDraft(ctx, competitionID, eventID, name, ageGroupID)
 	if err != nil {
 		return ResponseDTO{}, err
 	}
@@ -104,6 +128,7 @@ func toResponses(items []Event) []ResponseDTO {
 func toResponse(item Event) ResponseDTO {
 	response := ResponseDTO{
 		ID: item.ID, CompetitionID: item.CompetitionID,
+		Name:        item.Name,
 		Discipline:  ReferenceDTO{ID: item.DisciplineID, Name: item.DisciplineName},
 		ProtocolURL: item.ProtocolURL,
 	}

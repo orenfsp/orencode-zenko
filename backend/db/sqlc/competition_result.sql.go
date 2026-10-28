@@ -169,6 +169,7 @@ func (q *Queries) GetEventResultSheet(ctx context.Context, pEventID int64) (Comp
 const getResultEventContext = `-- name: GetResultEventContext :one
 SELECT
     ce.id AS event_id,
+    ce.name AS event_name,
     c.id AS competition_id,
     c.name AS competition_name,
     c.status AS competition_status,
@@ -192,6 +193,7 @@ type GetResultEventContextParams struct {
 
 type GetResultEventContextRow struct {
 	EventID           int64
+	EventName         string
 	CompetitionID     int64
 	CompetitionName   string
 	CompetitionStatus string
@@ -207,6 +209,7 @@ func (q *Queries) GetResultEventContext(ctx context.Context, arg GetResultEventC
 	var i GetResultEventContextRow
 	err := row.Scan(
 		&i.EventID,
+		&i.EventName,
 		&i.CompetitionID,
 		&i.CompetitionName,
 		&i.CompetitionStatus,

@@ -29,6 +29,7 @@
   "data": {
     "id": 9,
     "competition_id": 7,
+    "name": "Личный зачёт среди юниоров",
     "discipline": {
       "id": 2,
       "name": "Алгоритмическое программирование"
@@ -51,10 +52,10 @@ POST /api/v1/competitions/7/events
 Authorization: Bearer <access_token>
 Content-Type: application/json
 
-{"age_group_id":3}
+{"name":"Личный зачёт среди юниоров","age_group_id":3}
 ```
 
-`age_group_id` необязателен; если задан, справочник `age_group` должен содержать запись. `competition_id` берётся только из URL, а `discipline_id` — из заблокированной строки родительского Competition. Попытка передать эти поля в JSON отклоняется как неизвестное поле. Успешный ответ: `201 Created` и полный Event.
+`name` обязателен и должен содержать от 1 до 250 символов. `age_group_id` необязателен; если задан, справочник `age_group` должен содержать запись. `competition_id` берётся только из URL, а `discipline_id` — из заблокированной строки родительского Competition. Попытка передать эти поля в JSON отклоняется как неизвестное поле. Успешный ответ: `201 Created` и полный Event.
 
 Создавать Event можно только у Competition со статусом `draft`. Repository начинает транзакцию, блокирует строку Competition через `SELECT ... FOR UPDATE`, проверяет статус и только затем выполняет INSERT. Будущая операция публикации должна блокировать ту же строку Competition; тогда публикация и изменение Events не смогут пройти одновременно на противоречивых состояниях.
 
@@ -65,10 +66,10 @@ PATCH /api/v1/competitions/7/events/9
 Authorization: Bearer <access_token>
 Content-Type: application/json
 
-{"age_group_id":4}
+{"name":"Личный зачёт 14–17 лет","age_group_id":4}
 ```
 
-Единственное изменяемое поле — `age_group_id`. Чтобы очистить его, передайте явный `null`:
+Изменяемые поля — `name` и `age_group_id`. Чтобы очистить возрастную группу, передайте явный `null`:
 
 ```json
 {"age_group_id":null}
@@ -109,7 +110,7 @@ curl http://localhost:8080/api/v1/admin/competitions/7/events \
 curl -X POST http://localhost:8080/api/v1/competitions/7/events \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"age_group_id":3}'
+  -d '{"name":"Личный зачёт среди юниоров","age_group_id":3}'
 
 curl -X PATCH http://localhost:8080/api/v1/competitions/7/events/9 \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
@@ -121,3 +122,8 @@ curl -i -X DELETE http://localhost:8080/api/v1/competitions/7/events/9 \
 ```
 
 Публикация Competition остаётся отдельной операцией. Перед переводом из `draft` она должна проверять готовность Events и использовать блокировку той же строки Competition, что и Event Repository.
+## Название зачёта
+
+Поле `name` обязательно при создании Event и возвращается во всех публичных и административных ответах. После нормализации длина должна быть от 1 до 250 символов. В `PATCH` можно передать только `name`, только `age_group_id` либо оба поля. Значение `null` и пустая строка для `name` запрещены.
+
+Генератор PDF-протокола использует `event.name`; техническое название вида `Мероприятие №{id}` больше не формируется.

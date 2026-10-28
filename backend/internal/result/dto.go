@@ -50,6 +50,7 @@ type CompetitionResponse struct {
 
 type EventResponse struct {
 	ID             int64   `json:"id"`
+	Name           string  `json:"name"`
 	DisciplineID   int64   `json:"discipline_id"`
 	DisciplineName string  `json:"discipline_name"`
 	AgeGroupName   *string `json:"age_group_name"`

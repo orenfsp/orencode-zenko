@@ -75,7 +75,7 @@ func (r *SQLCRepository) GetEventContext(
 		return EventContext{}, err
 	}
 	return EventContext{
-		EventID: row.EventID, CompetitionID: row.CompetitionID,
+		EventID: row.EventID, EventName: row.EventName, CompetitionID: row.CompetitionID,
 		CompetitionName: row.CompetitionName, CompetitionStatus: row.CompetitionStatus,
 		StartAt: row.StartAt.Time, EndAt: row.EndAt.Time,
 		DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,

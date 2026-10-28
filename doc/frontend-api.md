@@ -1051,3 +1051,12 @@ Authorization: Bearer <access_token>
 ```
 
 The `role` filter is optional and supports role codes such as `judge`, `coach` and `participant`. Results use the registry pagination format and require `registry.read`.
+## Competition event name
+
+Every competition Event now has a required `name` field. Send it when creating an Event and use the same field from all public/admin Event responses:
+
+```json
+{ "name": "Личный зачёт среди юниоров", "age_group_id": 3 }
+```
+
+It can be changed through the existing Event `PATCH` endpoint. The generated protocol displays this name instead of `Мероприятие №{id}`.

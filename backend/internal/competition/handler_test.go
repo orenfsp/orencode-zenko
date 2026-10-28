@@ -132,9 +132,14 @@ func TestHandlerCalendarReturnsCompactJSON(t *testing.T) {
 	if len(body["data"]) != 1 {
 		t.Fatalf("data = %#v", body["data"])
 	}
-	for _, field := range []string{"description", "registration_starts_at", "registration_ends_at", "calendar_plan", "regulation_url"} {
+	for _, field := range []string{"description", "calendar_plan"} {
 		if _, exists := body["data"][0][field]; exists {
 			t.Fatalf("compact response unexpectedly contains %q", field)
+		}
+	}
+	for _, field := range []string{"registration_starts_at", "registration_ends_at", "regulation_url"} {
+		if _, exists := body["data"][0][field]; !exists {
+			t.Fatalf("calendar response does not contain %q", field)
 		}
 	}
 }

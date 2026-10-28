@@ -2,6 +2,7 @@
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -19,6 +20,7 @@ ORDER BY ce.id;
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -44,6 +46,7 @@ SELECT EXISTS(
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -59,6 +62,7 @@ ORDER BY ce.id;
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -86,6 +90,7 @@ SELECT EXISTS(SELECT 1 FROM age_group WHERE id = sqlc.arg(age_group_id));
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -107,13 +112,14 @@ SELECT EXISTS(
 
 -- name: CreateCompetitionEvent :one
 WITH created AS (
-    INSERT INTO competition_event (competition_id, discipline_id, age_group_id)
-    VALUES (sqlc.arg(competition_id), sqlc.arg(discipline_id), sqlc.narg(age_group_id))
-    RETURNING id, competition_id, discipline_id, age_group_id, protocol_url
+    INSERT INTO competition_event (competition_id, name, discipline_id, age_group_id)
+    VALUES (sqlc.arg(competition_id), sqlc.arg(name), sqlc.arg(discipline_id), sqlc.narg(age_group_id))
+    RETURNING id, competition_id, name, discipline_id, age_group_id, protocol_url
 )
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -126,14 +132,16 @@ LEFT JOIN age_group AS ag ON ag.id = ce.age_group_id;
 -- name: UpdateCompetitionEvent :one
 WITH updated AS (
     UPDATE competition_event AS target
-    SET age_group_id = sqlc.narg(age_group_id)
+    SET name = sqlc.arg(name),
+        age_group_id = sqlc.narg(age_group_id)
     WHERE target.competition_id = sqlc.arg(competition_id)
       AND target.id = sqlc.arg(event_id)
-    RETURNING id, competition_id, discipline_id, age_group_id, protocol_url
+    RETURNING id, competition_id, name, discipline_id, age_group_id, protocol_url
 )
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,

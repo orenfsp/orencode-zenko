@@ -97,7 +97,7 @@ func (g *PDFProtocolGenerator) addPageHeader(
 	pdf.CellFormat(0, 7, "ПРОТОКОЛ РЕЗУЛЬТАТОВ", "", 1, "C", false, 0, "")
 	pdf.SetFont("Go", "", 9)
 	pdf.MultiCell(0, 5, data.Table.Context.CompetitionName, "", "C", false)
-	eventName := fmt.Sprintf("Мероприятие №%d", data.Table.Context.EventID)
+	eventName := data.Table.Context.EventName
 	if data.Table.Context.AgeGroupName != nil {
 		eventName += ", " + *data.Table.Context.AgeGroupName
 	}

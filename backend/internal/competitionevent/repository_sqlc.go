@@ -40,7 +40,7 @@ func (r *sqlRepository) ListPublic(ctx context.Context, competitionID int64) ([]
 	}
 	items := make([]Event, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, eventFromValues(row.ID, row.CompetitionID, row.DisciplineID,
+		items = append(items, eventFromValues(row.ID, row.CompetitionID, row.Name, row.DisciplineID,
 			row.DisciplineName, row.AgeGroupID, row.AgeGroupName, row.ProtocolUrl))
 	}
 	return items, nil
@@ -56,7 +56,7 @@ func (r *sqlRepository) GetPublic(ctx context.Context, competitionID, eventID in
 	if err != nil {
 		return Event{}, err
 	}
-	return eventFromValues(row.ID, row.CompetitionID, row.DisciplineID, row.DisciplineName,
+	return eventFromValues(row.ID, row.CompetitionID, row.Name, row.DisciplineID, row.DisciplineName,
 		row.AgeGroupID, row.AgeGroupName, row.ProtocolUrl), nil
 }
 
@@ -76,7 +76,7 @@ func (r *sqlRepository) ListAdmin(ctx context.Context, competitionID int64) ([]E
 	}
 	items := make([]Event, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, eventFromValues(row.ID, row.CompetitionID, row.DisciplineID,
+		items = append(items, eventFromValues(row.ID, row.CompetitionID, row.Name, row.DisciplineID,
 			row.DisciplineName, row.AgeGroupID, row.AgeGroupName, row.ProtocolUrl))
 	}
 	return items, nil
@@ -92,11 +92,11 @@ func (r *sqlRepository) GetAdmin(ctx context.Context, competitionID, eventID int
 	if err != nil {
 		return Event{}, err
 	}
-	return eventFromValues(row.ID, row.CompetitionID, row.DisciplineID, row.DisciplineName,
+	return eventFromValues(row.ID, row.CompetitionID, row.Name, row.DisciplineID, row.DisciplineName,
 		row.AgeGroupID, row.AgeGroupName, row.ProtocolUrl), nil
 }
 
-func (r *sqlRepository) CreateDraft(ctx context.Context, competitionID int64, ageGroupID *int64) (Event, error) {
+func (r *sqlRepository) CreateDraft(ctx context.Context, competitionID int64, name string, ageGroupID *int64) (Event, error) {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return Event{}, err
@@ -112,7 +112,7 @@ func (r *sqlRepository) CreateDraft(ctx context.Context, competitionID int64, ag
 		return Event{}, err
 	}
 	row, err := queries.CreateCompetitionEvent(ctx, db.CreateCompetitionEventParams{
-		CompetitionID: competitionID, DisciplineID: parent.DisciplineID, AgeGroupID: nullableInt64(ageGroupID),
+		CompetitionID: competitionID, Name: name, DisciplineID: parent.DisciplineID, AgeGroupID: nullableInt64(ageGroupID),
 	})
 	if err != nil {
 		return Event{}, mapWriteError(err)
@@ -120,11 +120,11 @@ func (r *sqlRepository) CreateDraft(ctx context.Context, competitionID int64, ag
 	if err := tx.Commit(ctx); err != nil {
 		return Event{}, err
 	}
-	return eventFromValues(row.ID, row.CompetitionID, row.DisciplineID, row.DisciplineName,
+	return eventFromValues(row.ID, row.CompetitionID, row.Name, row.DisciplineID, row.DisciplineName,
 		row.AgeGroupID, row.AgeGroupName, row.ProtocolUrl), nil
 }
 
-func (r *sqlRepository) UpdateDraft(ctx context.Context, competitionID, eventID int64, ageGroupID *int64) (Event, error) {
+func (r *sqlRepository) UpdateDraft(ctx context.Context, competitionID, eventID int64, name string, ageGroupID *int64) (Event, error) {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return Event{}, err
@@ -143,25 +143,27 @@ func (r *sqlRepository) UpdateDraft(ctx context.Context, competitionID, eventID 
 	if err != nil {
 		return Event{}, err
 	}
-	if sameNullableID(int64Pointer(current.AgeGroupID), ageGroupID) {
+	if current.Name == name && sameNullableID(int64Pointer(current.AgeGroupID), ageGroupID) {
 		if err := tx.Commit(ctx); err != nil {
 			return Event{}, err
 		}
-		return eventFromValues(current.ID, current.CompetitionID, current.DisciplineID,
+		return eventFromValues(current.ID, current.CompetitionID, current.Name, current.DisciplineID,
 			current.DisciplineName, current.AgeGroupID, current.AgeGroupName, current.ProtocolUrl), nil
 	}
 	if err := validateAgeGroup(ctx, queries, ageGroupID); err != nil {
 		return Event{}, err
 	}
-	hasApplications, err := queries.CompetitionEventHasApplications(ctx, eventID)
-	if err != nil {
-		return Event{}, err
-	}
-	if hasApplications {
-		return Event{}, ErrHasApplications
+	if !sameNullableID(int64Pointer(current.AgeGroupID), ageGroupID) {
+		hasApplications, err := queries.CompetitionEventHasApplications(ctx, eventID)
+		if err != nil {
+			return Event{}, err
+		}
+		if hasApplications {
+			return Event{}, ErrHasApplications
+		}
 	}
 	row, err := queries.UpdateCompetitionEvent(ctx, db.UpdateCompetitionEventParams{
-		CompetitionID: competitionID, EventID: eventID, AgeGroupID: nullableInt64(ageGroupID),
+		CompetitionID: competitionID, EventID: eventID, Name: name, AgeGroupID: nullableInt64(ageGroupID),
 	})
 	if err != nil {
 		return Event{}, mapWriteError(err)
@@ -169,7 +171,7 @@ func (r *sqlRepository) UpdateDraft(ctx context.Context, competitionID, eventID 
 	if err := tx.Commit(ctx); err != nil {
 		return Event{}, err
 	}
-	return eventFromValues(row.ID, row.CompetitionID, row.DisciplineID, row.DisciplineName,
+	return eventFromValues(row.ID, row.CompetitionID, row.Name, row.DisciplineID, row.DisciplineName,
 		row.AgeGroupID, row.AgeGroupName, row.ProtocolUrl), nil
 }
 
@@ -281,11 +283,11 @@ func sameNullableID(left, right *int64) bool {
 	return left == nil && right == nil || left != nil && right != nil && *left == *right
 }
 
-func eventFromValues(id, competitionID, disciplineID int64, disciplineName string,
+func eventFromValues(id, competitionID int64, name string, disciplineID int64, disciplineName string,
 	ageGroupID pgtype.Int8, ageGroupName, protocolURL pgtype.Text,
 ) Event {
 	return Event{
-		ID: id, CompetitionID: competitionID, DisciplineID: disciplineID, DisciplineName: disciplineName,
+		ID: id, CompetitionID: competitionID, Name: name, DisciplineID: disciplineID, DisciplineName: disciplineName,
 		AgeGroupID: int64Pointer(ageGroupID), AgeGroupName: textPointer(ageGroupName),
 		ProtocolURL: textPointer(protocolURL),
 	}

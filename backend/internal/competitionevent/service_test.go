@@ -13,8 +13,8 @@ type repositoryStub struct {
 	getPublicFn   func(context.Context, int64, int64) (Event, error)
 	listAdminFn   func(context.Context, int64) ([]Event, error)
 	getAdminFn    func(context.Context, int64, int64) (Event, error)
-	createDraftFn func(context.Context, int64, *int64) (Event, error)
-	updateDraftFn func(context.Context, int64, int64, *int64) (Event, error)
+	createDraftFn func(context.Context, int64, string, *int64) (Event, error)
+	updateDraftFn func(context.Context, int64, int64, string, *int64) (Event, error)
 	deleteDraftFn func(context.Context, int64, int64) error
 }
 
@@ -30,11 +30,11 @@ func (s *repositoryStub) ListAdmin(ctx context.Context, competitionID int64) ([]
 func (s *repositoryStub) GetAdmin(ctx context.Context, competitionID, eventID int64) (Event, error) {
 	return s.getAdminFn(ctx, competitionID, eventID)
 }
-func (s *repositoryStub) CreateDraft(ctx context.Context, competitionID int64, ageGroupID *int64) (Event, error) {
-	return s.createDraftFn(ctx, competitionID, ageGroupID)
+func (s *repositoryStub) CreateDraft(ctx context.Context, competitionID int64, name string, ageGroupID *int64) (Event, error) {
+	return s.createDraftFn(ctx, competitionID, name, ageGroupID)
 }
-func (s *repositoryStub) UpdateDraft(ctx context.Context, competitionID, eventID int64, ageGroupID *int64) (Event, error) {
-	return s.updateDraftFn(ctx, competitionID, eventID, ageGroupID)
+func (s *repositoryStub) UpdateDraft(ctx context.Context, competitionID, eventID int64, name string, ageGroupID *int64) (Event, error) {
+	return s.updateDraftFn(ctx, competitionID, eventID, name, ageGroupID)
 }
 func (s *repositoryStub) DeleteDraft(ctx context.Context, competitionID, eventID int64) error {
 	return s.deleteDraftFn(ctx, competitionID, eventID)
@@ -42,7 +42,7 @@ func (s *repositoryStub) DeleteDraft(ctx context.Context, competitionID, eventID
 
 func testEvent() Event {
 	ageGroupID, ageGroupName, protocol := int64(3), "Юниоры", "https://example.org/protocol.pdf"
-	return Event{ID: 9, CompetitionID: 7, DisciplineID: 2, DisciplineName: "Алгоритмическое программирование",
+	return Event{ID: 9, CompetitionID: 7, Name: "Личный зачёт", DisciplineID: 2, DisciplineName: "Алгоритмическое программирование",
 		AgeGroupID: &ageGroupID, AgeGroupName: &ageGroupName, ProtocolURL: &protocol}
 }
 
@@ -88,13 +88,13 @@ func TestServicePropagatesReadVisibilityAndOwnershipErrors(t *testing.T) {
 
 func TestServiceCreateDerivesDisciplineInRepository(t *testing.T) {
 	ageGroupID := int64(3)
-	repo := &repositoryStub{createDraftFn: func(_ context.Context, competitionID int64, got *int64) (Event, error) {
-		if competitionID != 7 || got == nil || *got != ageGroupID {
+	repo := &repositoryStub{createDraftFn: func(_ context.Context, competitionID int64, name string, got *int64) (Event, error) {
+		if competitionID != 7 || name != "Личный зачёт" || got == nil || *got != ageGroupID {
 			t.Fatalf("CreateDraft(%d, %v)", competitionID, got)
 		}
 		return testEvent(), nil
 	}}
-	created, err := NewService(repo).Create(context.Background(), 7, CreateRequest{AgeGroupID: &ageGroupID})
+	created, err := NewService(repo).Create(context.Background(), 7, CreateRequest{Name: "Личный зачёт", AgeGroupID: &ageGroupID})
 	if err != nil || created.Discipline.ID != 2 {
 		t.Fatalf("Create() = %#v, %v", created, err)
 	}
@@ -123,7 +123,7 @@ func TestServiceUpdateAndClearAgeGroup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &repositoryStub{updateDraftFn: func(_ context.Context, competitionID, eventID int64, ageGroupID *int64) (Event, error) {
+			repo := &repositoryStub{getAdminFn: func(context.Context, int64, int64) (Event, error) { return testEvent(), nil }, updateDraftFn: func(_ context.Context, competitionID, eventID int64, name string, ageGroupID *int64) (Event, error) {
 				if competitionID != 7 || eventID != 9 || (ageGroupID == nil) != tt.wantNil {
 					t.Fatalf("UpdateDraft(%d, %d, %v)", competitionID, eventID, ageGroupID)
 				}
@@ -140,7 +140,8 @@ func TestServiceMutationConflicts(t *testing.T) {
 	for _, want := range []error{ErrNotDraft, ErrAgeGroupMissing, ErrHasApplications} {
 		t.Run(want.Error(), func(t *testing.T) {
 			repo := &repositoryStub{
-				updateDraftFn: func(context.Context, int64, int64, *int64) (Event, error) { return Event{}, want },
+				getAdminFn:    func(context.Context, int64, int64) (Event, error) { return testEvent(), nil },
+				updateDraftFn: func(context.Context, int64, int64, string, *int64) (Event, error) { return Event{}, want },
 				deleteDraftFn: func(context.Context, int64, int64) error { return want },
 			}
 			request := UpdateRequest{AgeGroupID: competition.PatchField[int64]{Present: true, Null: true}}

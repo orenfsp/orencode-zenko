@@ -48,7 +48,7 @@ func TestHandlerPublicListAndGet(t *testing.T) {
 	for _, path := range []string{"/api/v1/competitions/7/events", "/api/v1/competitions/7/events/9"} {
 		response := httptest.NewRecorder()
 		mux.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
-		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"protocol_url"`) {
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"protocol_url"`) || !strings.Contains(response.Body.String(), `"name"`) {
 			t.Fatalf("GET %s = %d %s", path, response.Code, response.Body.String())
 		}
 	}
@@ -101,7 +101,7 @@ func TestHandlerRejectsInvalidPathID(t *testing.T) {
 }
 
 func TestHandlerCreateWithRBACAndStrictJSON(t *testing.T) {
-	repo := &repositoryStub{createDraftFn: func(context.Context, int64, *int64) (Event, error) {
+	repo := &repositoryStub{createDraftFn: func(context.Context, int64, string, *int64) (Event, error) {
 		return testEvent(), nil
 	}}
 	handler := NewHandler(NewService(repo))
@@ -117,7 +117,7 @@ func TestHandlerCreateWithRBACAndStrictJSON(t *testing.T) {
 		name, body string
 		want       int
 	}{
-		{name: "valid", body: `{"age_group_id":3}`, want: http.StatusCreated},
+		{name: "valid", body: `{"name":"Личный зачёт","age_group_id":3}`, want: http.StatusCreated},
 		{name: "discipline cannot be supplied", body: `{"discipline_id":2}`, want: http.StatusBadRequest},
 		{name: "protocol cannot be supplied", body: `{"protocol_url":"https://example.org"}`, want: http.StatusBadRequest},
 	} {

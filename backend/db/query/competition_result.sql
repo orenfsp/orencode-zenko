@@ -1,6 +1,7 @@
 -- name: GetResultEventContext :one
 SELECT
     ce.id AS event_id,
+    ce.name AS event_name,
     c.id AS competition_id,
     c.name AS competition_name,
     c.status AS competition_status,

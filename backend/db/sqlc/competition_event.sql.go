@@ -50,13 +50,14 @@ func (q *Queries) CompetitionForEventsExists(ctx context.Context, competitionID 
 
 const createCompetitionEvent = `-- name: CreateCompetitionEvent :one
 WITH created AS (
-    INSERT INTO competition_event (competition_id, discipline_id, age_group_id)
-    VALUES ($1, $2, $3)
-    RETURNING id, competition_id, discipline_id, age_group_id, protocol_url
+    INSERT INTO competition_event (competition_id, name, discipline_id, age_group_id)
+    VALUES ($1, $2, $3, $4)
+    RETURNING id, competition_id, name, discipline_id, age_group_id, protocol_url
 )
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -69,6 +70,7 @@ LEFT JOIN age_group AS ag ON ag.id = ce.age_group_id
 
 type CreateCompetitionEventParams struct {
 	CompetitionID int64
+	Name          string
 	DisciplineID  int64
 	AgeGroupID    pgtype.Int8
 }
@@ -76,6 +78,7 @@ type CreateCompetitionEventParams struct {
 type CreateCompetitionEventRow struct {
 	ID             int64
 	CompetitionID  int64
+	Name           string
 	DisciplineID   int64
 	DisciplineName string
 	AgeGroupID     pgtype.Int8
@@ -84,11 +87,17 @@ type CreateCompetitionEventRow struct {
 }
 
 func (q *Queries) CreateCompetitionEvent(ctx context.Context, arg CreateCompetitionEventParams) (CreateCompetitionEventRow, error) {
-	row := q.db.QueryRow(ctx, createCompetitionEvent, arg.CompetitionID, arg.DisciplineID, arg.AgeGroupID)
+	row := q.db.QueryRow(ctx, createCompetitionEvent,
+		arg.CompetitionID,
+		arg.Name,
+		arg.DisciplineID,
+		arg.AgeGroupID,
+	)
 	var i CreateCompetitionEventRow
 	err := row.Scan(
 		&i.ID,
 		&i.CompetitionID,
+		&i.Name,
 		&i.DisciplineID,
 		&i.DisciplineName,
 		&i.AgeGroupID,
@@ -121,6 +130,7 @@ const getCompetitionEventForAdmin = `-- name: GetCompetitionEventForAdmin :one
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -141,6 +151,7 @@ type GetCompetitionEventForAdminParams struct {
 type GetCompetitionEventForAdminRow struct {
 	ID             int64
 	CompetitionID  int64
+	Name           string
 	DisciplineID   int64
 	DisciplineName string
 	AgeGroupID     pgtype.Int8
@@ -154,6 +165,7 @@ func (q *Queries) GetCompetitionEventForAdmin(ctx context.Context, arg GetCompet
 	err := row.Scan(
 		&i.ID,
 		&i.CompetitionID,
+		&i.Name,
 		&i.DisciplineID,
 		&i.DisciplineName,
 		&i.AgeGroupID,
@@ -167,6 +179,7 @@ const getPublicCompetitionEvent = `-- name: GetPublicCompetitionEvent :one
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -190,6 +203,7 @@ type GetPublicCompetitionEventParams struct {
 type GetPublicCompetitionEventRow struct {
 	ID             int64
 	CompetitionID  int64
+	Name           string
 	DisciplineID   int64
 	DisciplineName string
 	AgeGroupID     pgtype.Int8
@@ -203,6 +217,7 @@ func (q *Queries) GetPublicCompetitionEvent(ctx context.Context, arg GetPublicCo
 	err := row.Scan(
 		&i.ID,
 		&i.CompetitionID,
+		&i.Name,
 		&i.DisciplineID,
 		&i.DisciplineName,
 		&i.AgeGroupID,
@@ -216,6 +231,7 @@ const listCompetitionEventsForAdmin = `-- name: ListCompetitionEventsForAdmin :m
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -231,6 +247,7 @@ ORDER BY ce.id
 type ListCompetitionEventsForAdminRow struct {
 	ID             int64
 	CompetitionID  int64
+	Name           string
 	DisciplineID   int64
 	DisciplineName string
 	AgeGroupID     pgtype.Int8
@@ -250,6 +267,7 @@ func (q *Queries) ListCompetitionEventsForAdmin(ctx context.Context, competition
 		if err := rows.Scan(
 			&i.ID,
 			&i.CompetitionID,
+			&i.Name,
 			&i.DisciplineID,
 			&i.DisciplineName,
 			&i.AgeGroupID,
@@ -270,6 +288,7 @@ const listPublicCompetitionEvents = `-- name: ListPublicCompetitionEvents :many
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -292,6 +311,7 @@ type ListPublicCompetitionEventsParams struct {
 type ListPublicCompetitionEventsRow struct {
 	ID             int64
 	CompetitionID  int64
+	Name           string
 	DisciplineID   int64
 	DisciplineName string
 	AgeGroupID     pgtype.Int8
@@ -311,6 +331,7 @@ func (q *Queries) ListPublicCompetitionEvents(ctx context.Context, arg ListPubli
 		if err := rows.Scan(
 			&i.ID,
 			&i.CompetitionID,
+			&i.Name,
 			&i.DisciplineID,
 			&i.DisciplineName,
 			&i.AgeGroupID,
@@ -331,6 +352,7 @@ const lockCompetitionEventForMutation = `-- name: LockCompetitionEventForMutatio
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -352,6 +374,7 @@ type LockCompetitionEventForMutationParams struct {
 type LockCompetitionEventForMutationRow struct {
 	ID             int64
 	CompetitionID  int64
+	Name           string
 	DisciplineID   int64
 	DisciplineName string
 	AgeGroupID     pgtype.Int8
@@ -365,6 +388,7 @@ func (q *Queries) LockCompetitionEventForMutation(ctx context.Context, arg LockC
 	err := row.Scan(
 		&i.ID,
 		&i.CompetitionID,
+		&i.Name,
 		&i.DisciplineID,
 		&i.DisciplineName,
 		&i.AgeGroupID,
@@ -417,14 +441,16 @@ func (q *Queries) PublicCompetitionForEventsExists(ctx context.Context, arg Publ
 const updateCompetitionEvent = `-- name: UpdateCompetitionEvent :one
 WITH updated AS (
     UPDATE competition_event AS target
-    SET age_group_id = $1
-    WHERE target.competition_id = $2
-      AND target.id = $3
-    RETURNING id, competition_id, discipline_id, age_group_id, protocol_url
+    SET name = $1,
+        age_group_id = $2
+    WHERE target.competition_id = $3
+      AND target.id = $4
+    RETURNING id, competition_id, name, discipline_id, age_group_id, protocol_url
 )
 SELECT
     ce.id,
     ce.competition_id,
+    ce.name,
     ce.discipline_id,
     d.name AS discipline_name,
     ce.age_group_id,
@@ -436,6 +462,7 @@ LEFT JOIN age_group AS ag ON ag.id = ce.age_group_id
 `
 
 type UpdateCompetitionEventParams struct {
+	Name          string
 	AgeGroupID    pgtype.Int8
 	CompetitionID int64
 	EventID       int64
@@ -444,6 +471,7 @@ type UpdateCompetitionEventParams struct {
 type UpdateCompetitionEventRow struct {
 	ID             int64
 	CompetitionID  int64
+	Name           string
 	DisciplineID   int64
 	DisciplineName string
 	AgeGroupID     pgtype.Int8
@@ -452,11 +480,17 @@ type UpdateCompetitionEventRow struct {
 }
 
 func (q *Queries) UpdateCompetitionEvent(ctx context.Context, arg UpdateCompetitionEventParams) (UpdateCompetitionEventRow, error) {
-	row := q.db.QueryRow(ctx, updateCompetitionEvent, arg.AgeGroupID, arg.CompetitionID, arg.EventID)
+	row := q.db.QueryRow(ctx, updateCompetitionEvent,
+		arg.Name,
+		arg.AgeGroupID,
+		arg.CompetitionID,
+		arg.EventID,
+	)
 	var i UpdateCompetitionEventRow
 	err := row.Scan(
 		&i.ID,
 		&i.CompetitionID,
+		&i.Name,
 		&i.DisciplineID,
 		&i.DisciplineName,
 		&i.AgeGroupID,

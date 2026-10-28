@@ -125,7 +125,7 @@ type protocolStub struct {
 func (p *protocolStub) Generate(ProtocolData) ([]byte, error) { p.calls++; return p.content, nil }
 
 func algorithmicContext() EventContext {
-	return EventContext{EventID: 2, CompetitionID: 1, CompetitionName: "Кубок", DisciplineID: 7, DisciplineName: AlgorithmicDiscipline}
+	return EventContext{EventID: 2, EventName: "Личный зачёт", CompetitionID: 1, CompetitionName: "Кубок", DisciplineID: 7, DisciplineName: AlgorithmicDiscipline}
 }
 
 func draftTable() Table {
