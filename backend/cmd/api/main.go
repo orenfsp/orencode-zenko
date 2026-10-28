@@ -355,6 +355,7 @@ func main() {
 	// User-coach relations.
 	mux.Handle("POST /api/v1/coach/user-coaches", rbacMiddleware.Authenticate(http.HandlerFunc(userCoachHandler.Create)))
 	mux.Handle("GET /api/v1/coach/user-coaches", rbacMiddleware.Authenticate(http.HandlerFunc(userCoachHandler.ListByCoach)))
+	mux.Handle("GET /api/v1/coach/participants", rbacMiddleware.Authenticate(http.HandlerFunc(userCoachHandler.SearchParticipants)))
 	mux.Handle("GET /api/v1/participant/coaches", rbacMiddleware.Authenticate(http.HandlerFunc(userCoachHandler.ListByParticipant)))
 	mux.Handle("PATCH /api/v1/user-coaches/{id}/confirm", rbacMiddleware.Authenticate(http.HandlerFunc(userCoachHandler.Confirm)))
 	mux.Handle("PATCH /api/v1/user-coaches/{id}/end", rbacMiddleware.Authenticate(http.HandlerFunc(userCoachHandler.End)))
