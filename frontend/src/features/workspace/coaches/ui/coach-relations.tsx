@@ -70,7 +70,7 @@ export function CoachRelations() {
     try {
       if (action === "confirm") await userCoachApi.confirm(relation.id);
       else await userCoachApi.end(relation.id);
-      notify.success(action === "confirm" ? "Связь подтверждена" : "Связь завершена");
+      notify.success(action === "confirm" ? "Сотрудничество с тренером подтверждено" : "Сотрудничество прекращено");
       state.reload();
     } catch (cause) {
       notify.error(cause instanceof Error ? cause.message : "Не удалось изменить связь");
@@ -107,11 +107,18 @@ export function CoachRelations() {
                 <StatusBadge status={relation.status} />
                 {state.data?.role === "participant" && relation.status === "pending" ? (
                   <Button size="sm" disabled={pendingId !== null} onClick={() => void update(relation, "confirm")}>
-                    {pendingId === relation.id ? <LoaderCircle className="animate-spin" /> : null}Подтвердить
+                    {pendingId === relation.id ? <LoaderCircle className="animate-spin" /> : null}Принять тренера
                   </Button>
                 ) : null}
                 {relation.status === "confirmed" ? (
-                  <ConfirmAction trigger={<Button variant="outline" size="sm" disabled={pendingId !== null}>Завершить</Button>} title="Завершить связь?" description="Тренер больше не сможет подавать заявки и формировать сборные за этого спортсмена." confirmLabel="Завершить связь" destructive onConfirm={() => update(relation, "end")} />
+                  <ConfirmAction
+                    trigger={<Button variant="outline" size="sm" disabled={pendingId !== null}>{state.data?.role === "coach" ? "Отвязать спортсмена" : "Прекратить сотрудничество"}</Button>}
+                    title={state.data?.role === "coach" ? "Отвязать спортсмена?" : "Прекратить сотрудничество с тренером?"}
+                    description="Тренер больше не сможет подавать заявки и формировать сборные за этого спортсмена. История сотрудничества сохранится."
+                    confirmLabel={state.data?.role === "coach" ? "Отвязать спортсмена" : "Прекратить сотрудничество"}
+                    destructive
+                    onConfirm={() => update(relation, "end")}
+                  />
                 ) : null}
               </div>
             </div>
