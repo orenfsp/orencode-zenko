@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -387,9 +388,7 @@ func handleServiceError(w http.ResponseWriter, err error) {
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(ErrorResponse{Message: message})
+	httpx.WriteError(w, status, httpx.ErrorCode(status), message)
 }
 
 func writeSuccess(w http.ResponseWriter, status int, data any) {

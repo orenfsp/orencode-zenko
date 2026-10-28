@@ -3,6 +3,7 @@ package competitionevent
 import (
 	"encoding/json"
 	"errors"
+	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"io"
 	"net/http"
 	"strconv"
@@ -188,7 +189,7 @@ func handleServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrAgeGroupMissing):
 		writeError(w, http.StatusBadRequest, "возрастная группа не найдена")
 	case errors.Is(err, ErrNotDraft):
-		writeError(w, http.StatusConflict, "изменять зачёты можно только у черновика соревнования")
+		httpx.WriteError(w, http.StatusConflict, "invalid_competition_status", "изменять зачёты можно только у черновика соревнования")
 	case errors.Is(err, ErrHasApplications):
 		writeError(w, http.StatusConflict, "зачёт нельзя изменить или удалить, пока существуют заявки")
 	default:
@@ -200,9 +201,7 @@ func handleServiceError(w http.ResponseWriter, err error) {
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(errorResponse{Message: message})
+	httpx.WriteError(w, status, httpx.ErrorCode(status), message)
 }
 
 func writeSuccess(w http.ResponseWriter, status int, data any) {

@@ -40,6 +40,7 @@ WITH scored AS (
       AND c.start_at < make_date(sqlc.arg(year)::integer + 1, 1, 1)
       AND (sqlc.narg(discipline_id)::bigint IS NULL OR d.id = sqlc.narg(discipline_id)::bigint)
       AND (sqlc.narg(municipality_id)::bigint IS NULL OR u.municipality_id = sqlc.narg(municipality_id)::bigint)
+      AND (sqlc.narg(age_group_id)::bigint IS NULL OR ce.age_group_id = sqlc.narg(age_group_id)::bigint)
 ), totals AS (
     SELECT user_id, last_name, first_name, middle_name, municipality_name,
            SUM(points)::double precision AS total_points,

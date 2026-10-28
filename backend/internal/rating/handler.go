@@ -57,7 +57,11 @@ func parseFilter(r *http.Request) (Filter, error) {
 	if err != nil {
 		return Filter{}, err
 	}
-	return Filter{Year: int32(year), DisciplineID: discipline, MunicipalityID: municipality, Limit: int32(limit), Offset: int32(offset)}, nil
+	ageGroup, err := optionalID(r.URL.Query().Get("age_group_id"))
+	if err != nil {
+		return Filter{}, err
+	}
+	return Filter{Year: int32(year), DisciplineID: discipline, MunicipalityID: municipality, AgeGroupID: ageGroup, Limit: int32(limit), Offset: int32(offset)}, nil
 }
 
 func optionalID(raw string) (*int64, error) {
