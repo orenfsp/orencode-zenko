@@ -80,7 +80,7 @@ func (r *repositoryStub) Approve(_ context.Context, _ int64, _ int64, _ int64, s
 func (r *repositoryStub) ListProtocolJudges(context.Context, int64) ([]Judge, error) {
 	return []Judge{{PositionName: "главный судья", LastName: "Иванов", FirstName: "Иван"}}, r.err
 }
-func (r *repositoryStub) ListHistory(context.Context, int64) ([]HistoryItem, error) {
+func (r *repositoryStub) ListHistory(context.Context, int64, *int64) ([]HistoryItem, error) {
 	return nil, r.err
 }
 

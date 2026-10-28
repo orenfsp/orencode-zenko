@@ -479,8 +479,8 @@ func (r *SQLCRepository) ListProtocolJudges(ctx context.Context, competitionID i
 	return result, nil
 }
 
-func (r *SQLCRepository) ListHistory(ctx context.Context, userID int64) ([]HistoryItem, error) {
-	rows, err := r.queries.ListAthleteResultHistory(ctx, userID)
+func (r *SQLCRepository) ListHistory(ctx context.Context, userID int64, disciplineID *int64) ([]HistoryItem, error) {
+	rows, err := r.queries.ListAthleteResultHistory(ctx, db.ListAthleteResultHistoryParams{PUserID: userID, PDisciplineID: nullableInt8(disciplineID)})
 	if err != nil {
 		return nil, err
 	}
@@ -494,7 +494,7 @@ func (r *SQLCRepository) ListHistory(ctx context.Context, userID int64) ([]Histo
 			}
 			score = &value.Float64
 		}
-		items = append(items, HistoryItem{CompetitionID: row.CompetitionID, CompetitionName: row.CompetitionName,
+		items = append(items, HistoryItem{ResultID: row.ResultID, CompetitionID: row.CompetitionID, CompetitionName: row.CompetitionName,
 			EventID: row.EventID, DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,
 			StartAt: row.StartAt.Time, Place: int32Pointer(row.Place), Score: score,
 			ResultStatus: textPointer(row.ResultStatus), ProtocolURL: textPointer(row.ProtocolUrl)})
