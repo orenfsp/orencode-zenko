@@ -1040,3 +1040,14 @@ GET /api/v1/judge-positions
 ```
 
 The public endpoint returns a list of `{ "id", "name" }` objects. Use the selected `id` as `position_id` when assigning a judge.
+
+## Search users by role
+
+Administrators can search users for assignment forms through:
+
+```http
+GET /api/v1/admin/users?role=judge&search=иван&limit=50&offset=0
+Authorization: Bearer <access_token>
+```
+
+The `role` filter is optional and supports role codes such as `judge`, `coach` and `participant`. Results use the registry pagination format and require `registry.read`.

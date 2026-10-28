@@ -411,6 +411,8 @@ func main() {
 	mux.HandleFunc("GET /api/v1/age-groups", referenceHandler.ListAgeGroups)
 	mux.Handle("GET /api/v1/admin/dashboard", protected(dashboard.PermissionRead, dashboardHandler.Get))
 	mux.Handle("GET /api/v1/admin/registry/users", protected(registry.PermissionRead, registryHandler.ListUsers))
+	// User lookup for administrative assignments. Supports role=judge and search filters.
+	mux.Handle("GET /api/v1/admin/users", protected(registry.PermissionRead, registryHandler.ListUsers))
 	mux.Handle("GET /api/v1/admin/registry/organizations", protected(registry.PermissionRead, registryHandler.ListOrganizations))
 	mux.Handle("GET /api/v1/admin/reports/users.xlsx", protected(registry.PermissionRead, registryReportHandler.UsersXLSX))
 	mux.Handle("GET /api/v1/admin/rating", protected(rating.PermissionRead, ratingHandler.List))
