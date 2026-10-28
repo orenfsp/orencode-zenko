@@ -705,6 +705,7 @@ Backend берёт `role_id` из access-токена и возвращает pe
 | `dashboard.read` | просмотр дашборда федерации |
 | `registry.read` | просмотр единого реестра федерации |
 | `rating.read` | просмотр рейтинга спортсменов |
+| `teams.manage` | формирование сборных команд |
 | `judge_categories.review` | рассмотрение заявок на судейские категории |
 | `rank_applications.review` | рассмотрение заявок на спортивные разряды |
 | `deadlines.manage` | управление отчётными сроками |
@@ -712,6 +713,16 @@ Backend берёт `role_id` из access-токена и возвращает pe
 Главный администратор из seed получает все эти permissions. Backend проверяет их по актуальным данным БД, поэтому назначение или удаление роли влияет на доступ независимо от `role_id` в старом JWT.
 
 ## Admin API
+
+### Сборные команды
+
+```http
+GET /api/v1/admin/teams
+POST /api/v1/admin/teams
+Authorization: Bearer <access_token>
+```
+
+Требуется permission `teams.manage`. Для создания передаются `name`, обязательный список `member_ids` и необязательный список `coach_ids`. Создаётся команда типа `regional_squad`.
 
 ### Рейтинг спортсменов
 

@@ -135,13 +135,15 @@ func seed(ctx context.Context, pool *pgxpool.Pool, config adminSeedConfig) error
 	if err != nil {
 		return err
 	}
+	roleIDs := map[string]int64{}
 	for _, role := range rbac.DefaultSelfAssignableRoles {
-		if _, err := queries.UpsertSelfAssignableRole(ctx, db.UpsertSelfAssignableRoleParams{
+		selfRoleID, err := queries.UpsertSelfAssignableRole(ctx, db.UpsertSelfAssignableRoleParams{
 			Code: role.Code,
 			Name: role.Name,
 		}); err != nil {
 			return err
 		}
+		roleIDs[role.Code] = selfRoleID
 	}
 
 	for _, permissionID := range permissionIDs {
@@ -156,6 +158,29 @@ func seed(ctx context.Context, pool *pgxpool.Pool, config adminSeedConfig) error
 			PermissionID: permissionID,
 		}); err != nil {
 			return err
+		}
+	}
+
+	permissionByCode := make(map[string]int64, len(permissionIDs))
+	for index, permission := range rbac.DefaultPermissions {
+		permissionByCode[permission.Code] = permissionIDs[index]
+	}
+	for roleCode, permissionCodes := range rbac.DefaultRolePermissions {
+		roleID := roleIDs[roleCode]
+		if roleID == 0 {
+			continue
+		}
+		if err := queries.ClearRolePermissions(ctx, roleID); err != nil {
+			return err
+		}
+		for _, permissionCode := range permissionCodes {
+			permissionID := permissionByCode[permissionCode]
+			if permissionID == 0 {
+				return fmt.Errorf("permission %q is not seeded", permissionCode)
+			}
+			if err := queries.AssignRolePermission(ctx, db.AssignRolePermissionParams{RoleID: roleID, PermissionID: permissionID}); err != nil {
+				return err
+			}
 		}
 	}
 

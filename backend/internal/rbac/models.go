@@ -28,6 +28,7 @@ const (
 	PermissionRankApplicationsReview    = "rank_applications.review"
 	PermissionDeadlinesManage           = "deadlines.manage"
 	PermissionRatingRead                = "rating.read"
+	PermissionTeamsManage               = "teams.manage"
 
 	SuperAdminRoleCode = "super_admin"
 	AdminRoleCode      = "admin"
@@ -47,6 +48,12 @@ var DefaultSelfAssignableRoles = []SeedRoleDefinition{
 	{Code: "participant", Name: "Участник"},
 	{Code: "coach", Name: "Тренер"},
 	{Code: "judge", Name: "Судья"},
+}
+
+var DefaultRolePermissions = map[string][]string{
+	"participant": {},
+	"coach":       {PermissionTeamsManage},
+	"judge":       {PermissionCompetitionResultsRead, PermissionCompetitionResultsManage},
 }
 
 var DefaultPermissions = []PermissionDefinition{
@@ -77,6 +84,7 @@ var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionRankApplicationsReview, Description: "Рассмотрение заявок на спортивные разряды"},
 	{Code: PermissionDeadlinesManage, Description: "Управление сроками федерации"},
 	{Code: PermissionRatingRead, Description: "Просмотр рейтинга спортсменов"},
+	{Code: PermissionTeamsManage, Description: "Формирование сборных команд"},
 }
 
 type Role struct {

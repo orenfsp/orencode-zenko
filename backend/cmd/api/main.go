@@ -29,6 +29,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/reference"
 	"github.com/orenfsp/orencode-zenko.git/internal/registry"
 	"github.com/orenfsp/orencode-zenko.git/internal/result"
+	"github.com/orenfsp/orencode-zenko.git/internal/team"
 	usercoach "github.com/orenfsp/orencode-zenko.git/internal/user_coach"
 	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
@@ -199,6 +200,9 @@ func main() {
 	ratingRepository := rating.NewRepository(queries)
 	ratingService := rating.NewService(ratingRepository)
 	ratingHandler := rating.NewHandler(ratingService)
+	teamRepository := team.NewRepository(queries, pool)
+	teamService := team.NewService(teamRepository)
+	teamHandler := team.NewHandler(teamService)
 	roleChecker := rbac.NewRoleChecker(queries)
 	judgeCategoryRepository := judgecategory.NewRepository(queries, pool)
 	judgeCategoryService := judgecategory.NewService(judgeCategoryRepository, roleChecker)
@@ -334,6 +338,8 @@ func main() {
 	mux.Handle("GET /api/v1/admin/registry/organizations", protected(registry.PermissionRead, registryHandler.ListOrganizations))
 	mux.Handle("GET /api/v1/admin/reports/users.xlsx", protected(registry.PermissionRead, registryReportHandler.UsersXLSX))
 	mux.Handle("GET /api/v1/admin/rating", protected(rating.PermissionRead, ratingHandler.List))
+	mux.Handle("GET /api/v1/admin/teams", protected(team.PermissionManage, teamHandler.List))
+	mux.Handle("POST /api/v1/admin/teams", protected(team.PermissionManage, teamHandler.Create))
 	mux.Handle("POST /api/v1/judge-category-applications", authenticated(judgeCategoryHandler.Create))
 	mux.Handle("GET /api/v1/judge-category-applications/mine", authenticated(judgeCategoryHandler.ListMine))
 	mux.Handle("GET /api/v1/judge-category/current", authenticated(judgeCategoryHandler.GetCurrent))

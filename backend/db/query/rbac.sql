@@ -34,6 +34,10 @@ INSERT INTO role_permission (role_id, permission_id)
 VALUES ($1, $2)
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
+-- name: ClearRolePermissions :exec
+DELETE FROM role_permission
+WHERE role_id = $1;
+
 -- name: UserExists :one
 SELECT EXISTS (
     SELECT 1
