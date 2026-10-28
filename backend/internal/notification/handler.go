@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+
+	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 )
 
 type Handler struct {
@@ -16,21 +18,20 @@ func NewHandler(repo Repository) *Handler {
 
 // ListNotifications обрабатывает GET /api/v1/notifications
 func (h *Handler) ListNotifications(w http.ResponseWriter, r *http.Request) {
-	// TODO: Когда друг сделает парсинг JWT, заменить эту строку на:
-	// userID := r.Context().Value(auth.UserIDKey).(int64)
-	userID := int64(1) // ВРЕМЕННАЯ ЗАГЛУШКА для демо
-
-	limitStr := r.URL.Query().Get("limit")
-	offsetStr := r.URL.Query().Get("offset")
-	limit, _ := strconv.Atoi(limitStr)
-	offset, _ := strconv.Atoi(offsetStr)
-	if limit == 0 {
-		limit = 20
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok || identity.UserID <= 0 {
+		writeError(w, http.StatusUnauthorized, "требуется access-токен")
+		return
+	}
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "некорректные limit или offset")
+		return
 	}
 
-	notifications, err := h.repo.GetUserNotifications(r.Context(), userID, int32(limit), int32(offset))
+	notifications, err := h.repo.GetUserNotifications(r.Context(), identity.UserID, limit, offset)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
 		return
 	}
 
@@ -47,15 +48,16 @@ func (h *Handler) ListNotifications(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"data": resp})
 }
 
 // MarkAsRead обрабатывает PATCH /api/v1/notifications/{id}/read
 func (h *Handler) MarkAsRead(w http.ResponseWriter, r *http.Request) {
-	// TODO: Заменить на реальный userID из токена
-	userID := int64(1) // ВРЕМЕННАЯ ЗАГЛУШКА
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok || identity.UserID <= 0 {
+		writeError(w, http.StatusUnauthorized, "требуется access-токен")
+		return
+	}
 
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -64,10 +66,37 @@ func (h *Handler) MarkAsRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.repo.MarkAsRead(r.Context(), id, userID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := h.repo.MarkAsRead(r.Context(), id, identity.UserID); err != nil {
+		writeError(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func parsePagination(r *http.Request) (int32, int32, error) {
+	limit, offset := int64(20), int64(0)
+	var err error
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		limit, err = strconv.ParseInt(raw, 10, 32)
+		if err != nil {
+			return 0, 0, err
+		}
+	}
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		offset, err = strconv.ParseInt(raw, 10, 32)
+		if err != nil {
+			return 0, 0, err
+		}
+	}
+	if limit < 1 || limit > 100 || offset < 0 {
+		return 0, 0, strconv.ErrRange
+	}
+	return int32(limit), int32(offset), nil
+}
+
+func writeError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"message": message})
 }

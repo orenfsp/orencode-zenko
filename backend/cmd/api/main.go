@@ -336,7 +336,7 @@ func main() {
 	// Rankings.
 	mux.HandleFunc("POST /api/v1/admin/rank", rankHandler.CreateRank)
 	mux.HandleFunc("GET /api/v1/rank/{id}", rankHandler.GetRank)
-	mux.HandleFunc("GET /api/v1/rank/", rankHandler.ListRank)
+	mux.HandleFunc("GET /api/v1/rank", rankHandler.ListRank)
 	mux.Handle("POST /api/v1/rank-applications", authenticated(rankApplicationHandler.Create))
 	mux.Handle("GET /api/v1/rank-applications/mine", authenticated(rankApplicationHandler.ListMine))
 	mux.Handle("GET /api/v1/ranks/history", authenticated(rankApplicationHandler.ListHistory))

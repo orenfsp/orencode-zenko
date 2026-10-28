@@ -628,6 +628,40 @@ Authorization: Bearer <access_token>
 
 Требуется `registry.read`. Организация возвращается с названием, типом и объектом муниципалитета. При отсутствии записей `items` — пустой массив.
 
+## Уведомления
+
+Уведомления создаются PostgreSQL-триггерами в `notification_outbox` и доставляются одновременно в in-app список и Telegram-очередь.
+
+```http
+GET /api/v1/notifications?limit=20&offset=0
+Authorization: Bearer <access_token>
+```
+
+Backend использует пользователя из access-токена; чужие уведомления не возвращаются. Ответ:
+
+```json
+{
+  "data": [
+    {
+      "id": 15,
+      "title": "Уведомление",
+      "message": "Ваша заявка на судейскую категорию одобрена.",
+      "is_read": false,
+      "created_at": "2026-10-27T12:00:00Z"
+    }
+  ]
+}
+```
+
+Прочитать уведомление:
+
+```http
+PATCH /api/v1/notifications/{id}/read
+Authorization: Bearer <access_token>
+```
+
+Доступные события включают изменение статуса заявки на разряд, заявки на судейскую категорию, назначение судьи на соревнование и снятие такого назначения.
+
 ## Permissions
 
 Сейчас определены следующие permissions:
