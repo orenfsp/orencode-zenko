@@ -21,6 +21,47 @@ func NewRepository(queries *db.Queries, pool *pgxpool.Pool) *SQLCRepository {
 	return &SQLCRepository{queries: queries, pool: pool}
 }
 
+func (r *SQLCRepository) ReplaceProtocol(ctx context.Context, eventID int64, key, url *string) (*string, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := r.queries.WithTx(tx)
+	sheet, err := queries.LockEventResultSheet(ctx, eventID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrProtocolNotApproved
+	}
+	if err != nil {
+		return nil, err
+	}
+	if sheet.Status != SheetApproved {
+		return nil, ErrProtocolNotApproved
+	}
+	oldKey := textPointer(sheet.ProtocolStorageKey)
+	if key == nil && oldKey == nil {
+		return nil, ErrProtocolNotFound
+	}
+	newKey := pgtype.Text{}
+	newURL := pgtype.Text{}
+	if key != nil {
+		newKey = pgtype.Text{String: *key, Valid: true}
+	}
+	if url != nil {
+		newURL = pgtype.Text{String: *url, Valid: true}
+	}
+	if err := queries.SetResultProtocolStorageKey(ctx, db.SetResultProtocolStorageKeyParams{PSheetID: sheet.ID, PProtocolStorageKey: newKey}); err != nil {
+		return nil, err
+	}
+	if err := queries.SetCompetitionEventProtocolURL(ctx, db.SetCompetitionEventProtocolURLParams{PEventID: eventID, PProtocolUrl: newURL}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return oldKey, nil
+}
+
 func (r *SQLCRepository) GetEventContext(
 	ctx context.Context, competitionID, eventID int64,
 ) (EventContext, error) {

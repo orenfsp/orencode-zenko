@@ -709,6 +709,22 @@ func (q *Queries) SetResultEntryStatus(ctx context.Context, arg SetResultEntrySt
 	return result.RowsAffected(), nil
 }
 
+const setResultProtocolStorageKey = `-- name: SetResultProtocolStorageKey :exec
+UPDATE competition_event_result_sheet
+SET protocol_storage_key = $1, updated_at = now()
+WHERE id = $2
+`
+
+type SetResultProtocolStorageKeyParams struct {
+	PProtocolStorageKey pgtype.Text
+	PSheetID            int64
+}
+
+func (q *Queries) SetResultProtocolStorageKey(ctx context.Context, arg SetResultProtocolStorageKeyParams) error {
+	_, err := q.db.Exec(ctx, setResultProtocolStorageKey, arg.PProtocolStorageKey, arg.PSheetID)
+	return err
+}
+
 const updateEventResultSheetSettings = `-- name: UpdateEventResultSheetSettings :one
 UPDATE competition_event_result_sheet
 SET mode = $1,

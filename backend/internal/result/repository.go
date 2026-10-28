@@ -13,4 +13,5 @@ type Repository interface {
 	Approve(ctx context.Context, eventID, actorUserID, version int64, summaries []EntrySummary, protocolKey, protocolURL string) (Approval, error)
 	ListProtocolJudges(ctx context.Context, competitionID int64) ([]Judge, error)
 	ListHistory(ctx context.Context, userID int64, disciplineID *int64) ([]HistoryItem, error)
+	ReplaceProtocol(ctx context.Context, eventID int64, key, url *string) (*string, error)
 }

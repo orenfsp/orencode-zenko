@@ -262,6 +262,11 @@ UPDATE competition_event
 SET protocol_url = sqlc.arg(p_protocol_url)
 WHERE id = sqlc.arg(p_event_id);
 
+-- name: SetResultProtocolStorageKey :exec
+UPDATE competition_event_result_sheet
+SET protocol_storage_key = sqlc.narg(p_protocol_storage_key), updated_at = now()
+WHERE id = sqlc.arg(p_sheet_id);
+
 -- name: ListResultProtocolJudges :many
 SELECT
     lower(jp.name) AS position_name,

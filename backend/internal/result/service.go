@@ -8,6 +8,9 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
+	"go.uber.org/zap"
 )
 
 type Storage interface {
@@ -151,7 +154,7 @@ func (s *Service) Approve(
 	}
 	protocolURL := protocolURL(competitionID, eventID)
 	if table.Sheet.Status == SheetApproved {
-		if table.Sheet.ApprovedAt == nil {
+		if table.Sheet.ApprovedAt == nil || table.Sheet.ProtocolStorageKey == nil {
 			return ApprovalResponse{}, ErrProtocolNotFound
 		}
 		return ApprovalResponse{
@@ -194,6 +197,46 @@ func (s *Service) Approve(
 	return ApprovalResponse{
 		Status: SheetApproved, ApprovedAt: approval.ApprovedAt, ProtocolURL: approval.ProtocolURL,
 	}, nil
+}
+
+func (s *Service) UploadProtocol(ctx context.Context, competitionID, eventID int64, content []byte) (string, error) {
+	if _, err := s.getEvent(ctx, competitionID, eventID); err != nil {
+		return "", err
+	}
+	key := fmt.Sprintf("protocols/competition-%d/event-%d-%s.pdf", competitionID, eventID, uuid.NewString())
+	if _, err := s.storage.Put(ctx, key, bytes.NewReader(content)); err != nil {
+		return "", err
+	}
+	url := protocolURL(competitionID, eventID)
+	oldKey, err := s.repository.ReplaceProtocol(ctx, eventID, &key, &url)
+	if err != nil {
+		s.removeProtocolFile(key)
+		return "", err
+	}
+	if oldKey != nil {
+		s.removeProtocolFile(*oldKey)
+	}
+	return url, nil
+}
+
+func (s *Service) DeleteProtocol(ctx context.Context, competitionID, eventID int64) error {
+	if _, err := s.getEvent(ctx, competitionID, eventID); err != nil {
+		return err
+	}
+	oldKey, err := s.repository.ReplaceProtocol(ctx, eventID, nil, nil)
+	if err != nil {
+		return err
+	}
+	if oldKey != nil {
+		s.removeProtocolFile(*oldKey)
+	}
+	return nil
+}
+
+func (s *Service) removeProtocolFile(key string) {
+	if err := s.storage.Delete(context.Background(), key); err != nil && logger.Log != nil {
+		logger.Log.Error("remove obsolete protocol file", zap.Error(err))
+	}
 }
 
 func sameApplications(entries []Entry, applications []Application) bool {
@@ -418,7 +461,7 @@ func toTableResponse(table Table) TableResponse {
 		})
 	}
 	var protocol *string
-	if table.Sheet.Status == SheetApproved {
+	if table.Sheet.Status == SheetApproved && table.Sheet.ProtocolStorageKey != nil {
 		value := protocolURL(table.Context.CompetitionID, table.Context.EventID)
 		protocol = &value
 	}
