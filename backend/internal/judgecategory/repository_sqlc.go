@@ -147,6 +147,17 @@ func (r *sqlRepository) ListAssignments(ctx context.Context, judgeUserID int64) 
 	return result, nil
 }
 
+func (r *sqlRepository) ListCategories(ctx context.Context) ([]Category, error) {
+	rows, err := r.queries.ListJudgeCategories(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Category, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, Category{ID: row.ID, Name: row.Name})
+	}
+	return result, nil
+}
 func fromApplication(row db.JudgeCategoryApplication) Application {
 	return Application{
 		ID: row.ID, JudgeUserID: row.JudgeUserID, CategoryID: row.CategoryID,

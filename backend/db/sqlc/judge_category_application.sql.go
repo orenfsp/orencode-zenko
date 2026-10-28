@@ -147,6 +147,32 @@ func (q *Queries) JudgeCategoryExists(ctx context.Context, categoryID int64) (bo
 	return exists, err
 }
 
+const listJudgeCategories = `-- name: ListJudgeCategories :many
+SELECT id, name
+FROM judge_category
+ORDER BY name
+`
+
+func (q *Queries) ListJudgeCategories(ctx context.Context) ([]JudgeCategory, error) {
+	rows, err := q.db.Query(ctx, listJudgeCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []JudgeCategory
+	for rows.Next() {
+		var i JudgeCategory
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listJudgeCategoryApplicationsByJudge = `-- name: ListJudgeCategoryApplicationsByJudge :many
 SELECT
     jca.id, jca.judge_user_id, jca.category_id, jc.name AS category_name,

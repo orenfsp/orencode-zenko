@@ -108,12 +108,92 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "некорректный JSON")
 		return
 	}
-	updated, err := h.service.Update(r.Context(), id, req)
+	updated, err := h.service.UpdateOwned(r.Context(), identity.UserID, id, req)
 	if err != nil {
 		handleServiceError(w, err)
 		return
 	}
 	writeSuccess(w, http.StatusOK, updated)
+}
+
+func (h *Handler) ListAdmin(w http.ResponseWriter, r *http.Request) {
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
+		return
+	}
+	var status *string
+	if value := r.URL.Query().Get("status"); value != "" {
+		status = &value
+	}
+	items, err := h.service.ListAdmin(r.Context(), identity.UserID, status)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, items)
+}
+
+func (h *Handler) GetAdmin(w http.ResponseWriter, r *http.Request) {
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		writeError(w, http.StatusBadRequest, "некорректный ID соревнования")
+		return
+	}
+	item, err := h.service.GetAdmin(r.Context(), identity.UserID, id)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, item)
+}
+
+func (h *Handler) Submit(w http.ResponseWriter, r *http.Request)        { h.transition(w, r, "under_review") }
+func (h *Handler) Publish(w http.ResponseWriter, r *http.Request)       { h.transition(w, r, "published") }
+func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request)        { h.transition(w, r, "cancelled") }
+func (h *Handler) ReturnToDraft(w http.ResponseWriter, r *http.Request) { h.transition(w, r, "draft") }
+
+func (h *Handler) transition(w http.ResponseWriter, r *http.Request, target string) {
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		writeError(w, http.StatusBadRequest, "некорректный ID соревнования")
+		return
+	}
+	item, err := h.service.Transition(r.Context(), identity.UserID, id, target)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, item)
+}
+
+func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		writeError(w, http.StatusBadRequest, "некорректный ID соревнования")
+		return
+	}
+	items, err := h.service.History(r.Context(), identity.UserID, id)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, items)
 }
 
 func parsePagination(r *http.Request) (int32, int32, error) {
@@ -219,6 +299,10 @@ func handleServiceError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "соревнование с таким названием уже существует")
 	case errors.Is(err, competitionerrs.ErrNotDraft):
 		httpx.WriteError(w, http.StatusConflict, "invalid_competition_status", "редактировать можно только черновик соревнования")
+	case errors.Is(err, competitionerrs.ErrInvalidTransition):
+		httpx.WriteError(w, http.StatusConflict, "invalid_competition_status", "недопустимый переход статуса соревнования")
+	case errors.Is(err, competitionerrs.ErrNotOwner):
+		writeError(w, http.StatusForbidden, "соревнование принадлежит другому администратору")
 	case errors.Is(err, competitionerrs.ErrForbidden):
 		writeError(w, http.StatusForbidden, "создание соревнования доступно только сотруднику федерации")
 	default:

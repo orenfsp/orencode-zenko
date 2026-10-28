@@ -193,6 +193,32 @@ func (q *Queries) ListCompetitionJudges(ctx context.Context, arg ListCompetition
 	return items, nil
 }
 
+const listJudgePositions = `-- name: ListJudgePositions :many
+SELECT id, name
+FROM judge_position
+ORDER BY name, id
+`
+
+func (q *Queries) ListJudgePositions(ctx context.Context) ([]JudgePosition, error) {
+	rows, err := q.db.Query(ctx, listJudgePositions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []JudgePosition
+	for rows.Next() {
+		var i JudgePosition
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeCompetitionJudge = `-- name: RemoveCompetitionJudge :execrows
 WITH target_competition AS (
     SELECT c.id

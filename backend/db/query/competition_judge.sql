@@ -20,6 +20,11 @@ WHERE cj.competition_id = sqlc.arg(p_competition_id)
   AND c.status = ANY(sqlc.arg(p_public_statuses)::text[])
 ORDER BY jp.name, u.last_name, u.first_name, cj.id;
 
+-- name: ListJudgePositions :many
+SELECT id, name
+FROM judge_position
+ORDER BY name, id;
+
 -- name: ListAdminCompetitionJudges :many
 SELECT
     cj.id,

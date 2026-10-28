@@ -12,6 +12,16 @@ type JudgeService struct {
 	repository JudgeRepository
 }
 
+func (s *JudgeService) ListPositions(ctx context.Context) ([]JudgePositionDTO, error) {
+	repo, ok := s.repository.(interface {
+		ListJudgePositions(context.Context) ([]JudgePositionDTO, error)
+	})
+	if !ok {
+		return nil, ErrInvalidJudgeRequest
+	}
+	return repo.ListJudgePositions(ctx)
+}
+
 func NewJudgeService(repository JudgeRepository) *JudgeService {
 	return &JudgeService{repository: repository}
 }

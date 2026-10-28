@@ -366,6 +366,13 @@ func main() {
 	mux.HandleFunc("GET /api/v1/competitions/{id}", competitionHandler.Get)
 	mux.Handle("POST /api/v1/competitions", protected(competition.PermissionCreate, competitionHandler.Create))
 	mux.Handle("PATCH /api/v1/competitions/{id}", protected(competition.PermissionUpdate, competitionHandler.Update))
+	mux.Handle("GET /api/v1/admin/competitions", protected(competition.PermissionUpdate, competitionHandler.ListAdmin))
+	mux.Handle("GET /api/v1/admin/competitions/{id}", protected(competition.PermissionUpdate, competitionHandler.GetAdmin))
+	mux.Handle("POST /api/v1/admin/competitions/{id}/submit", protected(competition.PermissionUpdate, competitionHandler.Submit))
+	mux.Handle("POST /api/v1/admin/competitions/{id}/publish", protected(competition.PermissionUpdate, competitionHandler.Publish))
+	mux.Handle("POST /api/v1/admin/competitions/{id}/cancel", protected(competition.PermissionUpdate, competitionHandler.Cancel))
+	mux.Handle("POST /api/v1/admin/competitions/{id}/return", protected(competition.PermissionUpdate, competitionHandler.ReturnToDraft))
+	mux.Handle("GET /api/v1/admin/competitions/{id}/history", protected(competition.PermissionUpdate, competitionHandler.History))
 	mux.Handle("POST /api/v1/competition-applications", authenticated(competitionApplicationHandler.Create))
 	mux.Handle("GET /api/v1/competition-applications/my", authenticated(competitionApplicationHandler.ListMine))
 	mux.Handle("GET /api/v1/competition-applications/{id}", authenticated(competitionApplicationHandler.GetMine))
@@ -403,9 +410,12 @@ func main() {
 	mux.HandleFunc("GET /api/v1/disciplines", referenceHandler.ListDisciplines)
 	mux.HandleFunc("GET /api/v1/competition-types", referenceHandler.ListCompetitionTypes)
 	mux.HandleFunc("GET /api/v1/competition-levels", referenceHandler.ListCompetitionLevels)
+	mux.HandleFunc("GET /api/v1/judge-positions", judgeHandler.ListPositions)
 	mux.HandleFunc("GET /api/v1/age-groups", referenceHandler.ListAgeGroups)
 	mux.Handle("GET /api/v1/admin/dashboard", protected(dashboard.PermissionRead, dashboardHandler.Get))
 	mux.Handle("GET /api/v1/admin/registry/users", protected(registry.PermissionRead, registryHandler.ListUsers))
+	// User lookup for administrative assignments. Supports role=judge and search filters.
+	mux.Handle("GET /api/v1/admin/users", protected(registry.PermissionRead, registryHandler.ListUsers))
 	mux.Handle("GET /api/v1/admin/registry/organizations", protected(registry.PermissionRead, registryHandler.ListOrganizations))
 	mux.Handle("GET /api/v1/admin/reports/users.xlsx", protected(registry.PermissionRead, registryReportHandler.UsersXLSX))
 	mux.Handle("GET /api/v1/admin/rating", protected(rating.PermissionRead, ratingHandler.List))
@@ -447,6 +457,7 @@ func main() {
 		rbacMiddleware.Authenticate(http.HandlerFunc(judgeHandler.ListByUser)))
 	mux.Handle("GET /api/v1/profile/assignments",
 		rbacMiddleware.Authenticate(http.HandlerFunc(judgeHandler.ListAssignments)))
+	mux.HandleFunc("GET /api/v1/judge-categories", judgeCategoryHandler.ListCategories)
 
 	address := ":" + cfg.HTTP.Port
 	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(auditMiddleware.Wrap(mux))

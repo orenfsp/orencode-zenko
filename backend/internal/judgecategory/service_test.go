@@ -38,6 +38,9 @@ func (r *repositoryStub) GetCurrent(context.Context, int64) (*CurrentCategory, e
 func (r *repositoryStub) ListAssignments(context.Context, int64) ([]Assignment, error) {
 	return r.assignments, r.err
 }
+func (r *repositoryStub) ListCategories(context.Context) ([]Category, error) {
+	return nil, r.err
+}
 
 type roleStub struct {
 	allowed bool

@@ -78,3 +78,7 @@ JOIN judge_position AS jp ON jp.id = cj.position_id
 WHERE cj.judge_user_id = sqlc.arg(judge_user_id)
 ORDER BY c.start_at DESC, c.id DESC, cj.id DESC;
 
+-- name: ListJudgeCategories :many
+SELECT id, name
+FROM judge_category
+ORDER BY name;
