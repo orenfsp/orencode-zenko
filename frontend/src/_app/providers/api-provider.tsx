@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { initApiClient, resetApiClient } from "@/shared/api/client";
 import { AUTH_FAILURE_EVENT, getAccessIdentity, refreshSession, tokenStorage } from "@/entities/session";
 
-const ApiContext = createContext(false);
+const ApiContext = createContext<boolean | null>(null);
 
 export function ApiProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -20,4 +20,12 @@ export function ApiProvider({ children }: { children: React.ReactNode }) {
   }, []);
   return <ApiContext.Provider value={ready}>{children}</ApiContext.Provider>;
 }
-export const useApiReady = () => useContext(ApiContext);
+export function useApiReady() {
+  const context = useContext(ApiContext);
+
+  if (context === null) {
+    throw new Error("useApiReady must be used inside ApiProvider");
+  }
+
+  return context;
+}
