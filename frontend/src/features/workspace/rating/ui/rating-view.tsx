@@ -9,7 +9,6 @@ import { useAuth } from "@/entities/session";
 import { profileApi } from "@/entities/profile";
 import { referenceDataApi } from "@/entities/reference-data";
 import { municipalityApi } from "@/entities/municipality";
-import { SectionHeading } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Card } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
@@ -60,7 +59,6 @@ export function RatingView() {
   }
 
   return <div className="mx-auto w-full max-w-6xl">
-    <SectionHeading title="Рейтинг спортсменов" description="Баллы за завершённые соревнования выбранного года." />
     <div className="mb-5 grid gap-3 sm:grid-cols-3">
       <Input aria-label="Год рейтинга" type="number" min={2000} max={new Date().getFullYear() + 1} value={year} onChange={(event) => { setYear(Number(event.target.value)); setOffset(0); setSelectedIds([]); }} />
       <Select value={String(disciplineId)} onValueChange={(value) => { setDisciplineId(Number(value)); setOffset(0); setSelectedIds([]); }}><SelectTrigger><SelectValue placeholder="Все дисциплины" /></SelectTrigger><SelectContent><SelectItem value="0">Все дисциплины</SelectItem>{references.data?.disciplines.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>

@@ -4,7 +4,7 @@ import { ChangeEvent, useCallback, useState } from "react";
 import { FileCheck2, LoaderCircle, Upload } from "lucide-react";
 
 import { antiDopingApi } from "@/entities/anti-doping";
-import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
+import { formatDate, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
@@ -36,19 +36,15 @@ export function AntiDopingDocuments() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <SectionHeading
-        title="Антидопинг"
-        description="Сертификаты и результаты проверки федерацией. Поддерживаются PDF, JPEG и PNG до 10 МБ."
-        action={
-          <Button asChild>
-            <label aria-disabled={uploading}>
-              {uploading ? <LoaderCircle className="animate-spin" /> : <Upload />}
-              Загрузить
-              <Input type="file" accept="application/pdf,image/jpeg,image/png" className="sr-only" disabled={uploading} onChange={(event) => void upload(event)} />
-            </label>
-          </Button>
-        }
-      />
+      <div className="mb-4 flex justify-end">
+        <Button asChild>
+          <label aria-disabled={uploading}>
+            {uploading ? <LoaderCircle className="animate-spin" /> : <Upload />}
+            Загрузить
+            <Input type="file" accept="application/pdf,image/jpeg,image/png" className="sr-only" disabled={uploading} onChange={(event) => void upload(event)} />
+          </label>
+        </Button>
+      </div>
       {state.loading ? <DataLoading rows={3} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !state.data?.length ? <DataEmpty title="Сертификатов пока нет" description="Загрузите первый сертификат для проверки." /> : null}

@@ -9,7 +9,6 @@ import {
 } from "@/entities/competition-event";
 import { competitionApi } from "@/entities/competition";
 import { referenceDataApi } from "@/entities/reference-data";
-import { SectionHeading } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
@@ -94,17 +93,13 @@ export function EventManagement() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <SectionHeading
-        title="Зачёты соревнований"
-        description="Управление зачётами соревнований из списка."
-        action={
-          competitionId ? (
-            <Button onClick={() => setEditor({ mode: "create", ageGroupId: null })}>
-              <Plus />Создать зачёт
-            </Button>
-          ) : undefined
-        }
-      />
+      {competitionId ? (
+        <div className="mb-4 flex justify-end">
+          <Button onClick={() => setEditor({ mode: "create", ageGroupId: null })}>
+            <Plus />Создать зачёт
+          </Button>
+        </div>
+      ) : null}
 
       <Card className="mb-5 bg-white/75 p-5 shadow-none">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">

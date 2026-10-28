@@ -8,7 +8,7 @@ import { competitionApi } from "@/entities/competition";
 import type { Competition } from "@/entities/competition/model/types";
 import { referenceDataApi } from "@/entities/reference-data";
 import { useAuth } from "@/entities/session";
-import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
+import { formatDate, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Card } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
@@ -118,11 +118,7 @@ export function CompetitionsList() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <SectionHeading
-        title="Соревнования"
-        description="Опубликованные соревнования и созданные здесь черновики."
-        action={canCreate ? <Button onClick={() => setCreateOpen(true)}><Plus />Создать</Button> : undefined}
-      />
+      {canCreate ? <div className="mb-4 flex justify-end"><Button onClick={() => setCreateOpen(true)}><Plus />Создать</Button></div> : null}
       {visibleDrafts.length ? (
         <section className="mb-6" aria-label="Черновики, созданные в этой вкладке">
           <h2 className="mb-2 text-sm font-medium">Созданные черновики</h2>

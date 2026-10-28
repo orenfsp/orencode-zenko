@@ -61,7 +61,6 @@ export function CalendarPlansList() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <SectionHeading title="Календарные планы" description="Официальные планы и периоды проведения соревнований." />
       {canCreate ? <Card className="mb-4 bg-white/75 p-4 shadow-none"><form className="grid gap-2 sm:grid-cols-[1fr_140px_auto]" onSubmit={create}><Input name="name" placeholder="Название плана" required /><Input name="year" type="number" min="2000" max="2200" placeholder="Год" required /><Button disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : <Plus />}Создать</Button></form></Card> : null}
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}

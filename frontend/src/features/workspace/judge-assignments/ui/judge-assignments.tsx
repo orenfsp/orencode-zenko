@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { Gavel } from "lucide-react";
 
 import { competitionJudgeApi } from "@/entities/competition-judge";
-import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
+import { formatDate, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Card } from "@/shared/ui/card";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
@@ -18,7 +18,6 @@ export function JudgeAssignments() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <SectionHeading title="Мои соревнования" description="Назначения в судейскую коллегию." />
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !state.data?.length ? (

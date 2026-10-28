@@ -13,7 +13,7 @@ import { rankApplicationApi, type RankApplication } from "@/entities/rank-applic
 import { referenceDataApi, type Discipline } from "@/entities/reference-data";
 import { userCoachApi, type UserCoachRelation } from "@/entities/user-coach";
 import { useAuth } from "@/entities/session";
-import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
+import { formatDate, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
@@ -154,11 +154,7 @@ export function ApplicationsView() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <SectionHeading
-        title={state.data?.mode === "review" ? "Заявки на рассмотрение" : "Мои заявки"}
-        description={state.data?.mode === "review" ? "Очередь заявок, доступная активной роли." : "Статусы заявок на разряд или судейскую категорию."}
-        action={canCreate ? <Button onClick={() => setCreateOpen(true)} disabled={missingCoachAthletes} title={missingCoachAthletes ? "Сначала добавьте спортсмена и дождитесь подтверждения" : undefined}><Plus />Подать заявку</Button> : undefined}
-      />
+      {canCreate ? <div className="mb-4 flex justify-end"><Button onClick={() => setCreateOpen(true)} disabled={missingCoachAthletes} title={missingCoachAthletes ? "Сначала добавьте спортсмена и дождитесь подтверждения" : undefined}><Plus />Подать заявку</Button></div> : null}
       {state.data?.currentCategory ? (
         <Card className="mb-4 bg-[#eeebff] p-4 shadow-none"><p className="font-medium">Текущая категория: {state.data.currentCategory.category_name}</p><p className="mt-1 text-xs text-muted-foreground">Назначена {formatDate(state.data.currentCategory.assigned_at)}{state.data.currentCategory.expires_at ? ` · до ${formatDate(state.data.currentCategory.expires_at)}` : ""}</p></Card>
       ) : null}

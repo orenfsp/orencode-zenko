@@ -9,7 +9,7 @@ import {
   type RegistryPage,
   type RegistryUser,
 } from "@/entities/registry";
-import { formatDate, fullName, SectionHeading } from "@/features/workspace/common";
+import { formatDate, fullName } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -64,7 +64,7 @@ export function RegistryView() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <SectionHeading title="Единый реестр" description="Пользователи и организации федерации." action={<Button variant="outline" disabled={downloading} onClick={() => void downloadReport()}><Download />Скачать XLSX</Button>} />
+      <div className="mb-4 flex justify-end"><Button variant="outline" disabled={downloading} onClick={() => void downloadReport()}><Download />Скачать XLSX</Button></div>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-2">
           <Button variant={mode === "users" ? "default" : "outline"} onClick={() => { setMode("users"); setOffset(0); }}><UserRound />Пользователи</Button>

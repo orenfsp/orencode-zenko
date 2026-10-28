@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { Award, FileText } from "lucide-react";
 
 import { competitionResultApi } from "@/entities/competition-result";
-import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
+import { formatDate, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -16,7 +16,6 @@ export function ResultsHistory() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <SectionHeading title="Результаты" description="История выступлений и опубликованные протоколы." />
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !state.data?.length ? (

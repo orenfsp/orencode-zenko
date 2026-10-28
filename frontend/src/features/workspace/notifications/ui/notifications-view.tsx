@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { Bell, Check, LoaderCircle } from "lucide-react";
 
 import { notificationApi } from "@/entities/notification";
-import { formatDate, SectionHeading } from "@/features/workspace/common";
+import { formatDate } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
@@ -32,7 +32,6 @@ export function NotificationsView() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <SectionHeading title="Уведомления" description="Решения по заявкам и важные события аккаунта." />
       {state.loading ? <DataLoading rows={5} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !state.data?.length ? <DataEmpty title="Уведомлений пока нет" /> : null}

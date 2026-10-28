@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { Medal } from "lucide-react";
 
 import { rankApplicationApi } from "@/entities/rank-application";
-import { formatDate, SectionHeading } from "@/features/workspace/common";
+import { formatDate } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Card } from "@/shared/ui/card";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
@@ -15,7 +15,6 @@ export function RankHistory() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <SectionHeading title="Мой разряд" description="История присвоений по дисциплинам и сроки действия." />
       {state.loading ? <DataLoading rows={3} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !state.data?.length ? (

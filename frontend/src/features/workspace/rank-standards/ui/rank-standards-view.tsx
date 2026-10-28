@@ -4,7 +4,7 @@ import { type FormEvent, useCallback, useState } from "react";
 import { rankStandardApi } from "@/entities/rank-standard";
 import { rankApi } from "@/entities/rank";
 import { referenceDataApi } from "@/entities/reference-data";
-import { SectionHeading, formatDate } from "@/features/workspace/common";
+import { formatDate } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
@@ -47,7 +47,6 @@ export function RankStandardsView() {
   }
 
   return <div className="mx-auto w-full max-w-6xl">
-    <SectionHeading title="Нормативы разрядов" description="Условия ЕВСК, по которым проверяются заявки на разряд." />
     <Card className="mb-5 bg-white/75 p-5 shadow-none"><form className="grid gap-3" onSubmit={(event) => void submit(event)}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Select name="rank_id" required><SelectTrigger><SelectValue placeholder="Разряд" /></SelectTrigger><SelectContent>{state.data?.ranks.map((rank) => <SelectItem key={rank.id} value={String(rank.id)}>{rank.name}</SelectItem>)}</SelectContent></Select>

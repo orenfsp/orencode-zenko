@@ -141,11 +141,9 @@ export function AdministrationView({ section }: { section: AdministrationSection
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-6">
-      <SectionHeading title="Администрирование" description="Роли, справочники, проверки и журнал действий." />
 
       {section === "roles" && (permissions.has("roles.read") || permissions.has("roles.create") || permissions.has("roles.assign")) ? (
         <Card className="bg-white/75 p-5 shadow-none">
-          <SectionHeading title="Роли и права" description="Создание ролей и назначение пользователям." />
           <div className="grid gap-5 xl:grid-cols-2">
             <div className="grid content-start gap-2">
               {data.roles.map((role) => (
@@ -241,7 +239,6 @@ export function AdministrationView({ section }: { section: AdministrationSection
 
       {section === "audit" && permissions.has("roles.read") ? (
         <Card className="bg-white/75 p-5 shadow-none">
-          <SectionHeading title="Журнал аудита" description="Последние действия административных пользователей." />
           <div className="grid max-h-[32rem] gap-2 overflow-auto">
             {data.audit.map((entry) => (
               <div key={entry.id} className="grid gap-1 rounded-xl bg-muted/60 p-3 text-sm md:grid-cols-[1fr_auto]">

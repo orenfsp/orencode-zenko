@@ -8,7 +8,7 @@ import type { RegistryUser } from "@/entities/registry";
 import { referenceDataApi, type Discipline } from "@/entities/reference-data";
 import { useAuth } from "@/entities/session";
 import { userCoachApi, type UserCoachRelation } from "@/entities/user-coach";
-import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
+import { formatDate, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
@@ -78,10 +78,6 @@ export function CoachRelations() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <SectionHeading
-        title={state.data?.role === "coach" ? "Мои спортсмены" : "Мои тренеры"}
-        description="Подтверждённые и ожидающие связи по спортивным дисциплинам."
-      />
       {state.data?.role === "coach" ? (
         <Card className="mb-4 bg-white/75 p-4 shadow-none">
           {canSearchParticipants ? <form key={formVersion} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={create}>

@@ -53,7 +53,6 @@ export function DeadlinesList() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <SectionHeading title="Сроки" description="Персональные сроки и обязательные действия для активной роли." />
       {canManage ? (
         <Card className="mb-4 bg-white/75 p-4 shadow-none">
           <form className="grid gap-2 sm:grid-cols-[1fr_180px_180px_auto]" onSubmit={createReport}>

@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { Download, FileText, LoaderCircle } from "lucide-react";
 
 import { fileApi } from "@/entities/file";
-import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
+import { formatDate, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
@@ -36,7 +36,6 @@ export function FilesList() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <SectionHeading title="Файлы" description="Загруженные документы и их технический статус." />
       {state.loading ? <DataLoading rows={5} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !state.data?.length ? <DataEmpty title="Файлов пока нет" /> : null}

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { dashboardApi, type DashboardData } from "@/entities/dashboard";
 import { deadlineApi, type DeadlineItem } from "@/entities/deadline";
 import { useAuth } from "@/entities/session";
-import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
+import { formatDate, StatusBadge } from "@/features/workspace/common";
 import { Button } from "@/shared/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { DataEmpty } from "@/shared/ui/data-state";
@@ -54,17 +54,11 @@ export function WorkspaceOverview() {
   if (data.kind === "personal") {
     return (
       <div className="mx-auto w-full max-w-5xl">
-        <SectionHeading
-          title="Ближайшие сроки"
-          description="Сроки и обязательные действия для вашей активной роли."
-          action={
-            <Button asChild variant="outline" size="sm">
-              <Link href="/workspace/competitions">
-                Все соревнования
-              </Link>
-            </Button>
-          }
-        />
+        <div className="mb-4 flex justify-end">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/workspace/competitions">Все соревнования</Link>
+          </Button>
+        </div>
 
         {data.deadlines.length ? (
           <div className="grid gap-3">
@@ -109,11 +103,6 @@ export function WorkspaceOverview() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <SectionHeading
-        title="Сводка федерации"
-        description="Ключевые показатели и ближайшие рабочие задачи."
-      />
-
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {metricCards.map(({ key, label, icon: Icon }) => (
           <Card
