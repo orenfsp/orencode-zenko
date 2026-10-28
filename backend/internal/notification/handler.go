@@ -23,7 +23,6 @@ func (h *Handler) ListNotifications(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	userID := identity.UserID
 
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
@@ -33,7 +32,7 @@ func (h *Handler) ListNotifications(w http.ResponseWriter, r *http.Request) {
 		limit = 20
 	}
 
-	notifications, err := h.repo.GetUserNotifications(r.Context(), identity.UserID, limit, offset)
+	notifications, err := h.repo.GetUserNotifications(r.Context(), identity.UserID, int32(limit), int32(offset))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
 		return
@@ -71,7 +70,7 @@ func (h *Handler) MarkAsRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.repo.MarkAsRead(r.Context(), id, identity.UserID); err != nil {
+	if err := h.repo.MarkAsRead(r.Context(), id, userID); err != nil {
 		writeError(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
 		return
 	}
