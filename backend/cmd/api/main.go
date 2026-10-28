@@ -14,6 +14,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/auth"
 	"github.com/orenfsp/orencode-zenko.git/internal/calendarplan"
 	"github.com/orenfsp/orencode-zenko.git/internal/competition"
+	"github.com/orenfsp/orencode-zenko.git/internal/competitionapplication"
 	"github.com/orenfsp/orencode-zenko.git/internal/competitionevent"
 	"github.com/orenfsp/orencode-zenko.git/internal/dashboard"
 	"github.com/orenfsp/orencode-zenko.git/internal/deadline"
@@ -180,6 +181,9 @@ func main() {
 	competitionRepository := competition.NewRepository(queries)
 	competitionService := competition.NewService(competitionRepository)
 	competitionHandler := competition.NewHandler(competitionService)
+	competitionApplicationRepository := competitionapplication.NewRepository(queries)
+	competitionApplicationService := competitionapplication.NewService(competitionApplicationRepository)
+	competitionApplicationHandler := competitionapplication.NewHandler(competitionApplicationService)
 	competitionEventRepository := competitionevent.NewRepository(queries, pool)
 	competitionEventService := competitionevent.NewService(competitionEventRepository)
 	competitionEventHandler := competitionevent.NewHandler(competitionEventService)
@@ -359,6 +363,14 @@ func main() {
 	mux.HandleFunc("GET /api/v1/competitions/{id}", competitionHandler.Get)
 	mux.Handle("POST /api/v1/competitions", protected(competition.PermissionCreate, competitionHandler.Create))
 	mux.Handle("PATCH /api/v1/competitions/{id}", protected(competition.PermissionUpdate, competitionHandler.Update))
+	mux.Handle("POST /api/v1/competition-applications", authenticated(competitionApplicationHandler.Create))
+	mux.Handle("GET /api/v1/competition-applications/my", authenticated(competitionApplicationHandler.ListMine))
+	mux.Handle("GET /api/v1/competition-applications/{id}", authenticated(competitionApplicationHandler.GetMine))
+	mux.Handle("POST /api/v1/competition-applications/{id}/withdraw", authenticated(competitionApplicationHandler.Withdraw))
+	mux.Handle("GET /api/v1/admin/competition-applications", protected(competitionapplication.PermissionReview, competitionApplicationHandler.ListForReview))
+	mux.Handle("GET /api/v1/admin/competition-applications/{id}", protected(competitionapplication.PermissionReview, competitionApplicationHandler.GetForReview))
+	mux.Handle("POST /api/v1/admin/competition-applications/{id}/approve", protected(competitionapplication.PermissionReview, competitionApplicationHandler.Approve))
+	mux.Handle("POST /api/v1/admin/competition-applications/{id}/reject", protected(competitionapplication.PermissionReview, competitionApplicationHandler.Reject))
 	mux.HandleFunc("GET /api/v1/competitions/{competitionID}/events", competitionEventHandler.ListPublic)
 	mux.HandleFunc("GET /api/v1/competitions/{competitionID}/events/{eventID}", competitionEventHandler.GetPublic)
 	mux.Handle("GET /api/v1/admin/competitions/{competitionID}/events", protected(competitionevent.PermissionRead, competitionEventHandler.ListAdmin))
