@@ -17,7 +17,7 @@ type Repository interface {
 	AllJudgeAssignments(ctx context.Context) ([]Item, error)
 	ListReports(ctx context.Context) ([]Report, error)
 	GetReport(ctx context.Context, id int64) (Report, error)
-	CreateReport(ctx context.Context, actorID int64, name string, dueAt time.Time, status string) (Report, error)
+	CreateReport(ctx context.Context, actorID int64, name string, dueAt time.Time, status, reportType string) (Report, error)
 	UpdateReport(ctx context.Context, report Report) (Report, error)
 	CreateReportDeadlineReminders(ctx context.Context, daysBefore int32) error
 }

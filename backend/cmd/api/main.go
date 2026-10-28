@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/orenfsp/orencode-zenko.git/config"
@@ -16,6 +17,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/competitionevent"
 	"github.com/orenfsp/orencode-zenko.git/internal/dashboard"
 	"github.com/orenfsp/orencode-zenko.git/internal/deadline"
+	"github.com/orenfsp/orencode-zenko.git/internal/evsk"
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"github.com/orenfsp/orencode-zenko.git/internal/judgecategory"
@@ -200,10 +202,58 @@ func main() {
 	ratingRepository := rating.NewRepository(queries)
 	ratingService := rating.NewService(ratingRepository)
 	ratingHandler := rating.NewHandler(ratingService)
-	teamRepository := team.NewRepository(queries, pool)
-	teamService := team.NewService(teamRepository)
-	teamHandler := team.NewHandler(teamService)
 	roleChecker := rbac.NewRoleChecker(queries)
+	judgeScoped := func(permission string, handler http.HandlerFunc) http.Handler {
+		return rbacMiddleware.Authenticate(rbacMiddleware.Require(permission)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			identity, ok := rbac.IdentityFromContext(r.Context())
+			if !ok || identity.UserID <= 0 {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			isAdmin, err := roleChecker.HasRole(r.Context(), identity.UserID, "admin")
+			if err != nil {
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
+			if !isAdmin {
+				isAdmin, err = roleChecker.HasRole(r.Context(), identity.UserID, "super_admin")
+				if err != nil {
+					http.Error(w, "internal server error", http.StatusInternalServerError)
+					return
+				}
+			}
+			if !isAdmin {
+				isJudge, err := roleChecker.HasRole(r.Context(), identity.UserID, "judge")
+				if err != nil {
+					http.Error(w, "internal server error", http.StatusInternalServerError)
+					return
+				}
+				competitionID, parseErr := strconv.ParseInt(r.PathValue("competitionID"), 10, 64)
+				if !isJudge || parseErr != nil || competitionID <= 0 {
+					http.Error(w, "forbidden", http.StatusForbidden)
+					return
+				}
+				assignments, err := judgeRepository.ListAdminCompetitionJudges(r.Context(), competitionID)
+				if err != nil {
+					http.Error(w, "internal server error", http.StatusInternalServerError)
+					return
+				}
+				assigned := false
+				for _, assignment := range assignments {
+					if assignment.JudgeUserID == identity.UserID {
+						assigned = true
+						break
+					}
+				}
+				if !assigned {
+					http.Error(w, "forbidden", http.StatusForbidden)
+					return
+				}
+			}
+			handler(w, r)
+		})))
+	}
+	teamRepository := team.NewRepository(queries, pool)
 	judgeCategoryRepository := judgecategory.NewRepository(queries, pool)
 	judgeCategoryService := judgecategory.NewService(judgeCategoryRepository, roleChecker)
 	judgeCategoryHandler := judgecategory.NewHandler(judgeCategoryService)
@@ -221,6 +271,8 @@ func main() {
 
 	// User-coach relations.
 	userCoachRepo := usercoach.NewSQLRepository(queries)
+	teamService := team.NewService(teamRepository, roleChecker, userCoachRepo)
+	teamHandler := team.NewHandler(teamService)
 
 	userCoachService, err := usercoach.NewService(userCoachRepo, roleChecker)
 	if err != nil {
@@ -232,6 +284,8 @@ func main() {
 	rankRepository := rank.NewRepository(queries)
 	rankService := rank.NewService(rankRepository)
 	rankHandler := rank.NewHandler(rankService)
+	evskService := evsk.NewService(evsk.NewRepository(queries))
+	evskHandler := evsk.NewHandler(evskService)
 	cleanupExpiredRanks := func(ctx context.Context) {
 		deleted, err := rankService.CleanupExpired(ctx)
 		if err != nil {
@@ -317,11 +371,11 @@ func main() {
 	mux.Handle("POST /api/v1/competitions/{id}/judges", protected(competition.PermissionManageJudges, judgeHandler.Assign))
 	mux.Handle("DELETE /api/v1/competitions/{id}/judges/{assignmentId}", protected(competition.PermissionManageJudges, judgeHandler.Remove))
 	resultBase := "/api/v1/admin/competitions/{competitionID}/events/{eventID}/results"
-	mux.Handle("GET "+resultBase, protected(result.PermissionRead, resultHandler.Get))
-	mux.Handle("PUT "+resultBase+"/settings", protected(result.PermissionManage, resultHandler.Configure))
-	mux.Handle("PUT "+resultBase, protected(result.PermissionManage, resultHandler.Save))
-	mux.Handle("POST "+resultBase+"/calculate", protected(result.PermissionManage, resultHandler.Calculate))
-	mux.Handle("POST "+resultBase+"/approve", protected(result.PermissionApprove, resultHandler.Approve))
+	mux.Handle("GET "+resultBase, judgeScoped(result.PermissionRead, resultHandler.Get))
+	mux.Handle("PUT "+resultBase+"/settings", judgeScoped(result.PermissionManage, resultHandler.Configure))
+	mux.Handle("PUT "+resultBase, judgeScoped(result.PermissionManage, resultHandler.Save))
+	mux.Handle("POST "+resultBase+"/calculate", judgeScoped(result.PermissionManage, resultHandler.Calculate))
+	mux.Handle("POST "+resultBase+"/approve", judgeScoped(result.PermissionApprove, resultHandler.Approve))
 	mux.HandleFunc("GET /api/v1/competitions/{competitionID}/events/{eventID}/protocol", resultHandler.DownloadProtocol)
 	mux.Handle("GET /api/v1/profile/competition-results", rbacMiddleware.Authenticate(http.HandlerFunc(resultHandler.History)))
 	mux.Handle("GET /api/v1/admin/calendar-plans", protected(calendarplan.PermissionRead, calendarPlanHandler.List))
@@ -360,6 +414,8 @@ func main() {
 	mux.Handle("GET /api/v1/ranks/history", authenticated(rankApplicationHandler.ListHistory))
 	mux.Handle("GET /api/v1/admin/rank-applications", protected(rbac.PermissionRankApplicationsReview, rankApplicationHandler.ListPending))
 	mux.Handle("PATCH /api/v1/admin/rank-applications/{applicationID}", protected(rbac.PermissionRankApplicationsReview, rankApplicationHandler.Review))
+	mux.Handle("GET /api/v1/admin/rank-standards", protected(rbac.PermissionRankApplicationsReview, evskHandler.List))
+	mux.Handle("POST /api/v1/admin/rank-standards", protected(rbac.PermissionRankApplicationsReview, evskHandler.Upsert))
 
 	mux.HandleFunc("GET /api/v1/municipalities", municipalityHandler.List)
 	mux.HandleFunc("GET /api/v1/municipalities/{id}", municipalityHandler.Get)

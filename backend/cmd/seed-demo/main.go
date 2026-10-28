@@ -11,6 +11,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const demoDisciplineName = "программирование алгоритмическое"
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -44,7 +46,7 @@ func main() {
 		return id
 	}
 
-	disciplineID := getOrCreateID("discipline", "Алгоритмическое программирование")
+	disciplineID := getOrCreateID("discipline", demoDisciplineName)
 	typeID := getOrCreateID("competition_type", "Чемпионат")
 	levelID := getOrCreateID("competition_level", "Региональный")
 	municipalityID := getOrCreateID("municipality", "г. Оренбург")

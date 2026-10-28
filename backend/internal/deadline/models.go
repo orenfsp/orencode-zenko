@@ -28,6 +28,7 @@ type Report struct {
 	Name            string    `json:"name"`
 	DueAt           time.Time `json:"due_at"`
 	Status          string    `json:"status"`
+	Type            string    `json:"type"`
 	CreatedByUserID int64     `json:"created_by_user_id"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
@@ -37,10 +38,12 @@ type CreateReportRequest struct {
 	Name   string `json:"name"`
 	DueAt  string `json:"due_at"`
 	Status string `json:"status,omitempty"`
+	Type   string `json:"type,omitempty"`
 }
 
 type UpdateReportRequest struct {
 	Name   *string `json:"name"`
 	DueAt  *string `json:"due_at"`
 	Status *string `json:"status"`
+	Type   *string `json:"type"`
 }

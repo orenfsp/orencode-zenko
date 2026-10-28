@@ -288,6 +288,17 @@ type RankApplication struct {
 	OrderNumber       pgtype.Text
 }
 
+type RankEvskStandard struct {
+	ID           int64
+	RankID       int64
+	DisciplineID int64
+	MinimumPlace pgtype.Int4
+	MinimumScore pgtype.Numeric
+	ValidFrom    pgtype.Date
+	ValidTo      pgtype.Date
+	CreatedAt    pgtype.Timestamptz
+}
+
 type ReportDeadline struct {
 	ID              int64
 	Name            string
@@ -296,6 +307,7 @@ type ReportDeadline struct {
 	CreatedByUserID int64
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+	DeadlineType    string
 }
 
 type ReportDeadlineReminder struct {

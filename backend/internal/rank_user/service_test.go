@@ -24,6 +24,7 @@ func (r *repositoryStub) IsConfirmedCoach(context.Context, int64, int64, int64) 
 func (r *repositoryStub) ValidateBasis(context.Context, int64, int64, int64, int64) (BasisValidation, error) {
 	return BasisValidation{ResultExists: true, AthleteMatches: true, DisciplineMatches: true, CompetitionMatches: true, ResultFinished: true}, nil
 }
+func (r *repositoryStub) ValidateEVSK(context.Context, int64) (bool, error) { return true, nil }
 
 func (r *repositoryStub) Create(_ context.Context, athleteUserID, rankID, disciplineID, submittedByUserID int64, applicationType string, competitionID, resultID int64) (Application, error) {
 	r.created = Application{

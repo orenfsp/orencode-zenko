@@ -145,6 +145,8 @@ func handleError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "недостаточно прав для подачи заявки")
 	case errors.Is(err, ErrConflict):
 		writeError(w, http.StatusConflict, "такая активная заявка уже существует")
+	case errors.Is(err, ErrEVSKNotMet):
+		writeError(w, http.StatusUnprocessableEntity, "EVSK standard is not met")
 	case errors.Is(err, ErrNotFound):
 		writeError(w, http.StatusNotFound, "заявка не найдена или уже рассмотрена")
 	default:

@@ -49,6 +49,10 @@ func (r *sqlRepository) ValidateBasis(ctx context.Context, athleteUserID, discip
 	}, nil
 }
 
+func (r *sqlRepository) ValidateEVSK(ctx context.Context, applicationID int64) (bool, error) {
+	return r.queries.ValidateRankApplicationEVSK(ctx, applicationID)
+}
+
 func (r *sqlRepository) Create(ctx context.Context, athleteUserID, rankID, disciplineID, submittedByUserID int64, applicationType string, competitionID, resultID int64) (Application, error) {
 	row, err := r.queries.CreateRankApplication(ctx, db.CreateRankApplicationParams{
 		AthleteUserID:     athleteUserID,

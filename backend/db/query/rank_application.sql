@@ -69,10 +69,30 @@ SELECT
         WHERE basis.id = sqlc.arg(result_id) AND basis.result_status = 'finished'
     ) AS result_finished;
 
+-- name: ValidateRankApplicationEVSK :one
+SELECT EXISTS (
+    SELECT 1
+    FROM rank_evsk_standard AS standard
+    JOIN rank_application AS application ON application.id = sqlc.arg(application_id)
+    JOIN competition_result AS cr ON cr.id = application.result_id
+    JOIN competition_application AS ca ON ca.id = cr.application_id
+    JOIN competition_event AS ce ON ce.id = ca.event_id
+    JOIN competition AS c ON c.id = ce.competition_id
+    WHERE standard.rank_id = application.rank_id
+      AND standard.discipline_id = application.discipline_id
+      AND cr.result_status = 'finished'
+      AND ca.athlete_user_id = application.athlete_user_id
+      AND ce.discipline_id = application.discipline_id
+      AND (standard.valid_from IS NULL OR c.start_at::date >= standard.valid_from)
+      AND (standard.valid_to IS NULL OR c.start_at::date <= standard.valid_to)
+      AND (standard.minimum_place IS NULL OR cr.place IS NOT NULL AND cr.place <= standard.minimum_place)
+      AND (standard.minimum_score IS NULL OR cr.score IS NOT NULL AND cr.score >= standard.minimum_score)
+) AS valid;
+
 -- name: ReviewRankApplication :one
 UPDATE rank_application
 SET
-    status = sqlc.arg(status),
+    status = sqlc.arg(status)::varchar,
     reviewed_by_user_id = sqlc.arg(reviewed_by_user_id),
     reviewed_at = now(),
     rejection_reason = sqlc.narg(rejection_reason),
@@ -80,7 +100,7 @@ SET
     expires_at = COALESCE(
         sqlc.narg(expires_at),
         CASE
-            WHEN sqlc.arg(status) = 'approved' AND rank.ttl IS NOT NULL
+            WHEN sqlc.arg(status)::varchar = 'approved'::varchar AND rank.ttl IS NOT NULL
             THEN (COALESCE(sqlc.narg(assigned_at), CURRENT_DATE) + make_interval(years => rank.ttl))::date
             ELSE NULL
         END

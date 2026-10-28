@@ -286,7 +286,7 @@ func (q *Queries) ListUserRankHistory(ctx context.Context, userID int64) ([]List
 const reviewRankApplication = `-- name: ReviewRankApplication :one
 UPDATE rank_application
 SET
-    status = $1,
+    status = $1::varchar,
     reviewed_by_user_id = $2,
     reviewed_at = now(),
     rejection_reason = $3,
@@ -294,7 +294,7 @@ SET
     expires_at = COALESCE(
         $5,
         CASE
-            WHEN $1 = 'approved' AND rank.ttl IS NOT NULL
+            WHEN $1::varchar = 'approved'::varchar AND rank.ttl IS NOT NULL
             THEN (COALESCE($4, CURRENT_DATE) + make_interval(years => rank.ttl))::date
             ELSE NULL
         END
@@ -414,4 +414,32 @@ func (q *Queries) ValidateRankApplicationBasis(ctx context.Context, arg Validate
 		&i.ResultFinished,
 	)
 	return i, err
+}
+
+const validateRankApplicationEVSK = `-- name: ValidateRankApplicationEVSK :one
+SELECT EXISTS (
+    SELECT 1
+    FROM rank_evsk_standard AS standard
+    JOIN rank_application AS application ON application.id = $1
+    JOIN competition_result AS cr ON cr.id = application.result_id
+    JOIN competition_application AS ca ON ca.id = cr.application_id
+    JOIN competition_event AS ce ON ce.id = ca.event_id
+    JOIN competition AS c ON c.id = ce.competition_id
+    WHERE standard.rank_id = application.rank_id
+      AND standard.discipline_id = application.discipline_id
+      AND cr.result_status = 'finished'
+      AND ca.athlete_user_id = application.athlete_user_id
+      AND ce.discipline_id = application.discipline_id
+      AND (standard.valid_from IS NULL OR c.start_at::date >= standard.valid_from)
+      AND (standard.valid_to IS NULL OR c.start_at::date <= standard.valid_to)
+      AND (standard.minimum_place IS NULL OR cr.place IS NOT NULL AND cr.place <= standard.minimum_place)
+      AND (standard.minimum_score IS NULL OR cr.score IS NOT NULL AND cr.score >= standard.minimum_score)
+) AS valid
+`
+
+func (q *Queries) ValidateRankApplicationEVSK(ctx context.Context, applicationID int64) (bool, error) {
+	row := q.db.QueryRow(ctx, validateRankApplicationEVSK, applicationID)
+	var valid bool
+	err := row.Scan(&valid)
+	return valid, err
 }

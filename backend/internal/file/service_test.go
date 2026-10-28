@@ -268,6 +268,42 @@ func TestDownloadRejectsOtherUserWithoutPermission(t *testing.T) {
 	}
 }
 
+func TestDownloadAllowsReaderToOpenGeneratedFile(t *testing.T) {
+	stored := []byte("generated report")
+	storage := &storageStub{values: map[string][]byte{"reports/users.xlsx": stored}}
+	repository := &repositoryStub{file: UploadedFile{
+		ID: 6, StorageKey: "reports/users.xlsx", Status: StatusUploaded,
+		OriginalFilename: "federation-users.xlsx", ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	}}
+	service := newTestService(t, repository, storage)
+
+	download, err := service.Download(context.Background(), 6, 1, true)
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	defer download.Content.Close()
+	content, _ := io.ReadAll(download.Content)
+	if !bytes.Equal(content, stored) {
+		t.Fatalf("content = %q", content)
+	}
+}
+
+func TestDownloadRejectsDeletePendingFileForReader(t *testing.T) {
+	repository := &repositoryStub{file: UploadedFile{
+		ID: 6, StorageKey: "reports/users.xlsx", Status: StatusDeletePending,
+	}}
+	storage := &storageStub{values: map[string][]byte{"reports/users.xlsx": []byte("generated report")}}
+	service := newTestService(t, repository, storage)
+
+	_, err := service.Download(context.Background(), 6, 1, true)
+	if !errors.Is(err, ErrFileNotFound) {
+		t.Fatalf("Download() error = %v, want ErrFileNotFound", err)
+	}
+	if storage.opened {
+		t.Fatal("storage must not be opened for delete-pending file")
+	}
+}
+
 func TestListAllPassesPagination(t *testing.T) {
 	repo := &repositoryStub{all: []UploadedFile{{ID: 1, Status: StatusAttached}}}
 	service, err := NewService(repo, &storageStub{}, DefaultPolicies())
