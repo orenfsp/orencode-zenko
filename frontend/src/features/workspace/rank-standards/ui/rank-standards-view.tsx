@@ -79,8 +79,8 @@ export function RankStandardsView() {
         <Select name="discipline_id" required><SelectTrigger><SelectValue placeholder="Дисциплина" /></SelectTrigger><SelectContent>{state.data?.disciplines.map((discipline) => <SelectItem key={discipline.id} value={String(discipline.id)}>{discipline.name}</SelectItem>)}</SelectContent></Select>
         <Input name="minimum_place" type="number" min="1" placeholder="Место не ниже" />
         <Input name="minimum_score" type="number" min="0" step="0.01" placeholder="Минимальный балл" />
-        <div><p className="mb-1 text-sm">Действует с</p><DatePicker id="standard-valid-from" name="valid_from" allowFuture /></div>
-        <div><p className="mb-1 text-sm">Действует до</p><DatePicker id="standard-valid-to" name="valid_to" allowFuture /></div>
+        <div><p className="mb-1 text-sm">Действует с</p><DatePicker id="standard-valid-from" name="valid_from" /></div>
+        <div><p className="mb-1 text-sm">Действует до</p><DatePicker id="standard-valid-to" name="valid_to" /></div>
       </div>
       <DialogFooter><Button type="submit" disabled={pending || !state.data}>{pending ? "Сохранение…" : "Сохранить норматив"}</Button></DialogFooter>
     </form></DialogContent></Dialog>

@@ -89,28 +89,28 @@ const workspacePageTitles: Array<[string, string]> = [
   ["/workspace/profile", "Профиль"],
   ["/workspace/competitions/", "Соревнование"],
   ["/workspace/competitions", "Соревнования"],
-  ["/workspace/applications", "Заявки"],
-  ["/workspace/deadlines", "Сроки"],
+  ["/workspace/applications", "Заявки и решения"],
+  ["/workspace/deadlines", "Важные сроки"],
   ["/workspace/coaches", "Тренеры и спортсмены"],
-  ["/workspace/results", "Результаты"],
-  ["/workspace/ranks", "Мой разряд"],
-  ["/workspace/documents", "Антидопинг"],
+  ["/workspace/results", "Спортивные результаты"],
+  ["/workspace/ranks", "Спортивный разряд"],
+  ["/workspace/documents", "Антидопинговые документы"],
   ["/workspace/teams", "Сборные команды"],
   ["/workspace/judge-competitions", "Мои соревнования"],
   ["/workspace/notifications", "Уведомления"],
   ["/workspace/registry", "Реестр"],
   ["/workspace/calendar-plans", "Календарные планы"],
-  ["/workspace/files", "Файлы"],
+  ["/workspace/files", "Документы пользователей"],
   ["/workspace/rating", "Рейтинг спортсменов"],
-  ["/workspace/administration/rank-standards", "Нормативы разрядов"],
+  ["/workspace/administration/rank-standards", "Разряды и нормативы"],
   ["/workspace/administration/roles", "Роли и права"],
-  ["/workspace/administration/directories", "Справочники"],
-  ["/workspace/administration/reviews", "Проверки"],
+  ["/workspace/administration/directories", "Системные справочники"],
+  ["/workspace/administration/reviews", "Проверка сертификатов"],
   ["/workspace/administration/audit", "Журнал аудита"],
 ];
 
 function pageTitle(pathname: string) {
-  return workspacePageTitles.find(([path]) => pathname === path || pathname.startsWith(path))?.[1] ?? "Обзор";
+  return workspacePageTitles.find(([path]) => pathname === path || pathname.startsWith(path))?.[1] ?? "Главная";
 }
 
 interface NavigationItem {
@@ -309,32 +309,32 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
   const role = user.activeRole?.code;
   const isFederationRole = role === "federation" || role === "super_admin";
   const items: NavigationItem[] = [
-    { label: "Обзор", icon: LayoutGrid, href: "/workspace" },
+    { label: "Главная", icon: LayoutGrid, href: "/workspace" },
     { label: "Соревнования", icon: Trophy, href: "/workspace/competitions" },
     {
       label:
         permissions.has("rank_applications.review") ||
         permissions.has("judge_categories.review")
-          ? "Заявки"
+          ? "Заявки на проверку"
           : "Мои заявки",
       icon: ClipboardList,
       href: "/workspace/applications",
     },
-    { label: "Сроки", icon: CalendarClock, href: "/workspace/deadlines" },
+    { label: "Важные сроки", icon: CalendarClock, href: "/workspace/deadlines" },
   ];
 
   if (role === "participant") {
     items.push(
       { label: "Мои тренеры", icon: UsersRound, href: "/workspace/coaches" },
-      { label: "Результаты", icon: Award, href: "/workspace/results" },
-      { label: "Мой разряд", icon: Medal, href: "/workspace/ranks" },
-      { label: "Антидопинг", icon: FileCheck2, href: "/workspace/documents" },
+      { label: "Мои результаты", icon: Award, href: "/workspace/results" },
+      { label: "Спортивный разряд", icon: Medal, href: "/workspace/ranks" },
+      { label: "Антидопинговые документы", icon: FileCheck2, href: "/workspace/documents" },
     );
   }
   if (role === "coach") {
     items.push(
       { label: "Мои спортсмены", icon: UsersRound, href: "/workspace/coaches" },
-      { label: "Результаты", icon: Award, href: "/workspace/results" },
+      { label: "Результаты спортсменов", icon: Award, href: "/workspace/results" },
     );
   }
   if (permissions.has("teams.manage") && !isFederationRole) {
@@ -363,7 +363,7 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
     });
   }
   if (permissions.has("files.read")) {
-    administration.push({ label: "Файлы", icon: FileText, href: "/workspace/files" });
+    administration.push({ label: "Документы пользователей", icon: FileText, href: "/workspace/files" });
   }
   if (permissions.has("rating.read")) {
     administration.push({ label: "Рейтинг спортсменов", icon: Star, href: "/workspace/rating" });
@@ -372,7 +372,7 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
     administration.push({ label: "Сборные команды", icon: UsersRound, href: "/workspace/teams" });
   }
   if (permissions.has("rank_applications.review")) {
-    administration.push({ label: "Нормативы разрядов", icon: Medal, href: "/workspace/administration/rank-standards" });
+    administration.push({ label: "Разряды и нормативы", icon: Medal, href: "/workspace/administration/rank-standards" });
   }
   const canAdminister =
     [
@@ -389,18 +389,18 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
       administration.push({ label: "Роли и права", icon: ShieldCheck, href: "/workspace/administration/roles" });
     }
     if (permissions.has("municipalities.create") || permissions.has("rank_applications.review")) {
-      administration.push({ label: "Справочники", icon: ListTree, href: "/workspace/administration/directories" });
+      administration.push({ label: "Системные справочники", icon: ListTree, href: "/workspace/administration/directories" });
     }
     if (permissions.has("anti_doping.review")) {
-      administration.push({ label: "Проверки", icon: FileCheck2, href: "/workspace/administration/reviews" });
+      administration.push({ label: "Проверка сертификатов", icon: FileCheck2, href: "/workspace/administration/reviews" });
     }
     if (permissions.has("roles.read")) {
       administration.push({ label: "Журнал аудита", icon: ClipboardList, href: "/workspace/administration/audit" });
     }
   }
   return [
-    { label: "Рабочее пространство", items },
-    ...(administration.length ? [{ label: "Администрирование", items: administration }] : []),
+    { label: "Главное", items },
+    ...(administration.length ? [{ label: "Управление федерацией", items: administration }] : []),
   ];
 }
 
@@ -781,7 +781,7 @@ export function WorkspaceShell({
   return (
     <main className="relative h-svh min-w-0 overflow-hidden bg-workspace">
       <div className="absolute inset-0">
-        {theme === "dark" ? <RibbonGlowDark /> : <RibbonGlow />}
+        {theme === "dark" ? <div className="opacity-20"> <RibbonGlowDark /></div> : <RibbonGlow />}
       </div>
       <div className="relative z-10 h-full">
         <SidebarProvider

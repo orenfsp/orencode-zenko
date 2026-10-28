@@ -70,7 +70,6 @@ Backend выдаёт два JWT:
 
 Сразу после обычной регистрации у пользователя нет роли, поэтому `role_id` в JWT отсутствует. После выбора роли backend возвращает новую пару токенов с `role_id`.
 
-Frontend обязан заменять одновременно оба токена после успешного refresh или выбора роли. Старый refresh-токен после ротации больше не действует.
 
 ## Регистрация
 
@@ -82,7 +81,6 @@ POST /api/v1/auth/register
 
 ### Запрос
 
-Запрос отправляется одним `multipart/form-data`. Frontend не загружает документы заранее и не передаёт URL или внутренние ID файлов. При использовании браузерного `FormData` заголовок `Content-Type` вручную задавать нельзя: браузер сам добавит корректный `boundary`.
 
 Поля:
 
@@ -1039,126 +1037,4 @@ export interface Permission {
   description: string;
 }
 ```
-
-## Рекомендуемый сценарий фронтенда
-
-1. Собрать текстовые поля и документы регистрации в один `FormData`.
-2. Рассчитать возраст на UI для показа поля родительского согласия, но окончательное решение оставить backend.
-3. После регистрации или входа сохранить пару токенов.
-4. Если в access-токене нет `role_id`, показать экран выбора роли.
-5. При выборе ролей отправить непустой массив `role_ids` вместе с актуальным refresh-токеном.
-6. Заменить токены значениями из ответа PATCH.
-7. Для admin-раздела ориентироваться на ответы API и `403`, а не только на декодированный JWT.
-8. При истечении access-токена один раз выполнить refresh и повторить исходный запрос.
-9. Если refresh вернул `401`, очистить сессию и отправить пользователя на страницу входа.
-
-## Текущие ограничения контракта
-
-- `GET /api/v1/roles/self-assignable` возвращает список ролей с `self_assignable: true`; необходим access-токен, административный permission не нужен.
-- Отдельные аутентифицированные маршруты `POST` и `GET /api/v1/anti-doping/self` загружают и перечисляют антидопинговые сертификаты; административный список — `GET /api/v1/admin/anti-doping` с `anti_doping.review`. Загрузка и удаление PDF-протокола описаны в [API результатов](./competition-results-api.md).
-- Refresh-токен возвращается в JSON, HttpOnly-cookie пока не используется.
-- CORS middleware подключён, а `CORS_ALLOWED_ORIGINS` разбирается как список origins через запятую. Однако сейчас `config.Load` не присваивает разобранный список полю `HTTP.CORSAllowedOrigins`: фактически список пуст и CORS-заголовки не выдаются, в том числе указанным origins. Любой OPTIONS получает `204`. Даже после исправления передачи списка middleware объявляет методы `GET, POST, PATCH, DELETE, OPTIONS` без `PUT`, разрешённые заголовки `Authorization, Content-Type` и max-age 600 секунд. Это ограничения backend для запросов с другого origin.
-- Нет изменения/удаления ролей и снятия роли с пользователя.
-- Пользовательский выбор ролей заменяет все назначенные роли; первый выбранный элемент становится активным в JWT, но отдельного endpoint для переключения активной роли без изменения набора пока нет.
-- Административный список пользователей доступен через `GET /api/v1/admin/registry/users` (также `/api/v1/admin/users`) с `registry.read`; фильтры и пагинация описаны в разделе «Единый реестр» выше.
-- В основных API возвращаются `code` и `message`; ряд остальных обработчиков пока возвращает только `message` или текст. Подробности — в [контракте ошибок](./mvp-backend-api.md#формат-ошибок-основных-api).
-- OpenAPI/Swagger-схема ещё не подготовлена.
-## Public profile
-
-```http
-GET /api/v1/profiles/{userId}
-```
-
-This endpoint is public and does not require an access token. It returns only safe profile fields: name, birth date, municipality, organization and roles. Email, Telegram username, access status, documents and tokens are never returned.
-
-```json
-{
-  "data": {
-    "id": 42,
-    "first_name": "Ivan",
-    "last_name": "Ivanov",
-    "middle_name": "Ivanovich",
-    "birth_date": "2000-05-10",
-    "municipality": { "id": 3, "name": "Orenburg" },
-    "organization": { "id": 8, "name": "Sports school" },
-    "roles": [{ "id": 2, "code": "participant", "name": "Participant" }]
-  }
-}
-```
-
-For an invalid or unknown `userId`, the API returns `404 Not Found`.
-
-## Competition workflow (administrator)
-
-Use `GET /api/v1/admin/competitions?status=draft` to restore the current administrator's own competitions. A single draft is available through `GET /api/v1/admin/competitions/{id}`.
-
-Status actions:
-
-```http
-POST /api/v1/admin/competitions/{id}/submit
-POST /api/v1/admin/competitions/{id}/publish
-POST /api/v1/admin/competitions/{id}/cancel
-POST /api/v1/admin/competitions/{id}/return
-GET  /api/v1/admin/competitions/{id}/history
-```
-
-Allowed transitions are `draft -> under_review`, `under_review -> published`, `under_review|published -> cancelled` and `under_review -> draft`. All workflow endpoints require `competitions.update`; only the competition creator can operate on it.
-## Anti-doping certificates
-
-The current user's certificates are loaded with:
-
-```http
-GET /api/v1/anti-doping/self
-Authorization: Bearer <access_token>
-```
-
-This returns certificate metadata (`id`, `file_id`, `status`, dates and rejection reason). The binary document is downloaded separately through `GET /api/v1/files/{fileID}/download`.
-
-Administrators with `anti_doping.review` can load all certificates:
-
-```http
-GET /api/v1/admin/anti-doping
-Authorization: Bearer <access_token>
-```
-
-The response uses the same certificate structure and is ordered from newest to oldest. Review is performed with `PATCH /api/v1/admin/anti-doping/{certificateID}`.
-## Judge positions
-
-```http
-GET /api/v1/judge-positions
-```
-
-The public endpoint returns a list of `{ "id", "name" }` objects. Use the selected `id` as `position_id` when assigning a judge.
-
-## Search users by role
-
-Administrators can search users for assignment forms through:
-
-```http
-GET /api/v1/admin/users?role=judge&search=иван&limit=50&offset=0
-Authorization: Bearer <access_token>
-```
-
-The `role` filter is optional and supports role codes such as `judge`, `coach` and `participant`. Results use the registry pagination format and require `registry.read`.
-## Competition event name
-
-Every competition Event now has a required `name` field. Send it when creating an Event and use the same field from all public/admin Event responses:
-
-```json
-{ "name": "Личный зачёт среди юниоров", "age_group_id": 3 }
-```
-
-It can be changed through the existing Event `PATCH` endpoint. The generated protocol displays this name instead of `Мероприятие №{id}`.
-## Administrative competition list
-
-```http
-GET /api/v1/admin/competitions
-GET /api/v1/admin/competitions?status=draft
-GET /api/v1/admin/competitions?status=under_review
-GET /api/v1/admin/competitions?status=completed
-GET /api/v1/admin/competitions?status=cancelled
-Authorization: Bearer <access_token>
-```
-
-Without `status`, the endpoint returns every competition created by the current administrator. Supported statuses are `draft`, `under_review`, `published`, `registration_open`, `registration_closed`, `ongoing`, `results_pending`, `completed` and `cancelled`. The endpoint requires `competitions.update` and never returns another administrator's competitions.
 

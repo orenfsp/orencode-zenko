@@ -20,7 +20,6 @@ interface DatePickerProps {
   defaultValue?: string;
   disabled?: boolean;
   required?: boolean;
-  allowFuture?: boolean;
   className?: string;
 }
 
@@ -36,7 +35,6 @@ export function DatePicker({
   defaultValue,
   disabled,
   required,
-  allowFuture = false,
   className,
 }: DatePickerProps) {
   const [date, setDate] = useState<Date | undefined>(() =>
@@ -76,9 +74,6 @@ export function DatePicker({
             onSelect={(selected) => { setDate(selected); if (selected) setInvalid(false); }}
             locale={ru}
             captionLayout="dropdown"
-            startMonth={new Date(new Date().getFullYear() - 120, 0, 1)}
-            endMonth={allowFuture ? new Date(new Date().getFullYear() + 20, 11, 31) : new Date()}
-            disabled={allowFuture ? undefined : { after: new Date() }}
           />
         </PopoverContent>
       </Popover>
