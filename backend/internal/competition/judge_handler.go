@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	competitionerrs "github.com/orenfsp/orencode-zenko.git/internal/competition/errs"
+	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"go.uber.org/zap"
@@ -163,7 +164,7 @@ func handleJudgeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrJudgeAssignmentExists):
 		writeError(w, http.StatusConflict, "судья уже назначен на эту должность")
 	case errors.Is(err, ErrJudgeCompetitionLocked):
-		writeError(w, http.StatusConflict, "назначения судей можно изменять только у черновика соревнования")
+		httpx.WriteError(w, http.StatusConflict, "invalid_competition_status", "назначения судей можно изменять только у черновика соревнования")
 	default:
 		if logger.Log != nil {
 			logger.Log.Error("competition judge request failed", zap.Error(err))
