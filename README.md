@@ -113,14 +113,15 @@ TG_TOKEN_BOT=
 ## Вот заполненный на всякий случай
 
 ```dotenv
+
 # PostgreSQL
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=StrongPassword123
 POSTGRES_DB=fsp
-POSTGRES_PORT=5432
+POSTGRES_PORT=5433
 
 # Подключение с компьютера (Windows)
-DATABASE_URL=postgres://postgres:StrongPassword123@localhost:5432/fap?sslmode=disable
+DATABASE_URL=postgres://postgres:StrongPassword123@localhost:5433/fsp?sslmode=disable
 
 # Подключение контейнеров к PostgreSQL внутри Docker-сети
 DATABASE_URL_DOCKER=postgres://postgres:StrongPassword123@postgres:5432/fsp?sslmode=disable
