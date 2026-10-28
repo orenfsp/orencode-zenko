@@ -166,6 +166,49 @@ func (s *Service) Refresh(ctx context.Context, req RefreshTokenRequest) (TokenRe
 	return s.rotateSession(ctx, session, user)
 }
 
+func (s *Service) SwitchActiveRole(ctx context.Context, userID int64, roleID int64) (TokenResponse, error) {
+	// 1. Достаем профиль пользователя (там есть список ролей)
+	profile, err := s.users.GetProfile(ctx, userID)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+
+	// 2. Проверяем, что запрошенная роль есть у пользователя
+	hasRole := false
+	for _, role := range profile.Roles {
+		if role.ID == roleID {
+			hasRole = true
+			break
+		}
+	}
+	if !hasRole {
+		return TokenResponse{}, autherrs.ErrAccessDenied
+	}
+
+	// 3. Достаем пользователя (для access_status)
+	user, err := s.users.GetUserByID(ctx, userID)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	if !user.AccessStatus {
+		return TokenResponse{}, autherrs.ErrAccessDenied
+	}
+
+	// 4. Генерируем новый access-токен с новым role_id
+	accessToken, err := s.tokens.GenerateAccessToken(token.TokenPayload{
+		UserID: userID,
+		RoleID: &roleID,
+	})
+	if err != nil {
+		return TokenResponse{}, err
+	}
+
+	// 5. Возвращаем только access-токен (refresh остается тем же)
+	return TokenResponse{
+		AccessToken: accessToken,
+	}, nil
+}
+
 func (s *Service) Logout(ctx context.Context, refreshToken string) error {
 	_, session, err := s.validRefreshSession(ctx, refreshToken)
 	if err != nil {

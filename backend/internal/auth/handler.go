@@ -396,3 +396,27 @@ func writeSuccess(w http.ResponseWriter, status int, data any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(SuccessResponse{Data: data})
 }
+
+func (h *Handler) SwitchActiveRole(w http.ResponseWriter, r *http.Request) {
+	claims, ok := rbac.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
+		return
+	}
+
+	var body struct {
+		RoleID int64 `json:"role_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.RoleID <= 0 {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_request", "role_id is required")
+		return
+	}
+
+	resp, err := h.service.SwitchActiveRole(r.Context(), claims.UserID, body.RoleID)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "switch_failed", err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"data": resp})
+}
