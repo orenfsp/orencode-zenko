@@ -40,6 +40,7 @@ import { DataError, DataLoading } from "@/shared/ui/data-state";
 import { useNotifications } from "@/shared/lib/notifications";
 import { downloadBlob } from "@/shared/lib/download";
 import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
 import {
   Select,
   SelectContent,
@@ -268,16 +269,30 @@ export function CompetitionDetails({
   function saveEvent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!eventEditor) return;
+    const name = String(new FormData(event.currentTarget).get("name") ?? "").trim();
+    if (!name || [...name].length > 250) {
+      notify.error("Название зачёта должно содержать от 1 до 250 символов");
+      return;
+    }
     const ageGroupId = eventEditor.ageGroupId;
+    console.log("Создание зачёта:", {
+  competitionId,
+  ageGroupId,
+  payload: {
+    age_group_id: ageGroupId,
+  },
+});
     const action =
       eventEditor.mode === "create"
         ? () =>
             competitionEventApi.create(competitionId, {
+              name,
               age_group_id: ageGroupId,
             })
         : eventEditor.eventId
           ? () =>
               competitionEventApi.update(competitionId, eventEditor.eventId!, {
+                name,
                 age_group_id: ageGroupId,
               })
           : null;
@@ -1026,6 +1041,10 @@ export function CompetitionDetails({
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={saveEvent} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="competition-event-name">Название зачёта</Label>
+              <Input key={`${eventEditor?.mode}-${eventEditor?.eventId ?? "new"}`} id="competition-event-name" name="name" required maxLength={250} placeholder="Например, Личный зачёт среди юниоров" defaultValue={eventEditor?.mode === "edit" ? events.find((item) => item.id === eventEditor.eventId)?.name ?? "" : ""} />
+            </div>
             <ScrollMask className="grid max-h-72 gap-2 pr-1">
               <Button
                 type="button"

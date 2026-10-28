@@ -133,6 +133,19 @@ export function RegisterForm() {
       return;
     }
 
+    const maxFileBytes = 10 * 1024 * 1024;
+    const selectedFiles = [personalConsent, ...(minor ? [parentalConsent] : [])];
+    if (selectedFiles.some((file) => file instanceof File && file.size > maxFileBytes)) {
+      notify.error("Размер каждого документа не должен превышать 10 МиБ");
+      setPending(false);
+      return;
+    }
+    if (selectedFiles.some((file) => file instanceof File && !/\.(pdf|jpe?g|png|xml|docx)$/i.test(file.name))) {
+      notify.error("Допустимые форматы документов: PDF, JPEG, PNG, XML и DOCX");
+      setPending(false);
+      return;
+    }
+
     const name = splitFullName(values.fullName);
     const body = new FormData();
     body.append("first_name", name.firstName);

@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { Label } from "@/shared/ui/label";
+import { Input } from "@/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { WorkspaceToolbar } from "@/shared/ui/workspace-toolbar";
 
@@ -55,21 +56,28 @@ export function EventManagement() {
   const selectedCompetition = competitions.data?.find((competition) => competition.id === competitionId);
   const visibleEvents = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("ru");
-    return (events.data ?? []).filter((item) => `${item.id} ${item.discipline.name} ${item.age_group?.name ?? ""}`.toLocaleLowerCase("ru").includes(query));
+    return (events.data ?? []).filter((item) => `${item.id} ${item.name} ${item.discipline.name} ${item.age_group?.name ?? ""}`.toLocaleLowerCase("ru").includes(query));
   }, [events.data, search]);
 
-  async function saveEvent(event: FormEvent) {
+  async function saveEvent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!competitionId || !editor) return;
+    const name = String(new FormData(event.currentTarget).get("name") ?? "").trim();
+    if (!name || [...name].length > 250) {
+      notify.error("Название зачёта должно содержать от 1 до 250 символов");
+      return;
+    }
     setPending(true);
     try {
       if (editor.mode === "create") {
         await competitionEventApi.create(competitionId, {
+          name,
           age_group_id: editor.ageGroupId,
         });
         notify.success("Зачёт создан");
       } else if (editor.eventId) {
         await competitionEventApi.update(competitionId, editor.eventId, {
+          name,
           age_group_id: editor.ageGroupId,
         });
         notify.success("Зачёт обновлён");
@@ -135,7 +143,7 @@ export function EventManagement() {
           <Card key={item.id} variant="glass" className="p-4 sm:p-5">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div className="min-w-0">
-                <p className="font-medium">Зачёт #{item.id}</p>
+                <p className="font-medium">{item.name}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{item.discipline.name} · {item.age_group?.name ?? "Без возрастной группы"}</p>
               </div>
               <div className="flex gap-2">
@@ -154,6 +162,10 @@ export function EventManagement() {
             <DialogDescription>Выберите возрастную группу. Дисциплину backend возьмёт из соревнования.</DialogDescription>
           </DialogHeader>
           <form onSubmit={saveEvent} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="event-name">Название зачёта</Label>
+              <Input key={`${editor?.mode}-${editor?.eventId ?? "new"}`} id="event-name" name="name" required maxLength={250} placeholder="Например, Личный зачёт среди юниоров" defaultValue={editor?.mode === "edit" ? events.data?.find((item) => item.id === editor.eventId)?.name ?? "" : ""} />
+            </div>
             <div className="grid max-h-72 gap-2 overflow-y-auto scroll-mask-y pr-1">
               <Button type="button" variant={editor?.ageGroupId === null ? "default" : "outline"} className="justify-start" onClick={() => setEditor((value) => value ? { ...value, ageGroupId: null } : value)}>Без возрастной группы</Button>
               {ageGroups.data?.map((group) => (
