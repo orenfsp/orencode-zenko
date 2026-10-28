@@ -105,6 +105,7 @@ type CompetitionEventResultEntry struct {
 	LastSolveTimeDeciseconds int64
 	NegativeAttempts         int32
 	Place                    pgtype.Int4
+	CustomValues             []byte
 }
 
 type CompetitionEventResultEntryApplication struct {
@@ -126,6 +127,9 @@ type CompetitionEventResultSheet struct {
 	CreatedAt          pgtype.Timestamptz
 	UpdatedAt          pgtype.Timestamptz
 	Revision           int64
+	ScoringMode        string
+	TemplateID         pgtype.Int8
+	TemplateSnapshot   []byte
 }
 
 type CompetitionEventTaskResult struct {
@@ -194,6 +198,16 @@ type Discipline struct {
 	Name      string
 	UpdatedAt pgtype.Timestamptz
 	CreatedAt pgtype.Timestamptz
+}
+
+type DisciplineResultTemplate struct {
+	ID           int64
+	DisciplineID int64
+	Name         string
+	Fields       []byte
+	IsActive     bool
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
 }
 
 type InappNotification struct {

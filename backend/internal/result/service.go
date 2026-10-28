@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"io"
+	"math"
 	"strings"
 	"time"
 
@@ -36,12 +37,28 @@ func NewService(repository Repository, storage Storage, protocol ProtocolGenerat
 func (s *Service) Configure(
 	ctx context.Context, competitionID, eventID int64, request SettingsRequest,
 ) (TableResponse, error) {
-	contextData, err := s.requireAlgorithmicEvent(ctx, competitionID, eventID)
+	contextData, err := s.getEvent(ctx, competitionID, eventID)
 	if err != nil {
 		return TableResponse{}, err
 	}
-	if request.TaskCount < 1 || request.TaskCount > MaxTaskCount ||
-		(request.Mode != ModeIndividual && request.Mode != ModeTeam) {
+	if request.ScoringMode == "" {
+		request.ScoringMode = ScoringAlgorithmic
+	}
+	if request.Mode != ModeIndividual && request.Mode != ModeTeam {
+		return TableResponse{}, ErrInvalidRequest
+	}
+	if request.ScoringMode == ScoringAlgorithmic {
+		if !strings.EqualFold(strings.TrimSpace(contextData.DisciplineName), AlgorithmicDiscipline) {
+			return TableResponse{}, ErrUnsupportedDiscipline
+		}
+		if request.TaskCount < 1 || request.TaskCount > MaxTaskCount || request.TemplateID != nil {
+			return TableResponse{}, ErrInvalidRequest
+		}
+	} else if request.ScoringMode == ScoringManual {
+		if request.TaskCount != 0 || request.TemplateID == nil || *request.TemplateID <= 0 {
+			return TableResponse{}, ErrInvalidRequest
+		}
+	} else {
 		return TableResponse{}, ErrInvalidRequest
 	}
 	applications, err := s.repository.ListApprovedApplications(ctx, eventID)
@@ -63,7 +80,22 @@ func (s *Service) Configure(
 			return TableResponse{}, err
 		}
 	}
-	if err := s.repository.Configure(ctx, eventID, request.Mode, request.TaskCount, teams, request.ConfirmReset); err != nil {
+	if request.ScoringMode == ScoringAlgorithmic {
+		err = s.repository.Configure(ctx, eventID, request.Mode, request.TaskCount, teams, request.ConfirmReset)
+	} else {
+		template, loadErr := s.repository.GetTemplate(ctx, *request.TemplateID)
+		if loadErr != nil {
+			return TableResponse{}, loadErr
+		}
+		if !template.IsActive {
+			return TableResponse{}, ErrTemplateInactive
+		}
+		if template.DisciplineID != contextData.DisciplineID {
+			return TableResponse{}, ErrTemplateDiscipline
+		}
+		err = s.repository.ConfigureManual(ctx, eventID, request.Mode, template, teams, request.ConfirmReset)
+	}
+	if err != nil {
 		return TableResponse{}, err
 	}
 	table, err := s.repository.GetTable(ctx, eventID)
@@ -102,6 +134,9 @@ func (s *Service) Save(
 	if table.Sheet.Status == SheetApproved {
 		return TableResponse{}, ErrAlreadyApproved
 	}
+	if effectiveScoringMode(table.Sheet) != ScoringAlgorithmic {
+		return TableResponse{}, ErrWrongScoringMode
+	}
 	updates, err := validateEntryUpdates(table, request)
 	if err != nil {
 		return TableResponse{}, err
@@ -112,10 +147,34 @@ func (s *Service) Save(
 	return s.Get(ctx, competitionID, eventID)
 }
 
+func (s *Service) SaveManual(ctx context.Context, competitionID, eventID int64, request SaveManualResultsRequest) (TableResponse, error) {
+	if _, err := s.getEvent(ctx, competitionID, eventID); err != nil {
+		return TableResponse{}, err
+	}
+	table, err := s.repository.GetTable(ctx, eventID)
+	if err != nil {
+		return TableResponse{}, err
+	}
+	if table.Sheet.Status == SheetApproved {
+		return TableResponse{}, ErrAlreadyApproved
+	}
+	if effectiveScoringMode(table.Sheet) != ScoringManual || table.Sheet.TemplateSnapshot == nil {
+		return TableResponse{}, ErrWrongScoringMode
+	}
+	updates, err := validateManualUpdates(table, request, true)
+	if err != nil {
+		return TableResponse{}, err
+	}
+	if err = s.repository.SaveManualEntries(ctx, eventID, request.Revision, updates); err != nil {
+		return TableResponse{}, err
+	}
+	return s.Get(ctx, competitionID, eventID)
+}
+
 func (s *Service) Calculate(
 	ctx context.Context, competitionID, eventID int64,
 ) (TableResponse, error) {
-	contextData, err := s.requireAlgorithmicEvent(ctx, competitionID, eventID)
+	contextData, err := s.getEvent(ctx, competitionID, eventID)
 	if err != nil {
 		return TableResponse{}, err
 	}
@@ -126,7 +185,20 @@ func (s *Service) Calculate(
 	if table.Sheet.Status == SheetApproved {
 		return TableResponse{}, ErrAlreadyApproved
 	}
-	summaries := calculateAlgorithmic(table.Entries)
+	var summaries []EntrySummary
+	if effectiveScoringMode(table.Sheet) == ScoringAlgorithmic {
+		if !strings.EqualFold(strings.TrimSpace(contextData.DisciplineName), AlgorithmicDiscipline) {
+			return TableResponse{}, ErrUnsupportedDiscipline
+		}
+		summaries = calculateAlgorithmic(table.Entries)
+	} else if effectiveScoringMode(table.Sheet) == ScoringManual {
+		if _, err = validateManualTable(table); err != nil {
+			return TableResponse{}, err
+		}
+		summaries = manualSummaries(table.Entries)
+	} else {
+		return TableResponse{}, ErrWrongScoringMode
+	}
 	if err := s.repository.SaveCalculated(ctx, eventID, table.Sheet.Revision, summaries); err != nil {
 		return TableResponse{}, err
 	}
@@ -144,7 +216,7 @@ func (s *Service) Approve(
 	if actorUserID <= 0 {
 		return ApprovalResponse{}, ErrInvalidRequest
 	}
-	contextData, err := s.requireAlgorithmicEvent(ctx, competitionID, eventID)
+	contextData, err := s.getEvent(ctx, competitionID, eventID)
 	if err != nil {
 		return ApprovalResponse{}, err
 	}
@@ -171,7 +243,20 @@ func (s *Service) Approve(
 	if len(table.Entries) == 0 {
 		return ApprovalResponse{}, ErrInvalidRequest
 	}
-	summaries := calculateAlgorithmic(table.Entries)
+	var summaries []EntrySummary
+	if effectiveScoringMode(table.Sheet) == ScoringAlgorithmic {
+		if !strings.EqualFold(strings.TrimSpace(contextData.DisciplineName), AlgorithmicDiscipline) {
+			return ApprovalResponse{}, ErrUnsupportedDiscipline
+		}
+		summaries = calculateAlgorithmic(table.Entries)
+	} else if effectiveScoringMode(table.Sheet) == ScoringManual {
+		if _, err = validateManualTable(table); err != nil {
+			return ApprovalResponse{}, err
+		}
+		summaries = manualSummaries(table.Entries)
+	} else {
+		return ApprovalResponse{}, ErrWrongScoringMode
+	}
 	applySummaries(&table, summaries)
 	judges, err := s.repository.ListProtocolJudges(ctx, competitionID)
 	if err != nil {
@@ -458,6 +543,7 @@ func toTableResponse(table Table) TableResponse {
 			SolvedCount: entry.SolvedCount, TotalTimeDeciseconds: entry.TotalTimeDeciseconds,
 			LastSolveTimeDeciseconds: entry.LastSolveTimeDeciseconds,
 			NegativeAttempts:         entry.NegativeAttempts, Place: entry.Place,
+			CustomValues: entry.CustomValues,
 		})
 	}
 	var protocol *string
@@ -472,5 +558,107 @@ func toTableResponse(table Table) TableResponse {
 		Mode: table.Sheet.Mode, TaskCount: table.Sheet.TaskCount, Status: table.Sheet.Status,
 		CalculatedAt: table.Sheet.CalculatedAt, ApprovedAt: table.Sheet.ApprovedAt,
 		ProtocolURL: protocol, Entries: entries,
+		Revision: table.Sheet.Revision, ScoringMode: table.Sheet.ScoringMode,
+		TemplateID: table.Sheet.TemplateID, Template: table.Sheet.TemplateSnapshot,
 	}
+}
+
+func validateManualUpdates(table Table, request SaveManualResultsRequest, requireAll bool) ([]ManualEntryUpdate, error) {
+	if table.Sheet.TemplateSnapshot == nil || len(request.Entries) == 0 {
+		return nil, ErrInvalidRequest
+	}
+	valid := make(map[int64]bool, len(table.Entries))
+	for _, e := range table.Entries {
+		valid[e.ID] = true
+	}
+	seen, places := map[int64]bool{}, map[int32]bool{}
+	updates := make([]ManualEntryUpdate, 0, len(request.Entries))
+	for _, item := range request.Entries {
+		if !valid[item.EntryID] {
+			return nil, ErrEntryNotFound
+		}
+		if seen[item.EntryID] {
+			return nil, ErrInvalidRequest
+		}
+		seen[item.EntryID] = true
+		if item.ResultStatus != ResultFinished && item.ResultStatus != ResultDidNotStart && item.ResultStatus != ResultDisqualified {
+			return nil, ErrInvalidRequest
+		}
+		if item.ResultStatus == ResultFinished {
+			if item.Place == nil || *item.Place <= 0 || places[*item.Place] {
+				return nil, ErrInvalidRequest
+			}
+			places[*item.Place] = true
+		} else if item.Place != nil {
+			return nil, ErrInvalidRequest
+		}
+		if err := validateCustomValues(table.Sheet.TemplateSnapshot.Fields, item.CustomValues, item.ResultStatus == ResultFinished); err != nil {
+			return nil, err
+		}
+		updates = append(updates, ManualEntryUpdate{EntryID: item.EntryID, ResultStatus: item.ResultStatus, Place: item.Place, CustomValues: item.CustomValues})
+	}
+	if requireAll && len(seen) != len(valid) {
+		return nil, ErrInvalidRequest
+	}
+	return updates, nil
+}
+
+func validateCustomValues(fields []TemplateField, values map[string]any, required bool) error {
+	allowed := make(map[string]TemplateField, len(fields))
+	for _, f := range fields {
+		allowed[f.Key] = f
+	}
+	for key, value := range values {
+		field, ok := allowed[key]
+		if !ok {
+			return ErrInvalidRequest
+		}
+		switch field.Type {
+		case "text":
+			v, ok := value.(string)
+			if !ok || len([]rune(v)) > MaxManualTextLength {
+				return ErrInvalidRequest
+			}
+		case "number":
+			v, ok := value.(float64)
+			if !ok || math.IsNaN(v) || math.IsInf(v, 0) {
+				return ErrInvalidRequest
+			}
+		default:
+			return ErrInvalidRequest
+		}
+	}
+	if required {
+		for _, f := range fields {
+			if f.Required {
+				if v, ok := values[f.Key]; !ok || v == nil || (f.Type == "text" && strings.TrimSpace(v.(string)) == "") {
+					return ErrInvalidRequest
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func validateManualTable(table Table) ([]ManualEntryUpdate, error) {
+	request := SaveManualResultsRequest{Entries: make([]ManualEntryRequest, 0, len(table.Entries))}
+	for _, e := range table.Entries {
+		request.Entries = append(request.Entries, ManualEntryRequest{EntryID: e.ID, ResultStatus: e.ResultStatus, Place: e.Place, CustomValues: e.CustomValues})
+	}
+	return validateManualUpdates(table, request, true)
+}
+
+func manualSummaries(entries []Entry) []EntrySummary {
+	items := make([]EntrySummary, 0, len(entries))
+	for _, e := range entries {
+		items = append(items, EntrySummary{EntryID: e.ID, Place: e.Place})
+	}
+	return items
+}
+
+func effectiveScoringMode(sheet Sheet) string {
+	if sheet.ScoringMode == "" {
+		return ScoringAlgorithmic
+	}
+	return sheet.ScoringMode
 }

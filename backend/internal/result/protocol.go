@@ -46,6 +46,17 @@ func (g *PDFProtocolGenerator) Generate(data ProtocolData) ([]byte, error) {
 		}
 		return entries[i].ID < entries[j].ID
 	})
+	if effectiveScoringMode(data.Table.Sheet) == ScoringManual {
+		if data.Table.Sheet.TemplateSnapshot == nil {
+			return nil, ErrInvalidRequest
+		}
+		g.addManualPages(pdf, data, entries)
+		var output bytes.Buffer
+		if err := pdf.Output(&output); err != nil {
+			return nil, err
+		}
+		return output.Bytes(), nil
+	}
 
 	for firstTask := 1; firstTask <= int(data.Table.Sheet.TaskCount); firstTask += protocolTasksPerSection {
 		lastTask := firstTask + protocolTasksPerSection - 1
@@ -87,6 +98,152 @@ func (g *PDFProtocolGenerator) Generate(data ProtocolData) ([]byte, error) {
 		return nil, err
 	}
 	return output.Bytes(), nil
+}
+
+const manualFieldsPerSection = 4
+
+func (g *PDFProtocolGenerator) addManualPages(pdf *fpdf.Fpdf, data ProtocolData, entries []Entry) {
+	fields := data.Table.Sheet.TemplateSnapshot.Fields
+	for first := 0; first < len(fields); first += manualFieldsPerSection {
+		last := first + manualFieldsPerSection
+		if last > len(fields) {
+			last = len(fields)
+		}
+		g.addManualHeader(pdf, data, first, last)
+		section := fields[first:last]
+		g.addManualTableHeader(pdf, section)
+		for index, entry := range entries {
+			height := manualRowHeight(pdf, entry, section)
+			if pdf.GetY()+height > 190 {
+				g.addManualHeader(pdf, data, first, last)
+				g.addManualTableHeader(pdf, section)
+			}
+			g.addManualEntryRow(pdf, index+1, entry, section, height)
+		}
+	}
+	g.addManualSignatures(pdf, data)
+}
+
+func (g *PDFProtocolGenerator) addManualHeader(pdf *fpdf.Fpdf, data ProtocolData, first, last int) {
+	pdf.AddPage()
+	pdf.SetFont("Go", "B", 12)
+	pdf.CellFormat(0, 6, "ФЕДЕРАЦИЯ СПОРТИВНОГО ПРОГРАММИРОВАНИЯ", "", 1, "C", false, 0, "")
+	pdf.CellFormat(0, 7, "ПРОТОКОЛ РЕЗУЛЬТАТОВ", "", 1, "C", false, 0, "")
+	pdf.SetFont("Go", "", 8)
+	pdf.MultiCell(0, 4.5, data.Table.Context.CompetitionName+" — "+data.Table.Context.DisciplineName, "", "C", false)
+	if data.Table.Context.AgeGroupName != nil {
+		pdf.CellFormat(0, 4, *data.Table.Context.AgeGroupName, "", 1, "C", false, 0, "")
+	}
+	pdf.CellFormat(0, 4, "Шаблон: "+data.Table.Sheet.TemplateSnapshot.Name+"; дата соревнования: "+data.Table.Context.StartAt.Format("02.01.2006"), "", 1, "C", false, 0, "")
+	if len(data.Table.Sheet.TemplateSnapshot.Fields) > manualFieldsPerSection {
+		pdf.CellFormat(0, 4, fmt.Sprintf("Поля %d–%d из %d", first+1, last, len(data.Table.Sheet.TemplateSnapshot.Fields)), "", 1, "C", false, 0, "")
+	}
+	pdf.Ln(2)
+}
+
+func manualWidths(fieldCount int) (float64, float64) {
+	const fixed = 8.0 + 28.0 + 14.0
+	fieldWidth := 36.0
+	nameWidth := 277.0 - fixed - fieldWidth*float64(fieldCount)
+	return nameWidth, fieldWidth
+}
+
+func (g *PDFProtocolGenerator) addManualTableHeader(pdf *fpdf.Fpdf, fields []TemplateField) {
+	nameWidth, fieldWidth := manualWidths(len(fields))
+	pdf.SetFont("Go", "B", 6.5)
+	pdf.CellFormat(8, 12, "№", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(nameWidth, 12, "Участник / команда", "1", 0, "C", false, 0, "")
+	for _, field := range fields {
+		pdf.CellFormat(fieldWidth, 12, truncateProtocol(field.Label, 28), "1", 0, "C", false, 0, "")
+	}
+	pdf.CellFormat(28, 12, "Статус", "1", 0, "C", false, 0, "")
+	pdf.CellFormat(14, 12, "Место", "1", 1, "C", false, 0, "")
+}
+
+func manualRowHeight(pdf *fpdf.Fpdf, entry Entry, fields []TemplateField) float64 {
+	nameWidth, fieldWidth := manualWidths(len(fields))
+	maxLines := len(pdf.SplitText(entryLabel(entry), nameWidth-2))
+	for _, field := range fields {
+		if count := len(pdf.SplitText(formatManualValue(entry.CustomValues[field.Key]), fieldWidth-2)); count > maxLines {
+			maxLines = count
+		}
+	}
+	if maxLines < 1 {
+		maxLines = 1
+	}
+	height := float64(maxLines)*3.2 + 2
+	if height < 8 {
+		height = 8
+	}
+	return height
+}
+
+func manualMultiCell(pdf *fpdf.Fpdf, width, height float64, text, align string) {
+	x, y := pdf.GetXY()
+	pdf.Rect(x, y, width, height, "D")
+	pdf.SetXY(x+1, y+1)
+	pdf.MultiCell(width-2, 3.2, text, "", align, false)
+	pdf.SetXY(x+width, y)
+}
+
+func (g *PDFProtocolGenerator) addManualEntryRow(pdf *fpdf.Fpdf, number int, entry Entry, fields []TemplateField, height float64) {
+	nameWidth, fieldWidth := manualWidths(len(fields))
+	pdf.SetFont("Go", "", 6.2)
+	pdf.CellFormat(8, height, fmt.Sprint(number), "1", 0, "C", false, 0, "")
+	manualMultiCell(pdf, nameWidth, height, entryLabel(entry), "L")
+	for _, field := range fields {
+		manualMultiCell(pdf, fieldWidth, height, formatManualValue(entry.CustomValues[field.Key]), "L")
+	}
+	pdf.CellFormat(28, height, manualStatus(entry.ResultStatus), "1", 0, "C", false, 0, "")
+	place := "—"
+	if entry.Place != nil {
+		place = fmt.Sprint(*entry.Place)
+	}
+	pdf.CellFormat(14, height, place, "1", 0, "C", false, 0, "")
+	pdf.SetXY(10, pdf.GetY()+height)
+}
+
+func (g *PDFProtocolGenerator) addManualSignatures(pdf *fpdf.Fpdf, data ProtocolData) {
+	if pdf.GetY()+32 > 190 {
+		pdf.AddPage()
+	}
+	pdf.Ln(5)
+	pdf.SetFont("Go", "", 8)
+	pdf.CellFormat(65, 6, "Главный судья соревнований", "", 0, "L", false, 0, "")
+	pdf.CellFormat(55, 6, "____________________", "", 0, "C", false, 0, "")
+	pdf.CellFormat(0, 6, judgeName(data.Table.Judges, "главный судья"), "", 1, "L", false, 0, "")
+	pdf.CellFormat(65, 6, "Главный секретарь соревнований", "", 0, "L", false, 0, "")
+	pdf.CellFormat(55, 6, "____________________", "", 0, "C", false, 0, "")
+	pdf.CellFormat(0, 6, judgeName(data.Table.Judges, "главный секретарь"), "", 1, "L", false, 0, "")
+	pdf.CellFormat(0, 6, data.Date.Format("02.01.2006")+" г.                                      М.П.", "", 1, "L", false, 0, "")
+}
+
+func formatManualValue(value any) string {
+	if value == nil {
+		return ""
+	}
+	if number, ok := value.(float64); ok {
+		return fmt.Sprintf("%g", number)
+	}
+	return fmt.Sprint(value)
+}
+func manualStatus(status string) string {
+	switch status {
+	case ResultFinished:
+		return "завершил"
+	case ResultDidNotStart:
+		return "не стартовал"
+	case ResultDisqualified:
+		return "дисквалиф."
+	}
+	return status
+}
+func truncateProtocol(value string, limit int) string {
+	runes := []rune(strings.ReplaceAll(value, "\n", " "))
+	if len(runes) <= limit {
+		return string(runes)
+	}
+	return string(runes[:limit-1]) + "…"
 }
 
 func (g *PDFProtocolGenerator) addPageHeader(

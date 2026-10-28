@@ -17,4 +17,8 @@ var (
 	ErrProtocolNotApproved   = errors.New("event results are not approved")
 	ErrInvalidPDF            = errors.New("invalid PDF file")
 	ErrProtocolTooLarge      = errors.New("protocol file too large")
+	ErrTemplateNotFound      = errors.New("result template not found")
+	ErrTemplateInactive      = errors.New("result template is inactive")
+	ErrTemplateDiscipline    = errors.New("result template belongs to another discipline")
+	ErrWrongScoringMode      = errors.New("wrong result scoring mode")
 )

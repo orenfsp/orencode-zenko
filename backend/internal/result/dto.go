@@ -7,6 +7,8 @@ type SettingsRequest struct {
 	TaskCount    int16              `json:"task_count"`
 	Teams        []TeamSetupRequest `json:"teams,omitempty"`
 	ConfirmReset bool               `json:"confirm_reset,omitempty"`
+	ScoringMode  string             `json:"scoring_mode,omitempty"`
+	TemplateID   *int64             `json:"template_id,omitempty"`
 }
 
 type TeamSetupRequest struct {
@@ -16,6 +18,18 @@ type TeamSetupRequest struct {
 
 type SaveResultsRequest struct {
 	Entries []EntryRequest `json:"entries"`
+}
+
+type SaveManualResultsRequest struct {
+	Revision int64                `json:"revision"`
+	Entries  []ManualEntryRequest `json:"entries"`
+}
+
+type ManualEntryRequest struct {
+	EntryID      int64          `json:"entry_id"`
+	ResultStatus string         `json:"result_status"`
+	Place        *int32         `json:"place"`
+	CustomValues map[string]any `json:"custom_values"`
 }
 
 type EntryRequest struct {
@@ -41,6 +55,10 @@ type TableResponse struct {
 	ApprovedAt   *time.Time          `json:"approved_at"`
 	ProtocolURL  *string             `json:"protocol_url"`
 	Entries      []EntryResponse     `json:"entries"`
+	Revision     int64               `json:"revision"`
+	ScoringMode  string              `json:"scoring_mode"`
+	TemplateID   *int64              `json:"template_id"`
+	Template     *TemplateSnapshot   `json:"template_snapshot"`
 }
 
 type CompetitionResponse struct {
@@ -66,6 +84,19 @@ type EntryResponse struct {
 	LastSolveTimeDeciseconds int64                 `json:"last_solve_time_deciseconds"`
 	NegativeAttempts         int32                 `json:"negative_attempts"`
 	Place                    *int32                `json:"place"`
+	CustomValues             map[string]any        `json:"custom_values"`
+}
+
+type CreateTemplateRequest struct {
+	DisciplineID int64           `json:"discipline_id"`
+	Name         string          `json:"name"`
+	Fields       []TemplateField `json:"fields"`
+}
+
+type UpdateTemplateRequest struct {
+	Name     *string          `json:"name"`
+	Fields   *[]TemplateField `json:"fields"`
+	IsActive *bool            `json:"is_active"`
 }
 
 type TeamResponse struct {

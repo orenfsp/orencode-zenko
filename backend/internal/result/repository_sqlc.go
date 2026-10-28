@@ -2,6 +2,7 @@ package result
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math/big"
 	"time"
@@ -202,6 +203,87 @@ func (r *SQLCRepository) Configure(
 	return tx.Commit(ctx)
 }
 
+func (r *SQLCRepository) ConfigureManual(
+	ctx context.Context, eventID int64, mode string, template ResultTemplate, teams []TeamSetup, confirmReset bool,
+) error {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := r.queries.WithTx(tx)
+	snapshot, err := json.Marshal(TemplateSnapshot{ID: template.ID, Name: template.Name, Fields: template.Fields})
+	if err != nil {
+		return err
+	}
+	sheet, err := queries.LockEventResultSheet(ctx, eventID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = tx.QueryRow(ctx, `INSERT INTO competition_event_result_sheet
+			(event_id, mode, task_count, scoring_mode, template_id, template_snapshot)
+			VALUES ($1,$2,0,'manual',$3,$4) RETURNING id`, eventID, mode, template.ID, snapshot).Scan(&sheet.ID)
+		sheet.EventID, sheet.Mode, sheet.TaskCount, sheet.ScoringMode = eventID, mode, 0, ScoringManual
+	} else if err == nil && sheet.Status == SheetApproved {
+		return ErrAlreadyApproved
+	} else if err == nil {
+		current, loadErr := loadTable(ctx, queries, eventID)
+		if loadErr != nil {
+			return loadErr
+		}
+		applications, loadErr := queries.ListApprovedResultApplications(ctx, eventID)
+		if loadErr != nil {
+			return loadErr
+		}
+		approved := make([]Application, 0, len(applications))
+		for _, a := range applications {
+			approved = append(approved, Application{ID: a.ApplicationID})
+		}
+		if current.Sheet.ScoringMode == ScoringManual && current.Sheet.TemplateID != nil && *current.Sheet.TemplateID == template.ID && sameConfiguration(current, mode, 0, teams, approved) {
+			return tx.Commit(ctx)
+		}
+		if !confirmReset {
+			return ErrResetConfirmation
+		}
+		err = tx.QueryRow(ctx, `UPDATE competition_event_result_sheet SET mode=$2, task_count=0,
+			scoring_mode='manual', template_id=$3, template_snapshot=$4, calculated_at=NULL,
+			revision=revision+1, updated_at=now() WHERE event_id=$1 AND status='draft' RETURNING id`,
+			eventID, mode, template.ID, snapshot).Scan(&sheet.ID)
+	}
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM competition_event_result_entry WHERE sheet_id=$1`, sheet.ID); err != nil {
+		return err
+	}
+	if mode == ModeIndividual {
+		applications, err := queries.ListApprovedResultApplications(ctx, eventID)
+		if err != nil {
+			return err
+		}
+		for _, application := range applications {
+			entryID, err := queries.CreateEventResultEntry(ctx, db.CreateEventResultEntryParams{PSheetID: sheet.ID})
+			if err != nil {
+				return err
+			}
+			if err = queries.LinkResultEntryApplication(ctx, db.LinkResultEntryApplicationParams{PEntryID: entryID, PApplicationID: application.ApplicationID}); err != nil {
+				return err
+			}
+		}
+	} else {
+		for _, team := range teams {
+			entryID, err := queries.CreateEventResultEntry(ctx, db.CreateEventResultEntryParams{PSheetID: sheet.ID, PTeamID: pgtype.Int8{Int64: team.TeamID, Valid: true}})
+			if err != nil {
+				return err
+			}
+			for _, applicationID := range team.ApplicationIDs {
+				if err = queries.LinkResultEntryApplication(ctx, db.LinkResultEntryApplicationParams{PEntryID: entryID, PApplicationID: applicationID}); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return tx.Commit(ctx)
+}
+
 func (r *SQLCRepository) GetTable(ctx context.Context, eventID int64) (Table, error) {
 	return loadTable(ctx, r.queries, eventID)
 }
@@ -238,7 +320,13 @@ func loadTable(ctx context.Context, queries *db.Queries, eventID int64) (Table, 
 			TotalTimeDeciseconds:     row.TotalTimeDeciseconds,
 			LastSolveTimeDeciseconds: row.LastSolveTimeDeciseconds,
 			NegativeAttempts:         row.NegativeAttempts, Place: int32Pointer(row.Place),
+			CustomValues: map[string]any{},
 		})
+		if len(row.CustomValues) > 0 {
+			if err := json.Unmarshal(row.CustomValues, &entries[len(entries)-1].CustomValues); err != nil {
+				return Table{}, err
+			}
+		}
 	}
 	for _, row := range applicationRows {
 		index, ok := entryIndexes[row.EntryID]
@@ -263,6 +351,53 @@ func loadTable(ctx context.Context, queries *db.Queries, eventID int64) (Table, 
 		})
 	}
 	return Table{Sheet: mapSheet(sheetRow), Entries: entries}, nil
+}
+
+func (r *SQLCRepository) SaveManualEntries(ctx context.Context, eventID, revision int64, entries []ManualEntryUpdate) error {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var sheetID int64
+	var status, scoring string
+	var currentRevision int64
+	err = tx.QueryRow(ctx, `SELECT id,status,scoring_mode,revision FROM competition_event_result_sheet WHERE event_id=$1 FOR UPDATE`, eventID).Scan(&sheetID, &status, &scoring, &currentRevision)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotConfigured
+	}
+	if err != nil {
+		return err
+	}
+	if status == SheetApproved {
+		return ErrAlreadyApproved
+	}
+	if scoring != ScoringManual {
+		return ErrWrongScoringMode
+	}
+	if revision != currentRevision {
+		return ErrStaleResults
+	}
+	for _, entry := range entries {
+		raw, err := json.Marshal(entry.CustomValues)
+		if err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `UPDATE competition_event_result_entry SET result_status=$1,place=$2,custom_values=$3,
+			solved_count=0,total_time_deciseconds=0,last_solve_time_deciseconds=0,negative_attempts=0
+			WHERE id=$4 AND sheet_id=$5`, entry.ResultStatus, nullableInt4(entry.Place), raw, entry.EntryID, sheetID)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrEntryNotFound
+		}
+	}
+	_, err = tx.Exec(ctx, `UPDATE competition_event_result_sheet SET calculated_at=NULL,revision=revision+1,updated_at=now() WHERE id=$1`, sheetID)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *SQLCRepository) SaveDraftEntries(
@@ -406,10 +541,14 @@ func (r *SQLCRepository) Approve(
 			return Approval{}, ErrEntryNotFound
 		}
 		for _, application := range entry.Applications {
+			score := pgtype.Numeric{}
+			if sheet.ScoringMode == "" || sheet.ScoringMode == ScoringAlgorithmic {
+				score = pgtype.Numeric{Int: big.NewInt(int64(summary.SolvedCount)), Valid: true}
+			}
 			_, err := queries.UpsertApprovedCompetitionResult(ctx, db.UpsertApprovedCompetitionResultParams{
 				PApplicationID: application.ID,
 				PPlace:         nullableInt4(summary.Place),
-				PScore:         pgtype.Numeric{Int: big.NewInt(int64(summary.SolvedCount)), Valid: true},
+				PScore:         score,
 				PResultStatus:  pgtype.Text{String: entry.ResultStatus, Valid: true},
 			})
 			if err != nil {
@@ -544,13 +683,21 @@ func (r *SQLCRepository) ListHistory(ctx context.Context, userID int64, discipli
 }
 
 func mapSheet(row db.CompetitionEventResultSheet) Sheet {
-	return Sheet{
+	result := Sheet{
 		ID: row.ID, EventID: row.EventID, Mode: row.Mode, TaskCount: row.TaskCount,
 		Status: row.Status, CalculatedAt: timePointer(row.CalculatedAt),
 		ApprovedByUserID: int64Pointer(row.ApprovedByUserID), ApprovedAt: timePointer(row.ApprovedAt),
 		ProtocolStorageKey: textPointer(row.ProtocolStorageKey),
 		CreatedAt:          row.CreatedAt.Time, UpdatedAt: row.UpdatedAt.Time, Revision: row.Revision,
+		ScoringMode: row.ScoringMode, TemplateID: int64Pointer(row.TemplateID),
 	}
+	if len(row.TemplateSnapshot) > 0 {
+		var snapshot TemplateSnapshot
+		if json.Unmarshal(row.TemplateSnapshot, &snapshot) == nil {
+			result.TemplateSnapshot = &snapshot
+		}
+	}
+	return result
 }
 
 func textPointer(value pgtype.Text) *string {

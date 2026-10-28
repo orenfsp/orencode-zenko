@@ -22,6 +22,9 @@ const (
 
 	AlgorithmicDiscipline = "программирование алгоритмическое"
 	MaxTaskCount          = 50
+	ScoringAlgorithmic    = "algorithmic"
+	ScoringManual         = "manual"
+	MaxManualTextLength   = 2000
 )
 
 type EventContext struct {
@@ -69,6 +72,9 @@ type Sheet struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	Revision           int64
+	ScoringMode        string
+	TemplateID         *int64
+	TemplateSnapshot   *TemplateSnapshot
 }
 
 type TaskResult struct {
@@ -90,6 +96,7 @@ type Entry struct {
 	LastSolveTimeDeciseconds int64
 	NegativeAttempts         int32
 	Place                    *int32
+	CustomValues             map[string]any
 }
 
 type Table struct {
@@ -112,6 +119,13 @@ type EntryUpdate struct {
 	Tasks        []TaskResult
 }
 
+type ManualEntryUpdate struct {
+	EntryID      int64
+	ResultStatus string
+	Place        *int32
+	CustomValues map[string]any
+}
+
 type EntrySummary struct {
 	EntryID                  int64
 	SolvedCount              int32
@@ -129,4 +143,20 @@ type Approval struct {
 type ProtocolDownload struct {
 	Content  io.ReadCloser
 	Filename string
+}
+
+type TemplateSnapshot struct {
+	ID     int64           `json:"id"`
+	Name   string          `json:"name"`
+	Fields []TemplateField `json:"fields"`
+}
+
+type ResultTemplate struct {
+	ID           int64           `json:"id"`
+	DisciplineID int64           `json:"discipline_id"`
+	Name         string          `json:"name"`
+	Fields       []TemplateField `json:"fields"`
+	IsActive     bool            `json:"is_active"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
 }

@@ -71,7 +71,7 @@ func (q *Queries) CreateEventResultEntry(ctx context.Context, arg CreateEventRes
 const createEventResultSheet = `-- name: CreateEventResultSheet :one
 INSERT INTO competition_event_result_sheet (event_id, mode, task_count)
 VALUES ($1, $2, $3)
-RETURNING id, event_id, mode, task_count, status, calculated_at, approved_by_user_id, approved_at, protocol_storage_key, created_at, updated_at, revision
+RETURNING id, event_id, mode, task_count, status, calculated_at, approved_by_user_id, approved_at, protocol_storage_key, created_at, updated_at, revision, scoring_mode, template_id, template_snapshot
 `
 
 type CreateEventResultSheetParams struct {
@@ -96,6 +96,9 @@ func (q *Queries) CreateEventResultSheet(ctx context.Context, arg CreateEventRes
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Revision,
+		&i.ScoringMode,
+		&i.TemplateID,
+		&i.TemplateSnapshot,
 	)
 	return i, err
 }
@@ -129,19 +132,7 @@ func (q *Queries) DeleteResultEntryTasks(ctx context.Context, arg DeleteResultEn
 }
 
 const getEventResultSheet = `-- name: GetEventResultSheet :one
-SELECT
-    id,
-    event_id,
-    mode,
-    task_count,
-    status,
-    calculated_at,
-    approved_by_user_id,
-    approved_at,
-    protocol_storage_key,
-    created_at,
-    updated_at
-    ,revision
+SELECT id, event_id, mode, task_count, status, calculated_at, approved_by_user_id, approved_at, protocol_storage_key, created_at, updated_at, revision, scoring_mode, template_id, template_snapshot
 FROM competition_event_result_sheet
 WHERE event_id = $1
 `
@@ -162,6 +153,9 @@ func (q *Queries) GetEventResultSheet(ctx context.Context, pEventID int64) (Comp
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Revision,
+		&i.ScoringMode,
+		&i.TemplateID,
+		&i.TemplateSnapshot,
 	)
 	return i, err
 }
@@ -409,6 +403,7 @@ SELECT
     e.last_solve_time_deciseconds,
     e.negative_attempts,
     e.place
+    , e.custom_values
 FROM competition_event_result_entry AS e
 LEFT JOIN team AS t ON t.id = e.team_id
 WHERE e.sheet_id = $1
@@ -425,6 +420,7 @@ type ListEventResultEntriesRow struct {
 	LastSolveTimeDeciseconds int64
 	NegativeAttempts         int32
 	Place                    pgtype.Int4
+	CustomValues             []byte
 }
 
 func (q *Queries) ListEventResultEntries(ctx context.Context, pSheetID int64) ([]ListEventResultEntriesRow, error) {
@@ -446,6 +442,7 @@ func (q *Queries) ListEventResultEntries(ctx context.Context, pSheetID int64) ([
 			&i.LastSolveTimeDeciseconds,
 			&i.NegativeAttempts,
 			&i.Place,
+			&i.CustomValues,
 		); err != nil {
 			return nil, err
 		}
@@ -595,19 +592,7 @@ func (q *Queries) ListResultProtocolJudges(ctx context.Context, pCompetitionID i
 }
 
 const lockEventResultSheet = `-- name: LockEventResultSheet :one
-SELECT
-    id,
-    event_id,
-    mode,
-    task_count,
-    status,
-    calculated_at,
-    approved_by_user_id,
-    approved_at,
-    protocol_storage_key,
-    created_at,
-    updated_at
-    ,revision
+SELECT id, event_id, mode, task_count, status, calculated_at, approved_by_user_id, approved_at, protocol_storage_key, created_at, updated_at, revision, scoring_mode, template_id, template_snapshot
 FROM competition_event_result_sheet
 WHERE event_id = $1
 FOR UPDATE
@@ -629,6 +614,9 @@ func (q *Queries) LockEventResultSheet(ctx context.Context, pEventID int64) (Com
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Revision,
+		&i.ScoringMode,
+		&i.TemplateID,
+		&i.TemplateSnapshot,
 	)
 	return i, err
 }
@@ -729,12 +717,15 @@ const updateEventResultSheetSettings = `-- name: UpdateEventResultSheetSettings 
 UPDATE competition_event_result_sheet
 SET mode = $1,
     task_count = $2,
+    scoring_mode = 'algorithmic',
+    template_id = NULL,
+    template_snapshot = NULL,
     calculated_at = NULL,
     revision = revision + 1,
     updated_at = now()
 WHERE event_id = $3
   AND status = 'draft'
-RETURNING id, event_id, mode, task_count, status, calculated_at, approved_by_user_id, approved_at, protocol_storage_key, created_at, updated_at, revision
+RETURNING id, event_id, mode, task_count, status, calculated_at, approved_by_user_id, approved_at, protocol_storage_key, created_at, updated_at, revision, scoring_mode, template_id, template_snapshot
 `
 
 type UpdateEventResultSheetSettingsParams struct {
@@ -759,6 +750,9 @@ func (q *Queries) UpdateEventResultSheetSettings(ctx context.Context, arg Update
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Revision,
+		&i.ScoringMode,
+		&i.TemplateID,
+		&i.TemplateSnapshot,
 	)
 	return i, err
 }

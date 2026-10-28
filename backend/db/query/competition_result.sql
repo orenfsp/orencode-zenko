@@ -48,36 +48,12 @@ WHERE ca.event_id = sqlc.arg(p_event_id)
 ORDER BY t.name, t.id, ca.id;
 
 -- name: GetEventResultSheet :one
-SELECT
-    id,
-    event_id,
-    mode,
-    task_count,
-    status,
-    calculated_at,
-    approved_by_user_id,
-    approved_at,
-    protocol_storage_key,
-    created_at,
-    updated_at
-    ,revision
+SELECT *
 FROM competition_event_result_sheet
 WHERE event_id = sqlc.arg(p_event_id);
 
 -- name: LockEventResultSheet :one
-SELECT
-    id,
-    event_id,
-    mode,
-    task_count,
-    status,
-    calculated_at,
-    approved_by_user_id,
-    approved_at,
-    protocol_storage_key,
-    created_at,
-    updated_at
-    ,revision
+SELECT *
 FROM competition_event_result_sheet
 WHERE event_id = sqlc.arg(p_event_id)
 FOR UPDATE;
@@ -91,6 +67,9 @@ RETURNING *;
 UPDATE competition_event_result_sheet
 SET mode = sqlc.arg(p_mode),
     task_count = sqlc.arg(p_task_count),
+    scoring_mode = 'algorithmic',
+    template_id = NULL,
+    template_snapshot = NULL,
     calculated_at = NULL,
     revision = revision + 1,
     updated_at = now()
@@ -122,6 +101,7 @@ SELECT
     e.last_solve_time_deciseconds,
     e.negative_attempts,
     e.place
+    , e.custom_values
 FROM competition_event_result_entry AS e
 LEFT JOIN team AS t ON t.id = e.team_id
 WHERE e.sheet_id = sqlc.arg(p_sheet_id)
