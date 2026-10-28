@@ -3,7 +3,7 @@ package audit
 type ResponseDTO struct {
 	ID          int64  `json:"id"`
 	EventType   string `json:"event_type"`
-	ActorUserID int64  `json:"actor_user_id"`
+	ActorUserID *int64 `json:"actor_user_id"`
 	EntityType  string `json:"entity_type"`
 	EntityID    *int64 `json:"entity_id,omitempty"`
 	Method      string `json:"method"`

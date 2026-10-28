@@ -18,7 +18,7 @@ func NewRepository(queries *db.Queries) Repository {
 func (r *sqlRepository) Write(ctx context.Context, event EventCreate) error {
 	return r.queries.CreateAuditLog(ctx, db.CreateAuditLogParams{
 		EventType:   event.EventType,
-		ActorUserID: event.ActorUserID,
+		ActorUserID: optionalInt8(event.ActorUserID),
 		EntityType:  event.EntityType,
 		EntityID:    optionalInt8(event.EntityID),
 		Method:      event.Method,
@@ -38,7 +38,7 @@ func (r *sqlRepository) List(ctx context.Context, limit, offset int32) ([]Event,
 		result = append(result, Event{
 			ID:          row.ID,
 			EventType:   row.EventType,
-			ActorUserID: row.ActorUserID,
+			ActorUserID: optionalInt64(row.ActorUserID),
 			EntityType:  row.EntityType,
 			EntityID:    optionalInt64(row.EntityID),
 			Method:      row.Method,

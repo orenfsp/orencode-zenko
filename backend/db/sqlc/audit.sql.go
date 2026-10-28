@@ -25,7 +25,7 @@ INSERT INTO audit_log (
 
 type CreateAuditLogParams struct {
 	EventType   string
-	ActorUserID int64
+	ActorUserID pgtype.Int8
 	EntityType  string
 	EntityID    pgtype.Int8
 	Method      string

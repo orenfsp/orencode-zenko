@@ -30,11 +30,12 @@ func (r *repositoryStub) List(_ context.Context, limit, offset int32) ([]Event, 
 
 func TestListMapsEventsAndPassesPagination(t *testing.T) {
 	entityID := int64(42)
+	actorID := int64(1)
 	occurredAt := time.Date(2026, time.October, 27, 12, 30, 0, 0, time.FixedZone("UTC+3", 3*60*60))
 	repo := &repositoryStub{events: []Event{{
 		ID:          7,
 		EventType:   EventRoleCreated,
-		ActorUserID: 1,
+		ActorUserID: &actorID,
 		EntityType:  "role",
 		EntityID:    &entityID,
 		Method:      "POST",

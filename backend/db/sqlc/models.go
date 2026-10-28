@@ -34,7 +34,7 @@ type AntiDoping struct {
 type AuditLog struct {
 	ID          int64
 	EventType   string
-	ActorUserID int64
+	ActorUserID pgtype.Int8
 	EntityType  string
 	EntityID    pgtype.Int8
 	Method      string
