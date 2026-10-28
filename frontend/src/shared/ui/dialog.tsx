@@ -55,18 +55,45 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const [swipeOffset, setSwipeOffset] = React.useState(0)
+  const swipeStart = React.useRef<number | null>(null)
+  const swipeCloseButton = React.useRef<HTMLButtonElement>(null)
+
+  function handleTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    if (window.innerWidth >= 768) return
+    swipeStart.current = event.touches[0]?.clientY ?? null
+  }
+
+  function handleTouchMove(event: React.TouchEvent<HTMLDivElement>) {
+    if (swipeStart.current === null) return
+    const delta = (event.touches[0]?.clientY ?? swipeStart.current) - swipeStart.current
+    if (delta > 0) setSwipeOffset(delta)
+  }
+
+  function handleTouchEnd() {
+    if (swipeOffset > 80) swipeCloseButton.current?.click()
+    setSwipeOffset(0)
+    swipeStart.current = null
+  }
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
+        {...props}
         data-slot="dialog-content"
         className={cn(
-          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border bg-background p-4 pt-7 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg sm:p-6 max-sm:top-auto max-sm:right-0 max-sm:bottom-0 max-sm:left-0 max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:max-h-[90vh] max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:pb-8 max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=open]:slide-in-from-bottom",
           className
         )}
-        {...props}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{ ...props.style, ...(swipeOffset ? { transform: `translateY(${swipeOffset}px)` } : {}) }}
       >
+        <div className="pointer-events-none absolute top-2 left-1/2 hidden h-1.5 w-12 -translate-x-1/2 rounded-full bg-muted-foreground/30 max-sm:block" aria-hidden="true" />
         {children}
+        <DialogPrimitive.Close ref={swipeCloseButton} className="sr-only" aria-label="Закрыть окно" />
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"

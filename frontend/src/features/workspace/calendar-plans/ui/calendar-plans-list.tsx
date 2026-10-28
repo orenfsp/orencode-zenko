@@ -141,7 +141,7 @@ export function CalendarPlansList() {
       </Dialog>
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-h-[min(720px,calc(100vh-2rem))] overflow-y-auto scroll-mask-y sm:max-w-2xl">
+        <DialogContent className="max-h-[min(720px,calc(100vh-2rem))] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle>{selected?.plan.name}</DialogTitle><DialogDescription>Соревнования, включённые в календарный план за {selected?.plan.year} год.</DialogDescription></DialogHeader>
           {selected ? selected.competitions.length ? <div className="grid gap-2">
             {selected.competitions.map((competition) => <div key={competition.id} className="rounded-xl border bg-muted/30 p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="font-medium">{competition.name}</p><p className="mt-1 text-xs text-muted-foreground">{competition.discipline.name} · {formatDate(competition.start_at)} — {formatDate(competition.end_at)}{competition.calendar_plan_number ? ` · № ${competition.calendar_plan_number}` : ""}</p></div><StatusBadge status={competition.status} /></div></div>)}
@@ -154,7 +154,7 @@ export function CalendarPlansList() {
       {!state.loading && !state.error && !plans.length ? <DataEmpty title={search || yearFilter ? "Планы не найдены" : "Календарных планов пока нет"} description={search || yearFilter ? "Измените запрос или сбросьте фильтр по году." : canCreate ? "Создайте первый план кнопкой «Создать план», чтобы связать с ним соревнования." : "Планы появятся после того, как администратор добавит их."} /> : null}
 
       <div className="grid gap-3">
-        {plans.map((plan) => <Card key={plan.id} className="bg-white/75 p-4 shadow-none sm:p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><CalendarDays className="size-4 shrink-0 text-muted-foreground" /><h2 className="truncate font-medium">{plan.name}</h2></div><p className="mt-1 pl-6 text-sm text-muted-foreground">{plan.year} год · план № {plan.id}</p></div><div className="flex flex-wrap gap-2 sm:shrink-0"><Button type="button" variant="outline" onClick={() => void openPlan(plan)} disabled={pending}><Search />Открыть соревнования</Button>{canUpdate ? <Button type="button" variant="ghost" size="icon" aria-label={`Изменить план «${plan.name}»`} onClick={() => setEditing(plan)} disabled={pending}><Pencil /></Button> : null}</div></div></Card>)}
+        {plans.map((plan) => <Card key={plan.id} className="bg-white/75 p-4 shadow-none sm:p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><CalendarDays className="size-4 shrink-0 text-muted-foreground" /><h2 className="truncate font-medium">{plan.name}</h2></div><p className="mt-1 pl-6 text-sm text-muted-foreground">{plan.year} год</p></div><div className="flex flex-wrap gap-2 sm:shrink-0"><Button type="button" variant="outline" onClick={() => void openPlan(plan)} disabled={pending}><Search />Открыть соревнования</Button>{canUpdate ? <Button type="button" variant="ghost" size="icon" aria-label={`Изменить план «${plan.name}»`} onClick={() => setEditing(plan)} disabled={pending}><Pencil /></Button> : null}</div></div></Card>)}
       </div>
     </div>
   );

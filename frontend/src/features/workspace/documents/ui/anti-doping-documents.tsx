@@ -1,12 +1,14 @@
 "use client";
 
 import { ChangeEvent, useCallback, useState } from "react";
-import { LoaderCircle, Upload } from "lucide-react";
+import { Download, LoaderCircle, Upload } from "lucide-react";
 
 import { antiDopingApi } from "@/entities/anti-doping";
+import { fileApi } from "@/entities/file";
 import { formatDate, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { useNotifications } from "@/shared/lib/notifications";
+import { downloadBlob } from "@/shared/lib/download";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
@@ -31,6 +33,15 @@ export function AntiDopingDocuments() {
       notify.error(cause instanceof Error ? cause.message : "Не удалось загрузить сертификат");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function download(fileId: number) {
+    try {
+      const file = await fileApi.download(fileId);
+      downloadBlob(file.blob, file.filename);
+    } catch (cause) {
+      notify.error(cause instanceof Error ? cause.message : "Не удалось скачать сертификат");
     }
   }
 
@@ -60,7 +71,7 @@ export function AntiDopingDocuments() {
                   {certificate.rejection_reason ? <p className="mt-2 text-sm text-destructive">{certificate.rejection_reason}</p> : null}
                 </div>
               </div>
-              <StatusBadge status={certificate.status} />
+              <div className="flex shrink-0 flex-col items-end gap-2"><StatusBadge status={certificate.status} /><Button type="button" size="sm" variant="outline" onClick={() => void download(certificate.file_id)}><Download />Скачать</Button></div>
             </div>
           </Card>
         ))}

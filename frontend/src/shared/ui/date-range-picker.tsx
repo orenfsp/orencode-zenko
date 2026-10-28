@@ -32,10 +32,11 @@ export function DateRangePicker({ startName, endName, startDefaultValue, endDefa
     from: parseDate(startDefaultValue),
     to: parseDate(endDefaultValue),
   }));
+  const display = (date: Date) => format(date, `d MMM${date.getFullYear() !== new Date().getFullYear() ? " yyyy" : ""}`, { locale: ru });
   const label = range?.from
     ? range.to
-      ? `${format(range.from, "d MMM yyyy", { locale: ru })} — ${format(range.to, "d MMM yyyy", { locale: ru })}`
-      : format(range.from, "d MMM yyyy", { locale: ru })
+      ? `${display(range.from)} — ${display(range.to)}`
+      : display(range.from)
     : placeholder;
 
   return (

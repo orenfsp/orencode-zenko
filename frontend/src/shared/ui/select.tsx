@@ -20,7 +20,7 @@ function Select({ name, required, defaultValue = "", onValueChange, ...props }: 
 
 function SelectTrigger({ className, children, ...props }: React.ComponentProps<typeof SelectPrimitive.Trigger>) {
   return (
-    <SelectPrimitive.Trigger className={cn("flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50", className)} {...props}>
+    <SelectPrimitive.Trigger data-slot="select-trigger" className={cn("flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 disabled:cursor-not-allowed disabled:opacity-50", className)} {...props}>
       {children}
       <SelectPrimitive.Icon><ChevronDownIcon className="size-4 text-muted-foreground" /></SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
@@ -34,7 +34,7 @@ function SelectValue(props: React.ComponentProps<typeof SelectPrimitive.Value>) 
 function SelectContent({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Content>) {
   return (
     <SelectPrimitive.Portal>
-      <SelectPrimitive.Content position="popper" className={cn("z-50 max-h-72 min-w-(--radix-select-trigger-width) overflow-y-auto scroll-mask-y rounded-xl border bg-popover p-1 text-popover-foreground shadow-md", className)} {...props} />
+      <SelectPrimitive.Content position="popper" className={cn("z-50 max-h-72 min-w-(--radix-select-trigger-width) overflow-y-auto rounded-xl border bg-popover p-1 text-popover-foreground shadow-md", className)} {...props} />
     </SelectPrimitive.Portal>
   );
 }

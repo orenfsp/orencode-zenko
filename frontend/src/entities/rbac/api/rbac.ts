@@ -5,6 +5,10 @@ export const rbacApi = {
     (
       await api.get<ApiEnvelope<string[]>>("/api/v1/my-permission")
     ).data,
+  permissionsForActiveRole: async () =>
+    (
+      await api.get<ApiEnvelope<string[]>>("/api/v1/my-permissions")
+    ).data,
   selfAssignableRoles: async () =>
     (await api.get<ApiEnvelope<Role[]>>("/api/v1/roles/self-assignable")).data,
   roles: async () => {

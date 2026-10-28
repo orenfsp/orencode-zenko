@@ -32,7 +32,7 @@ import {
 const news = [
   {
     id: 1,
-    date: "09 октября 2026",
+    date: "09 октября",
     title:
       "Пять лет Федерации спортивного программирования: Москва принимает финал Кубка 2026",
     image: "/assets/new_1.png",
@@ -40,21 +40,21 @@ const news = [
   },
   {
     id: 2,
-    date: "29 июля 2026",
+    date: "29 июля",
     title: "Федерация спортивного программирования представила технологические разработки на заседании комиссии Госсовета",
     image: "/assets/new_2.png",
     category: "Новость",
   },
   {
     id: 3,
-    date: "20 сентября 2026",
+    date: "20 сентября",
     title: "Пять лет Федерации спортивного программирования: в Москве подвели итоги Кубка ФСП 2026",
     image: "/assets/new_3.png",
     category: "Новость",
   },
   {
     id: 4,
-    date: "09 сентября 2026",
+    date: "09 сентября",
     title: "Завершился первый Кубок Дальнего Востока по спортивному программированию",
     image: "/assets/new_4.png",
     category: "Новость",
@@ -62,14 +62,18 @@ const news = [
 ];
 
 function competitionDate(start: string, end: string) {
-  const format = new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  return `${format.format(new Date(start))} — ${format.format(new Date(end))}`;
+  const format = (value: string) => {
+    const date = new Date(value);
+    const includeYear = date.getFullYear() !== new Date().getFullYear();
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "numeric",
+      month: "short",
+      ...(includeYear ? { year: "numeric" as const } : {}),
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  };
+  return `${format(start)} — ${format(end)}`;
 }
 
 function daysWord(value: number) {

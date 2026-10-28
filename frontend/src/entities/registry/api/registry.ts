@@ -26,6 +26,13 @@ export const registryApi = {
         { permission: "registry.read", params: { ...query } },
       )
     ).data,
+  adminUsers: async (query: RegistryUserQuery = {}) =>
+    (
+      await api.get<ApiEnvelope<RegistryPage<RegistryUser>>>(
+        "/api/v1/admin/users",
+        { permission: "registry.read", params: { ...query } },
+      )
+    ).data,
   organizations: async (query: RegistryOrganizationQuery = {}) =>
     (
       await api.get<ApiEnvelope<RegistryPage<RegistryOrganization>>>(

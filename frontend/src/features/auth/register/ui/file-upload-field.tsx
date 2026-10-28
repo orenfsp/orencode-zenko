@@ -43,7 +43,7 @@ export function FileUploadField({
       />
       <Label
         htmlFor={id}
-        className="flex h-8 w-full cursor-pointer items-center overflow-hidden rounded-[10px] border border-border bg-background px-2.5 font-normal transition-shadow hover:bg-accent peer-focus-visible:border-ring peer-focus-visible:ring-2 peer-focus-visible:ring-ring/25"
+        className="flex h-8 w-full cursor-pointer items-center overflow-hidden rounded-xl border border-border bg-background px-2.5 font-normal transition-shadow hover:bg-accent peer-focus-visible:border-ring peer-focus-visible:ring-2 peer-focus-visible:ring-ring/25"
       >
         <span className="shrink-0 pr-1 text-sm font-medium text-foreground">
           Выберите файл

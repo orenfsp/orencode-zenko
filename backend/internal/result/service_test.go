@@ -43,6 +43,11 @@ func (r *repositoryStub) Configure(_ context.Context, eventID int64, mode string
 	r.table.Sheet = Sheet{ID: 1, EventID: eventID, Mode: mode, TaskCount: taskCount, Status: SheetDraft}
 	return nil
 }
+func (r *repositoryStub) ConfigureManual(_ context.Context, eventID int64, mode string, template ResultTemplate, teams []TeamSetup, _ bool) error {
+	r.configuredMode, r.configuredTeams = mode, teams
+	r.table.Sheet = Sheet{ID: 1, EventID: eventID, Mode: mode, ScoringMode: ScoringManual, TemplateID: &template.ID, TemplateSnapshot: &TemplateSnapshot{ID: template.ID, Name: template.Name, Fields: template.Fields}, Status: SheetDraft}
+	return r.err
+}
 func (r *repositoryStub) GetTable(context.Context, int64) (Table, error) {
 	if r.err != nil {
 		return Table{}, r.err
@@ -55,6 +60,9 @@ func (r *repositoryStub) SaveDraftEntries(_ context.Context, _ int64, entries []
 	}
 	r.saved = entries
 	return nil
+}
+func (r *repositoryStub) SaveManualEntries(context.Context, int64, int64, []ManualEntryUpdate) error {
+	return r.err
 }
 func (r *repositoryStub) SaveCalculated(_ context.Context, _ int64, _ int64, summaries []EntrySummary) error {
 	if r.err != nil {
@@ -96,6 +104,18 @@ func (r *repositoryStub) ReplaceProtocol(_ context.Context, _ int64, key, _ *str
 	}
 	r.table.Sheet.ProtocolStorageKey = key
 	return old, nil
+}
+func (r *repositoryStub) CreateTemplate(_ context.Context, disciplineID int64, name string, fields []TemplateField) (ResultTemplate, error) {
+	return ResultTemplate{ID: 1, DisciplineID: disciplineID, Name: name, Fields: fields, IsActive: true}, r.err
+}
+func (r *repositoryStub) GetTemplate(context.Context, int64) (ResultTemplate, error) {
+	return ResultTemplate{ID: 1, DisciplineID: r.contextData.DisciplineID, Name: "test", Fields: []TemplateField{{Key: "value", Label: "Value", Type: "number", Required: true}}, IsActive: true}, r.err
+}
+func (r *repositoryStub) ListTemplates(context.Context, int64) ([]ResultTemplate, error) {
+	return nil, r.err
+}
+func (r *repositoryStub) UpdateTemplate(_ context.Context, item ResultTemplate) (ResultTemplate, error) {
+	return item, r.err
 }
 
 type storageStub struct {

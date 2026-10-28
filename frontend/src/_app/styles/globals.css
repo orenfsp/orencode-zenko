@@ -24,6 +24,8 @@
   --ring: #402fff;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
+  --workspace: #f2efff;
+  --brand-soft: #e8e5ff;
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
   --sidebar-primary: hsl(240 5.9% 10%);
@@ -54,6 +56,8 @@
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-workspace: var(--workspace);
+  --color-brand-soft: var(--brand-soft);
   --font-sans: "Inter Variable", Arial, sans-serif;
   --font-mono: "JetBrains Mono Variable", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
@@ -93,44 +97,54 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
-.scroll-mask-y {
-  --scroll-mask-fade: 32px;
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    black var(--scroll-mask-fade),
-    black calc(100% - var(--scroll-mask-fade)),
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    black var(--scroll-mask-fade),
-    black calc(100% - var(--scroll-mask-fade)),
-    transparent 100%
-  );
-  mask-mode: alpha;
-  -webkit-mask-composite: source-in;
+.scroll-mask-y,
+.scroll-mask-x {
+  mask-image: none;
+  -webkit-mask-image: none;
 }
 
-.scroll-mask-x {
-  --scroll-mask-fade: 28px;
-  mask-image: linear-gradient(
-    to right,
-    transparent 0,
-    black var(--scroll-mask-fade),
-    black calc(100% - var(--scroll-mask-fade)),
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent 0,
-    black var(--scroll-mask-fade),
-    black calc(100% - var(--scroll-mask-fade)),
-    transparent 100%
-  );
-  mask-mode: alpha;
-  -webkit-mask-composite: source-in;
+/* Next.js remounts app-router templates on navigation. The transition lives
+ * in the workspace template so persistent chrome, including the sidebar,
+ * never fades or slides with the page content. */
+.workspace-page-transition {
+  animation: workspace-page-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: 50% 0;
+  will-change: opacity, transform;
+}
+
+@keyframes workspace-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Modal surfaces stay fully opaque; masks are reserved for list scroll areas. */
+[data-slot="dialog-content"] .scroll-mask-y,
+[data-slot="dialog-content"].scroll-mask-y,
+[data-slot="drawer-content"] .scroll-mask-y,
+[data-slot="drawer-content"].scroll-mask-y {
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}
+
+/* Native validation is shown only after the user tries to submit the form. */
+[data-slot="input"]:user-invalid,
+[data-slot="textarea"]:user-invalid,
+[data-slot="select-trigger"][aria-invalid="true"],
+[data-slot="date-picker-trigger"][aria-invalid="true"] {
+  border-color: var(--destructive) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--destructive) 18%, transparent) !important;
+}
+
+[data-slot="input"]:user-invalid:focus-visible,
+[data-slot="textarea"]:user-invalid:focus-visible {
+  outline-color: var(--destructive);
 }
 
 [data-slot="chart"],
@@ -191,6 +205,10 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .workspace-page-transition {
+    animation-duration: 1ms;
+  }
+
   .registration-step[data-transition] {
     animation-duration: 1ms;
   }

@@ -6,7 +6,12 @@ const statusLabels: Record<string, string> = {
   rejected: "Отклонено",
   active: "Активно",
   draft: "Черновик",
+  under_review: "На проверке",
   published: "Опубликовано",
+  registration_open: "Регистрация открыта",
+  registration_closed: "Регистрация закрыта",
+  ongoing: "Идёт сейчас",
+  results_pending: "Ожидаются результаты",
   completed: "Завершено",
   cancelled: "Отменено",
   confirmed: "Подтверждено",
@@ -17,6 +22,8 @@ const statusLabels: Record<string, string> = {
   uploaded: "Загружен",
   attached: "Прикреплён",
   delete_pending: "Удаляется",
+  withdrawn: "Отозвано",
+  planned: "Запланировано",
 };
 
 export function StatusBadge({ status }: { status?: string | null }) {

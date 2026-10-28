@@ -18,6 +18,7 @@ import { fileApi, type UploadedFile } from "@/entities/file";
 import { formatDate } from "@/features/workspace/common";
 import { useNotifications } from "@/shared/lib/notifications";
 import { useAsyncData } from "@/shared/lib/use-async-data";
+import { downloadBlob } from "@/shared/lib/download";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
@@ -67,12 +68,7 @@ export function FilesList() {
     setDownloadingId(fileId);
     try {
       const file = await fileApi.download(fileId);
-      const url = URL.createObjectURL(file.blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = file.filename;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(file.blob, file.filename);
     } catch (cause) {
       notify.error(cause instanceof Error ? cause.message : "Не удалось скачать файл");
     } finally {

@@ -15,6 +15,7 @@ import { rbacApi } from "@/entities/rbac";
 import { useAuth } from "@/entities/session";
 import { formatDate, fullName } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
+import { downloadBlob } from "@/shared/lib/download";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -83,12 +84,7 @@ export function RegistryView() {
     setDownloading(true);
     try {
       const report = await registryApi.report();
-      const url = URL.createObjectURL(report.blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = report.filename;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      downloadBlob(report.blob, report.filename);
     } catch (cause) {
       notify.error(cause instanceof Error ? cause.message : "Не удалось скачать отчёт");
     } finally {
@@ -116,8 +112,8 @@ export function RegistryView() {
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !state.data?.page.items.length ? <DataEmpty title="Записей не найдено" description="Попробуйте изменить поисковый запрос." /> : null}
 
-      {!state.loading && !state.error && state.data?.mode === "users" ? <div className="grid gap-3 sm:grid-cols-2">{state.data.page.items.map((item) => <Card key={item.id} role={canAssignRole ? "button" : undefined} tabIndex={canAssignRole ? 0 : undefined} className={`border-0 bg-white p-5 shadow-none ${canAssignRole ? "cursor-pointer transition-colors hover:bg-white/80 focus-visible:ring-2 focus-visible:ring-ring" : ""}`} onClick={canAssignRole ? () => { setSelectedUser(item); setAssignOpen(true); } : undefined} onKeyDown={canAssignRole ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedUser(item); setAssignOpen(true); } } : undefined}><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{fullName(item.last_name, item.first_name, item.middle_name)}</p><p className="mt-1 text-xs text-muted-foreground">#{item.id} · {formatDate(item.birth)}</p></div><div className="flex flex-wrap justify-end gap-1.5">{item.roles.map((role) => <Badge key={role.id} variant="secondary">{role.name}</Badge>)}</div></div><div className="mt-4 grid gap-1.5 text-sm text-muted-foreground"><p>Организация: {item.organization?.name ?? "Не указана"}</p><p>Муниципалитет: {item.municipality?.name ?? "Не указан"}</p><p>Связи: {item.coach_relations?.length ?? 0} · назначения: {item.judge_assignments?.length ?? 0}</p></div></Card>)}</div> : null}
-      {!state.loading && !state.error && state.data?.mode === "organizations" ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{state.data.page.items.map((item) => <Card key={item.id} className="bg-white p-5 shadow-none"><p className="font-medium">{item.name}</p><p className="mt-1 text-xs text-muted-foreground">#{item.id}</p><div className="mt-4 grid gap-1.5 text-sm text-muted-foreground"><p>Тип: {item.organization_type}</p><p>Муниципалитет: {item.municipality?.name ?? "Не указан"}</p></div></Card>)}</div> : null}
+      {!state.loading && !state.error && state.data?.mode === "users" ? <div className="grid gap-3 sm:grid-cols-2">{state.data.page.items.map((item) => <Card key={item.id} role={canAssignRole ? "button" : undefined} tabIndex={canAssignRole ? 0 : undefined} className={`border-0 bg-white p-5 shadow-none ${canAssignRole ? "cursor-pointer transition-colors hover:bg-white/80 focus-visible:ring-2 focus-visible:ring-ring" : ""}`} onClick={canAssignRole ? () => { setSelectedUser(item); setAssignOpen(true); } : undefined} onKeyDown={canAssignRole ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedUser(item); setAssignOpen(true); } } : undefined}><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{fullName(item.last_name, item.first_name, item.middle_name)}</p><p className="mt-1 text-xs text-muted-foreground">Дата рождения: {formatDate(item.birth)}</p></div><div className="flex flex-wrap justify-end gap-1.5">{item.roles.map((role) => <Badge key={role.id} variant="secondary">{role.name}</Badge>)}</div></div><div className="mt-4 grid gap-1.5 text-sm text-muted-foreground"><p>Организация: {item.organization?.name ?? "Не указана"}</p><p>Муниципалитет: {item.municipality?.name ?? "Не указан"}</p><p>Связи: {item.coach_relations?.length ?? 0} · назначения: {item.judge_assignments?.length ?? 0}</p></div></Card>)}</div> : null}
+      {!state.loading && !state.error && state.data?.mode === "organizations" ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{state.data.page.items.map((item) => <Card key={item.id} className="bg-white p-5 shadow-none"><p className="font-medium">{item.name}</p><div className="mt-4 grid gap-1.5 text-sm text-muted-foreground"><p>Тип: {item.organization_type}</p><p>Муниципалитет: {item.municipality?.name ?? "Не указан"}</p></div></Card>)}</div> : null}
       {state.data && !state.loading && !state.error ? <div className="mt-4 flex flex-wrap items-center justify-between gap-2 pb-16 text-sm text-muted-foreground sm:pb-0"><span>Показаны {state.data.page.items.length ? offset + 1 : 0}–{offset + state.data.page.items.length}{state.data.page.total ? ` из ${state.data.page.total}` : ""}</span><div className="flex gap-2"><Button type="button" variant="outline" size="sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 100))}>Назад</Button><Button type="button" variant="outline" size="sm" disabled={state.data.page.items.length < 100 || (state.data.page.total > 0 && offset + 100 >= state.data.page.total)} onClick={() => setOffset(offset + 100)}>Далее</Button></div></div> : null}
     </div>
   );

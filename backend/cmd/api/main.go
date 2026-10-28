@@ -336,6 +336,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
 	mux.HandleFunc("POST /api/v1/auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /api/v1/auth/logout", authHandler.Logout)
+	
+	mux.Handle("POST /api/v1/session/active-role", authenticated(authHandler.SwitchActiveRole))
+	
 	mux.Handle("GET /api/v1/profile", authenticated(authHandler.GetProfile))
 	mux.HandleFunc("GET /api/v1/profiles/{userID}", authHandler.GetPublicProfile)
 	mux.HandleFunc("PATCH /api/v1/profile", authHandler.PatchProfile)
@@ -403,6 +406,11 @@ func main() {
 	mux.Handle("PUT "+resultBase, judgeScoped(result.PermissionManage, resultHandler.Save))
 	mux.Handle("POST "+resultBase+"/calculate", judgeScoped(result.PermissionManage, resultHandler.Calculate))
 	mux.Handle("POST "+resultBase+"/approve", judgeScoped(result.PermissionApprove, resultHandler.Approve))
+	mux.Handle("PUT "+resultBase+"/manual", judgeScoped(result.PermissionManage, resultHandler.SaveManual))
+	mux.Handle("POST /api/v1/admin/result-templates", protected(result.PermissionManage, resultHandler.CreateTemplate))
+	mux.Handle("GET /api/v1/admin/result-templates", protected(result.PermissionRead, resultHandler.ListTemplates))
+	mux.Handle("GET /api/v1/admin/result-templates/{id}", protected(result.PermissionRead, resultHandler.GetTemplate))
+	mux.Handle("PATCH /api/v1/admin/result-templates/{id}", protected(result.PermissionManage, resultHandler.UpdateTemplate))
 	mux.HandleFunc("GET /api/v1/competitions/{competitionID}/events/{eventID}/protocol", resultHandler.DownloadProtocol)
 	mux.Handle("PUT /api/v1/admin/competitions/{competitionID}/events/{eventID}/protocol", protected(result.PermissionApprove, resultHandler.UploadProtocol))
 	mux.Handle("DELETE /api/v1/admin/competitions/{competitionID}/events/{eventID}/protocol", protected(result.PermissionApprove, resultHandler.DeleteProtocol))

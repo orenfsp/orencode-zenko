@@ -67,6 +67,25 @@ export interface CompetitionCalendarQuery extends PaginationQuery {
   level_id?: number;
 }
 
+export type CompetitionAdminStatus =
+  | "draft"
+  | "under_review"
+  | "published"
+  | "cancelled";
+
+export interface CompetitionAdminQuery extends PaginationQuery {
+  status?: CompetitionAdminStatus;
+}
+
+export interface CompetitionHistoryEntry {
+  id: number;
+  competition_id: number;
+  from_status: string | null;
+  to_status: string;
+  changed_by_user_id: number | null;
+  changed_at: string;
+}
+
 export interface CalendarCompetition {
   id: number;
   name: string;

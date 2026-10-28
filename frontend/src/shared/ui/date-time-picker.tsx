@@ -28,7 +28,7 @@ export function DateTimePicker({ id, name, required, defaultValue, className }: 
   return (
     <div className={cn("grid grid-cols-[1fr_6.5rem] gap-2", className)}>
       <Popover>
-        <PopoverTrigger asChild><Button ref={triggerRef} id={id} type="button" variant="outline" aria-required={required} aria-invalid={invalid} aria-describedby={invalid ? `${id}-error` : undefined} className={cn("h-9 justify-between px-3 text-left font-normal", !date && "text-muted-foreground")}>{date ? format(date, "d MMMM yyyy", { locale: ru }) : "Выберите дату"}<CalendarIcon className="size-4 text-muted-foreground" /></Button></PopoverTrigger>
+        <PopoverTrigger asChild><Button ref={triggerRef} data-slot="date-picker-trigger" id={id} type="button" variant="outline" aria-required={required} aria-invalid={invalid} aria-describedby={invalid ? `${id}-error` : undefined} className={cn("h-9 justify-between px-3 text-left font-normal", !date && "text-muted-foreground")}>{date ? format(date, `d MMMM${date.getFullYear() !== new Date().getFullYear() ? " yyyy" : ""}`, { locale: ru }) : "Выберите дату"}<CalendarIcon className="size-4 text-muted-foreground" /></Button></PopoverTrigger>
         <PopoverContent className="w-auto overflow-hidden p-0" align="start"><Calendar mode="single" selected={date} onSelect={(selected) => { setDate(selected); if (selected) setInvalid(false); }} locale={ru} captionLayout="dropdown" /></PopoverContent>
       </Popover>
       <Input type="time" value={time} onChange={(event) => setTime(event.target.value)} aria-label="Время" />

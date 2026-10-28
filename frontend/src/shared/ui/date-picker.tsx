@@ -51,6 +51,7 @@ export function DatePicker({
         <PopoverTrigger asChild>
           <Button
             ref={triggerRef}
+            data-slot="date-picker-trigger"
             id={id}
             type="button"
             variant="outline"
@@ -64,7 +65,7 @@ export function DatePicker({
               className,
             )}
           >
-            {date ? format(date, "d MMMM yyyy", { locale: ru }) : "Выберите дату"}
+            {date ? format(date, `d MMMM${date.getFullYear() !== new Date().getFullYear() ? " yyyy" : ""}`, { locale: ru }) : "Выберите дату"}
             <CalendarIcon className="size-4 text-muted-foreground" />
           </Button>
         </PopoverTrigger>

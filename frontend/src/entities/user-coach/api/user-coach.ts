@@ -1,11 +1,20 @@
 import { api, type ApiEnvelope } from "@/shared/api/client";
 import type {
   CreateUserCoachPayload,
+  CoachParticipantPage,
+  CoachParticipantQuery,
   UserCoachListQuery,
   UserCoachRelation,
 } from "../model/types";
 
 export const userCoachApi = {
+  participants: async (query: CoachParticipantQuery = {}) =>
+    (
+      await api.get<ApiEnvelope<CoachParticipantPage>>(
+        "/api/v1/coach/participants",
+        { params: { ...query } },
+      )
+    ).data,
   create: async (body: CreateUserCoachPayload) =>
     (
       await api.post<ApiEnvelope<UserCoachRelation>>(
