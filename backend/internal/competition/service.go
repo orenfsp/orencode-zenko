@@ -39,6 +39,19 @@ func (s *Service) List(ctx context.Context, limit, offset int32) ([]ResponseDTO,
 	return result, nil
 }
 
+func (s *Service) ListWithMeta(ctx context.Context, limit, offset int32) (ListPageDTO, error) {
+	items, err := s.List(ctx, limit, offset)
+	if err != nil {
+		return ListPageDTO{}, err
+	}
+	total, err := s.repo.CountPublic(ctx)
+	if err != nil {
+		return ListPageDTO{}, err
+	}
+	return ListPageDTO{Items: items, Total: total, Limit: limit, Offset: offset,
+		HasNext: int64(offset)+int64(len(items)) < total}, nil
+}
+
 func (s *Service) Calendar(ctx context.Context, filter CalendarFilter) ([]CalendarCompetitionDTO, error) {
 	if filter.From.IsZero() || filter.To.IsZero() || !filter.From.Before(filter.To) {
 		return nil, competitionerrs.ErrInvalidCalendarPeriod

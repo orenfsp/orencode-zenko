@@ -49,6 +49,29 @@ POST /api/v1/admin/competitions/{id}/return
 
 Для защищённых запросов нужен заголовок `Authorization: Bearer <access_token>`. Значение `created_by` backend всегда берёт из проверенного JWT-контекста; клиент не может его задать.
 
+## Публичный список и пагинация
+
+`GET /api/v1/competitions` принимает `limit` (по умолчанию 50, от 1 до 100), `offset` (по умолчанию 0, неотрицательный) и необязательный `with_meta`. Сортировка — по `start_at`, затем `id`. Неверные параметры, пустой `with_meta` и значения кроме `true` или `false` возвращают `400` с кодом `invalid_request`.
+
+Без `with_meta` или при `with_meta=false` сохраняется прежний формат:
+
+```json
+{"data": [{"id": 7, "name": "Кубок Оренбуржья", "status": "published"}]}
+```
+
+Объект соревнования показан сокращённо; фактические поля не меняются. При `with_meta=true`:
+
+```json
+{"data": {"items": [{"id": 7, "name": "Кубок Оренбуржья", "status": "published"}], "total": 31, "limit": 1, "offset": 0, "has_next": true}}
+```
+
+`total` — число всех соревнований с публичными статусами без учёта страницы; `has_next` равен `offset + len(items) < total`. Для пустой страницы `items` — `[]`, а `total` остаётся общим числом. Подсчёт выполняется только в режиме с метаданными. В условиях одновременного изменения соревнований список и подсчёт выполняются отдельными запросами и могут отражать разные моменты времени.
+
+```bash
+curl 'http://localhost:8080/api/v1/competitions?limit=20&offset=0'
+curl 'http://localhost:8080/api/v1/competitions?limit=20&offset=0&with_meta=true'
+```
+
 ## Публичный календарь
 
 ```http

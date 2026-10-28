@@ -20,6 +20,10 @@ func NewRepository(queries *db.Queries) Repository {
 	return &sqlRepository{queries: queries}
 }
 
+func (r *sqlRepository) CountPublic(ctx context.Context) (int64, error) {
+	return r.queries.CountPublicCompetitions(ctx, publicCompetitionStatuses)
+}
+
 func (r *sqlRepository) ListPublic(ctx context.Context, limit, offset int32) ([]Competition, error) {
 	rows, err := r.queries.ListPublicCompetitions(ctx, db.ListPublicCompetitionsParams{
 		Limit:           limit,
