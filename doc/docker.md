@@ -13,6 +13,8 @@
 
 3. Укажите `BACKEND_PORT=8080`. При необходимости задайте `FRONTEND_PORT=3000`.
 
+Укажите также `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` и `ADMIN_PASSWORD` (12–72 байта). Переменная `CORS_ALLOWED_ORIGINS` есть в конфигурации, но в текущем backend её значение не доходит до middleware; см. [ограничения CORS](./frontend-api.md#текущие-ограничения-контракта).
+
 ## Запуск
 
 Из корня репозитория:
@@ -20,6 +22,15 @@
 ```bash
 docker compose --env-file backend/.env up --build -d
 ```
+
+Только backend с PostgreSQL и предусмотренными Compose миграциями и seed:
+
+```bash
+docker compose --env-file backend/.env build server
+docker compose --env-file backend/.env up -d postgres migrate rbac-seed seed-demo server
+```
+
+Порты хоста можно изменить переменными `POSTGRES_PORT` и `BACKEND_PORT`; внутри сети Compose PostgreSQL остаётся на `postgres:5432`, backend — на `server:8080`.
 
 Compose запускает сервисы в следующем порядке:
 
@@ -33,7 +44,7 @@ postgres → migrate → rbac-seed → seed-demo → server → frontend
 - backend API: `http://localhost:8080`;
 - PostgreSQL: `127.0.0.1:${POSTGRES_PORT}`.
 
-Фронтенд направляет запросы на `/api/v1/*` во внутренний backend-сервис, поэтому браузеру не требуется отдельный адрес API или настройка CORS.
+При использовании frontend-прокси запросы на `/api/v1/*` направляются во внутренний backend-сервис. Для прямых запросов браузера с другого origin действуют указанные ограничения CORS.
 
 ## Полезные команды
 
