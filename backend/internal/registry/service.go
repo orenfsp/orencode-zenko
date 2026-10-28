@@ -12,6 +12,10 @@ func NewService(repository Repository) *Service { return &Service{repository: re
 func (s *Service) ListUsers(ctx context.Context, filter UserFilter) (Page[User], error) {
 	filter.Search = normalizedString(filter.Search)
 	filter.RoleCode = normalizedString(filter.RoleCode)
+	if filter.RoleCode != nil {
+		roleCode := strings.ToLower(*filter.RoleCode)
+		filter.RoleCode = &roleCode
+	}
 	if !validPagination(filter.Limit, filter.Offset) || !validIDs(
 		filter.DisciplineID, filter.OrganizationID, filter.RankID,
 		filter.AgeGroupID, filter.MunicipalityID,
@@ -33,7 +37,7 @@ func normalizedString(value *string) *string {
 	if value == nil {
 		return nil
 	}
-	normalized := strings.TrimSpace(*value)
+	normalized := strings.Join(strings.Fields(*value), " ")
 	if normalized == "" {
 		return nil
 	}

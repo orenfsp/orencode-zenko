@@ -3,14 +3,17 @@ package dashboard
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"go.uber.org/zap"
 )
 
 type dashboardService interface {
-	Get(ctx context.Context) (Data, error)
+	Get(ctx context.Context, year int) (Data, error)
 }
 
 type Handler struct {
@@ -22,8 +25,21 @@ func NewHandler(service dashboardService) *Handler {
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	data, err := h.service.Get(r.Context())
+	year := time.Now().UTC().Year()
+	if rawYear := r.URL.Query().Get("year"); rawYear != "" {
+		parsed, err := strconv.Atoi(rawYear)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "year должен быть числом")
+			return
+		}
+		year = parsed
+	}
+	data, err := h.service.Get(r.Context(), year)
 	if err != nil {
+		if errors.Is(err, ErrInvalidYear) {
+			writeError(w, http.StatusBadRequest, "недопустимый год")
+			return
+		}
 		if logger.Log != nil {
 			logger.Log.Error("dashboard request failed", zap.Error(err))
 		}

@@ -136,6 +136,67 @@ SELECT
         ORDER BY ujc.assigned_at DESC, ujc.id DESC
         LIMIT 1
     ), 'null'::jsonb) AS judge_category,
+    COALESCE((
+        SELECT jsonb_agg(rel.item ORDER BY rel.requested_at DESC, rel.id DESC)
+        FROM (
+            SELECT
+                uc.id,
+                uc.requested_at,
+                jsonb_build_object(
+                    'id', uc.id,
+                    'relation_type', 'participant',
+                    'related_user_id', participant.id,
+                    'related_user_name', concat_ws(' ', participant.last_name, participant.first_name, participant.middle_name),
+                    'discipline', jsonb_build_object('id', d.id, 'name', d.name),
+                    'status', uc.status,
+                    'requested_at', uc.requested_at,
+                    'confirmed_at', uc.confirmed_at,
+                    'ended_at', uc.ended_at
+                ) AS item
+            FROM user_coach AS uc
+            JOIN "user" AS participant ON participant.id = uc.user_id
+            JOIN discipline AS d ON d.id = uc.discipline_id
+            WHERE uc.coach_user_id = u.id
+            UNION ALL
+            SELECT
+                uc.id,
+                uc.requested_at,
+                jsonb_build_object(
+                    'id', uc.id,
+                    'relation_type', 'coach',
+                    'related_user_id', coach.id,
+                    'related_user_name', concat_ws(' ', coach.last_name, coach.first_name, coach.middle_name),
+                    'discipline', jsonb_build_object('id', d.id, 'name', d.name),
+                    'status', uc.status,
+                    'requested_at', uc.requested_at,
+                    'confirmed_at', uc.confirmed_at,
+                    'ended_at', uc.ended_at
+                ) AS item
+            FROM user_coach AS uc
+            JOIN "user" AS coach ON coach.id = uc.coach_user_id
+            JOIN discipline AS d ON d.id = uc.discipline_id
+            WHERE uc.user_id = u.id
+        ) AS rel
+    ), '[]'::jsonb) AS coach_relations,
+    COALESCE((
+        SELECT jsonb_agg(
+            jsonb_build_object(
+                'id', cj.id,
+                'competition_id', c.id,
+                'competition_name', c.name,
+                'competition_status', c.status,
+                'position_id', jp.id,
+                'position_name', jp.name,
+                'start_at', c.start_at,
+                'end_at', c.end_at,
+                'appointed_at', cj.appointed_at
+            ) ORDER BY c.start_at DESC, cj.id DESC
+        )
+        FROM competition_judge AS cj
+        JOIN competition AS c ON c.id = cj.competition_id
+        JOIN judge_position AS jp ON jp.id = cj.position_id
+        WHERE cj.judge_user_id = u.id
+    ), '[]'::jsonb) AS judge_assignments,
     COUNT(*) OVER() AS total_count
 FROM "user" AS u
 LEFT JOIN organization AS o ON o.id = u.organization_id
@@ -143,7 +204,7 @@ LEFT JOIN municipality AS m ON m.id = u.municipality_id
 WHERE u.access_status = true
   AND (
       $1::text IS NULL
-      OR concat_ws(' ', u.last_name, u.first_name, u.middle_name) ILIKE '%' || $1 || '%'
+      OR regexp_replace(concat_ws(' ', u.last_name, u.first_name, u.middle_name), '[[:space:]]+', ' ', 'g') ILIKE '%' || $1 || '%'
   )
   AND ($2::bigint IS NULL OR u.organization_id = $2)
   AND ($3::bigint IS NULL OR u.municipality_id = $3)
@@ -211,6 +272,8 @@ type ListRegistryUsersRow struct {
 	Disciplines      interface{}
 	Ranks            interface{}
 	JudgeCategory    interface{}
+	CoachRelations   interface{}
+	JudgeAssignments interface{}
 	TotalCount       int64
 }
 
@@ -247,6 +310,8 @@ func (q *Queries) ListRegistryUsers(ctx context.Context, arg ListRegistryUsersPa
 			&i.Disciplines,
 			&i.Ranks,
 			&i.JudgeCategory,
+			&i.CoachRelations,
+			&i.JudgeAssignments,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err

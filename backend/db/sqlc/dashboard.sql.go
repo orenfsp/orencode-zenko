@@ -16,15 +16,35 @@ SELECT
     (SELECT COUNT(DISTINCT ru.user_id)
      FROM role_user AS ru
      JOIN role AS r ON r.id = ru.role_id
-     WHERE r.code = 'participant') AS athlete_count,
-    (SELECT COUNT(*) FROM competition) AS competition_count,
+     JOIN "user" AS u ON u.id = ru.user_id
+     WHERE r.code = 'participant'
+       AND u.access_status = true) AS athlete_count,
+    (SELECT COUNT(*)
+     FROM competition AS c
+     WHERE c.start_at >= $1
+       AND c.start_at < $2
+       AND c.status <> 'cancelled') AS competition_count,
     (SELECT COUNT(DISTINCT ca.athlete_user_id)
      FROM competition_application AS ca
-     WHERE ca.status = 'approved') AS participant_count,
+     JOIN competition_event AS ce ON ce.id = ca.event_id
+     JOIN competition AS c ON c.id = ce.competition_id
+     JOIN "user" AS u ON u.id = ca.athlete_user_id
+     WHERE ca.status = 'approved'
+       AND u.access_status = true
+       AND c.start_at >= $1
+       AND c.start_at < $2
+       AND c.status <> 'cancelled') AS participant_count,
     (SELECT COUNT(*)
      FROM user_rank_discipline AS urd
-     WHERE urd.expires_at IS NULL OR urd.expires_at >= CURRENT_DATE) AS active_rank_count
+     JOIN "user" AS u ON u.id = urd.user_id
+     WHERE u.access_status = true
+       AND (urd.expires_at IS NULL OR urd.expires_at >= CURRENT_DATE)) AS active_rank_count
 `
+
+type GetFederationDashboardMetricsParams struct {
+	PeriodStart pgtype.Timestamptz
+	PeriodEnd   pgtype.Timestamptz
+}
 
 type GetFederationDashboardMetricsRow struct {
 	AthleteCount     int64
@@ -33,8 +53,8 @@ type GetFederationDashboardMetricsRow struct {
 	ActiveRankCount  int64
 }
 
-func (q *Queries) GetFederationDashboardMetrics(ctx context.Context) (GetFederationDashboardMetricsRow, error) {
-	row := q.db.QueryRow(ctx, getFederationDashboardMetrics)
+func (q *Queries) GetFederationDashboardMetrics(ctx context.Context, arg GetFederationDashboardMetricsParams) (GetFederationDashboardMetricsRow, error) {
+	row := q.db.QueryRow(ctx, getFederationDashboardMetrics, arg.PeriodStart, arg.PeriodEnd)
 	var i GetFederationDashboardMetricsRow
 	err := row.Scan(
 		&i.AthleteCount,
@@ -438,7 +458,8 @@ SELECT
     d.name AS discipline_name
 FROM competition AS c
 JOIN discipline AS d ON d.id = c.discipline_id
-WHERE c.start_at >= now()
+     WHERE c.start_at >= now()
+      AND c.status NOT IN ('completed', 'cancelled')
 ORDER BY c.start_at, c.id
 LIMIT $1
 `

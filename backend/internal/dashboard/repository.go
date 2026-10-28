@@ -3,5 +3,5 @@ package dashboard
 import "context"
 
 type Repository interface {
-	Load(ctx context.Context, limit, days int32) (Data, error)
+	Load(ctx context.Context, limit, days int32, year int) (Data, error)
 }

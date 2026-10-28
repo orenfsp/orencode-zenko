@@ -3,6 +3,7 @@ package dashboard
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	db "github.com/orenfsp/orencode-zenko.git/db/sqlc"
@@ -16,8 +17,13 @@ func NewRepository(queries *db.Queries) Repository {
 	return &sqlRepository{queries: queries}
 }
 
-func (r *sqlRepository) Load(ctx context.Context, limit, days int32) (Data, error) {
-	metrics, err := r.queries.GetFederationDashboardMetrics(ctx)
+func (r *sqlRepository) Load(ctx context.Context, limit, days int32, year int) (Data, error) {
+	periodStart := time.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := periodStart.AddDate(1, 0, 0)
+	metrics, err := r.queries.GetFederationDashboardMetrics(ctx, db.GetFederationDashboardMetricsParams{
+		PeriodStart: pgtype.Timestamptz{Time: periodStart, Valid: true},
+		PeriodEnd:   pgtype.Timestamptz{Time: periodEnd, Valid: true},
+	})
 	if err != nil {
 		return Data{}, err
 	}
@@ -56,6 +62,7 @@ func (r *sqlRepository) Load(ctx context.Context, limit, days int32) (Data, erro
 	}
 
 	data := emptyData()
+	data.PeriodYear = year
 	data.Metrics = Metrics{
 		Athletes: metrics.AthleteCount, Competitions: metrics.CompetitionCount,
 		Participants: metrics.ParticipantCount, ActiveRanks: metrics.ActiveRankCount,

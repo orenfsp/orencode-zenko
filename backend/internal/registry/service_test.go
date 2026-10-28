@@ -25,7 +25,7 @@ func (r *repositoryStub) ListOrganizations(_ context.Context, filter Organizatio
 }
 
 func TestListUsersNormalizesSearchAndPassesFilters(t *testing.T) {
-	search, role := "  Иванов ", " participant "
+	search, role := "  Иванов   Иван ", " participant "
 	repository := &repositoryStub{users: Page[User]{Items: []User{{ID: 7}}}}
 	page, err := NewService(repository).ListUsers(context.Background(), UserFilter{
 		Search: &search, RoleCode: &role, Limit: 25,
@@ -33,7 +33,7 @@ func TestListUsersNormalizesSearchAndPassesFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if page.Items[0].ID != 7 || repository.userFilter.Search == nil || *repository.userFilter.Search != "Иванов" {
+	if page.Items[0].ID != 7 || repository.userFilter.Search == nil || *repository.userFilter.Search != "Иванов Иван" {
 		t.Fatalf("page=%#v filter=%#v", page, repository.userFilter)
 	}
 	if repository.userFilter.RoleCode == nil || *repository.userFilter.RoleCode != "participant" {
@@ -63,5 +63,16 @@ func TestDecodeJSONValue(t *testing.T) {
 	}
 	if len(roles) != 1 || roles[0].Code != "judge" {
 		t.Fatalf("roles=%#v", roles)
+	}
+	var relations []CoachRelation
+	if err := decodeJSONValue([]any{map[string]any{
+		"id": float64(2), "relation_type": "participant", "related_user_id": float64(9),
+		"related_user_name": "Петров Пётр", "status": "confirmed",
+		"requested_at": "2026-01-01T10:00:00Z",
+	}}, &relations); err != nil {
+		t.Fatal(err)
+	}
+	if len(relations) != 1 || relations[0].RelatedUserID != 9 || relations[0].Status != "confirmed" {
+		t.Fatalf("relations=%#v", relations)
 	}
 }

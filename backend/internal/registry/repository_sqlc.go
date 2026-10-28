@@ -31,6 +31,7 @@ func (r *sqlRepository) ListUsers(ctx context.Context, filter UserFilter) (Page[
 			Organization: referencePointer(row.OrganizationID, row.OrganizationName),
 			Municipality: referencePointer(row.MunicipalityID, row.MunicipalityName),
 			Roles:        make([]Role, 0), Disciplines: make([]Reference, 0), Ranks: make([]Rank, 0),
+			CoachRelations: make([]CoachRelation, 0), JudgeAssignments: make([]JudgeAssignment, 0),
 		}
 		if err := decodeJSONValue(row.Roles, &user.Roles); err != nil {
 			return Page[User]{}, fmt.Errorf("decode roles: %w", err)
@@ -40,6 +41,12 @@ func (r *sqlRepository) ListUsers(ctx context.Context, filter UserFilter) (Page[
 		}
 		if err := decodeJSONValue(row.Ranks, &user.Ranks); err != nil {
 			return Page[User]{}, fmt.Errorf("decode ranks: %w", err)
+		}
+		if err := decodeJSONValue(row.CoachRelations, &user.CoachRelations); err != nil {
+			return Page[User]{}, fmt.Errorf("decode coach relations: %w", err)
+		}
+		if err := decodeJSONValue(row.JudgeAssignments, &user.JudgeAssignments); err != nil {
+			return Page[User]{}, fmt.Errorf("decode judge assignments: %w", err)
 		}
 		if row.JudgeCategory != nil {
 			var category JudgeCategory

@@ -1,6 +1,11 @@
 package dashboard
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var ErrInvalidYear = errors.New("invalid dashboard year")
 
 const (
 	PermissionRead = "dashboard.read"
@@ -54,6 +59,7 @@ type Deadline struct {
 }
 
 type Data struct {
+	PeriodYear                     int                   `json:"period_year"`
 	Metrics                        Metrics               `json:"metrics"`
 	UpcomingCompetitions           []UpcomingCompetition `json:"upcoming_competitions"`
 	PendingCompetitionApplications []PendingApplication  `json:"pending_competition_applications"`

@@ -505,6 +505,129 @@ Content-Type: application/json
 
 Срок действия разряда задаётся полем `ttl` справочника разрядов в календарных годах. Backend удаляет истёкшие записи при старте и далее раз в `RANK_CLEANUP_INTERVAL` (по умолчанию — раз в сутки). `ttl = null` означает бессрочный разряд.
 
+## Дашборд федерации
+
+```http
+GET /api/v1/admin/dashboard?year=2026
+Authorization: Bearer <access_token>
+```
+
+Требуется permission `dashboard.read`. Параметр `year` необязательный: если его нет, backend использует текущий календарный год. Допустимый диапазон года — от 2000 до следующего календарного года.
+
+Метрики считаются только по данным PostgreSQL и учитывают пользователей с `access_status = true`:
+
+- `athletes` — активные пользователи с ролью `participant`;
+- `competitions` — соревнования выбранного года, кроме отменённых;
+- `participants` — уникальные спортсмены с подтверждёнными заявками на соревнования выбранного года;
+- `active_ranks` — действующие записи присвоенных разрядов.
+
+Ответ содержит также списки ближайших соревнований, заявок на модерацию, истекающих разрядов и судейских категорий, а также регистрационных и отчётных дедлайнов. При отсутствии данных backend возвращает пустые массивы, а не `null`.
+
+Пример ответа:
+
+```json
+{
+  "data": {
+    "period_year": 2026,
+    "metrics": {
+      "athletes": 120,
+      "competitions": 18,
+      "participants": 94,
+      "active_ranks": 76
+    },
+    "upcoming_competitions": [],
+    "pending_competition_applications": [],
+    "pending_rank_applications": [],
+    "pending_judge_category_applications": [],
+    "expiring_ranks": [],
+    "expiring_judge_categories": [],
+    "deadlines": []
+  }
+}
+```
+
+Ошибки: `400` для некорректного `year`, `401` без access-токена, `403` без `dashboard.read`, `500` при ошибке базы данных.
+
+## Единый реестр
+
+### Пользователи
+
+```http
+GET /api/v1/admin/registry/users
+Authorization: Bearer <access_token>
+```
+
+Требуется `registry.read`. Параметры фильтрации обрабатываются backend и комбинируются:
+
+| Параметр | Описание |
+|---|---|
+| `search` | Поиск по нормализованному ФИО. |
+| `role` | Код роли: `participant`, `coach` или `judge`. |
+| `discipline_id` | Дисциплина пользователя. |
+| `organization_id` | Организация пользователя. |
+| `rank_id` | Действующий разряд. |
+| `age_group_id` | Текущая возрастная группа. |
+| `municipality_id` | Муниципалитет пользователя. |
+| `limit` | От 1 до 100, по умолчанию 50. |
+| `offset` | Неотрицательное смещение, по умолчанию 0. |
+
+В элементе пользователя возвращаются роли, дисциплины, действующие разряды, действующая судейская категория, а также:
+
+- `coach_relations` — все связи тренера и спортсмена с типом связи (`coach` или `participant`), дисциплиной, статусом и датами;
+- `judge_assignments` — назначения судьи с соревнованием, должностью, статусом соревнования и датами.
+
+Исторические завершённые связи и назначения не скрываются из этих вложенных списков. При отсутствии связей возвращаются пустые массивы.
+
+Пример элемента:
+
+```json
+{
+  "id": 7,
+  "last_name": "Иванов",
+  "first_name": "Иван",
+  "coach_relations": [
+    {
+      "id": 12,
+      "relation_type": "participant",
+      "related_user_id": 31,
+      "related_user_name": "Петров Пётр",
+      "discipline": { "id": 2, "name": "Спортивное программирование" },
+      "status": "confirmed",
+      "requested_at": "2026-01-10T10:00:00Z",
+      "confirmed_at": "2026-01-11T10:00:00Z"
+    }
+  ],
+  "judge_assignments": [
+    {
+      "id": 4,
+      "competition_id": 9,
+      "competition_name": "Региональный чемпионат",
+      "competition_status": "published",
+      "position_id": 1,
+      "position_name": "Главный судья",
+      "start_at": "2026-05-20T09:00:00Z",
+      "end_at": "2026-05-21T18:00:00Z",
+      "appointed_at": "2026-04-01T12:00:00Z"
+    }
+  ]
+}
+```
+
+Ответ имеет формат страницы:
+
+```json
+{ "data": { "items": [], "total": 0, "limit": 50, "offset": 0 } }
+```
+
+### Организации
+
+```http
+GET /api/v1/admin/registry/organizations?search=школа&municipality_id=3&limit=50&offset=0
+Authorization: Bearer <access_token>
+```
+
+Требуется `registry.read`. Организация возвращается с названием, типом и объектом муниципалитета. При отсутствии записей `items` — пустой массив.
+
 ## Permissions
 
 Сейчас определены следующие permissions:
@@ -516,6 +639,11 @@ Content-Type: application/json
 | `roles.assign` | назначение ролей пользователям |
 | `permissions.read` | просмотр справочника permissions |
 | `files.read` | просмотр документов любых пользователей |
+| `dashboard.read` | просмотр дашборда федерации |
+| `registry.read` | просмотр единого реестра федерации |
+| `judge_categories.review` | рассмотрение заявок на судейские категории |
+| `rank_applications.review` | рассмотрение заявок на спортивные разряды |
+| `deadlines.manage` | управление отчётными сроками |
 
 Главный администратор из seed получает все эти permissions. Backend проверяет их по актуальным данным БД, поэтому назначение или удаление роли влияет на доступ независимо от `role_id` в старом JWT.
 

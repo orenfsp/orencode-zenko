@@ -3,6 +3,7 @@ package dashboard
 import (
 	"context"
 	"sort"
+	"time"
 )
 
 type Service struct {
@@ -13,11 +14,15 @@ func NewService(repository Repository) *Service {
 	return &Service{repository: repository}
 }
 
-func (s *Service) Get(ctx context.Context) (Data, error) {
-	data, err := s.repository.Load(ctx, defaultLimit, expiringDays)
+func (s *Service) Get(ctx context.Context, year int) (Data, error) {
+	if year < 2000 || year > time.Now().UTC().Year()+1 {
+		return Data{}, ErrInvalidYear
+	}
+	data, err := s.repository.Load(ctx, defaultLimit, expiringDays, year)
 	if err != nil {
 		return Data{}, err
 	}
+	data.PeriodYear = year
 	return normalize(data), nil
 }
 
