@@ -678,6 +678,21 @@ Authorization: Bearer <access_token>
 
 ## Permissions
 
+### Мои права активной роли
+
+```http
+GET /api/v1/my-permission
+Authorization: Bearer <access_token>
+```
+
+Backend берёт `role_id` из access-токена и возвращает permissions этой активной роли. Также поддерживается алиас `GET /api/v1/my-permissions`:
+
+```json
+{ "data": ["dashboard.read", "registry.read"] }
+```
+
+Если в токене нет активной роли, возвращается `404`.
+
 Сейчас определены следующие permissions:
 
 | Permission | Назначение |
@@ -689,6 +704,7 @@ Authorization: Bearer <access_token>
 | `files.read` | просмотр документов любых пользователей |
 | `dashboard.read` | просмотр дашборда федерации |
 | `registry.read` | просмотр единого реестра федерации |
+| `rating.read` | просмотр рейтинга спортсменов |
 | `judge_categories.review` | рассмотрение заявок на судейские категории |
 | `rank_applications.review` | рассмотрение заявок на спортивные разряды |
 | `deadlines.manage` | управление отчётными сроками |
@@ -696,6 +712,15 @@ Authorization: Bearer <access_token>
 Главный администратор из seed получает все эти permissions. Backend проверяет их по актуальным данным БД, поэтому назначение или удаление роли влияет на доступ независимо от `role_id` в старом JWT.
 
 ## Admin API
+
+### Рейтинг спортсменов
+
+```http
+GET /api/v1/admin/rating?year=2026&discipline_id=2&municipality_id=3&limit=50&offset=0
+Authorization: Bearer <access_token>
+```
+
+Требуется permission `rating.read`. В рейтинг попадают только завершённые результаты соревнований за указанный год. Если в результате есть `score`, используются его баллы; иначе применяются базовые баллы за место: 100, 80, 60, 50, 40, 30, 20, 10. Ответ содержит позицию, спортсмена, сумму баллов, количество результатов и побед.
 
 ### Выгрузка отчёта численности
 

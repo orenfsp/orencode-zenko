@@ -24,6 +24,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/notifier"
 	"github.com/orenfsp/orencode-zenko.git/internal/rank"
 	rankuser "github.com/orenfsp/orencode-zenko.git/internal/rank_user"
+	"github.com/orenfsp/orencode-zenko.git/internal/rating"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/internal/reference"
 	"github.com/orenfsp/orencode-zenko.git/internal/registry"
@@ -195,6 +196,9 @@ func main() {
 	registryService := registry.NewService(registryRepository)
 	registryHandler := registry.NewHandler(registryService)
 	registryReportHandler := registry.NewReportHandler(registryService, fileService)
+	ratingRepository := rating.NewRepository(queries)
+	ratingService := rating.NewService(ratingRepository)
+	ratingHandler := rating.NewHandler(ratingService)
 	roleChecker := rbac.NewRoleChecker(queries)
 	judgeCategoryRepository := judgecategory.NewRepository(queries, pool)
 	judgeCategoryService := judgecategory.NewService(judgeCategoryRepository, roleChecker)
@@ -280,6 +284,8 @@ func main() {
 	mux.Handle("POST /api/v1/admin/roles", protected(rbac.PermissionRolesCreate, rbacHandler.CreateRole))
 	mux.Handle("POST /api/v1/admin/users/{userID}/roles", protected(rbac.PermissionRolesAssign, rbacHandler.AssignRole))
 	mux.Handle("GET /api/v1/admin/permissions", protected(rbac.PermissionPermissionsRead, rbacHandler.ListPermissions))
+	mux.Handle("GET /api/v1/my-permissions", authenticated(rbacHandler.MyPermissions))
+	mux.Handle("GET /api/v1/my-permission", authenticated(rbacHandler.MyPermissions))
 	mux.Handle("GET /api/v1/roles/self-assignable", rbacMiddleware.Authenticate(http.HandlerFunc(rbacHandler.ListSelfAssignableRoles)))
 
 	// User-coach relations.
@@ -327,6 +333,7 @@ func main() {
 	mux.Handle("GET /api/v1/admin/registry/users", protected(registry.PermissionRead, registryHandler.ListUsers))
 	mux.Handle("GET /api/v1/admin/registry/organizations", protected(registry.PermissionRead, registryHandler.ListOrganizations))
 	mux.Handle("GET /api/v1/admin/reports/users.xlsx", protected(registry.PermissionRead, registryReportHandler.UsersXLSX))
+	mux.Handle("GET /api/v1/admin/rating", protected(rating.PermissionRead, ratingHandler.List))
 	mux.Handle("POST /api/v1/judge-category-applications", authenticated(judgeCategoryHandler.Create))
 	mux.Handle("GET /api/v1/judge-category-applications/mine", authenticated(judgeCategoryHandler.ListMine))
 	mux.Handle("GET /api/v1/judge-category/current", authenticated(judgeCategoryHandler.GetCurrent))

@@ -31,6 +31,9 @@ func (handlerRBACRepository) ListPermissions(context.Context) ([]rbac.Permission
 func (handlerRBACRepository) ListSelfAssignableRoles(context.Context) ([]rbac.Role, error) {
 	return nil, nil
 }
+func (handlerRBACRepository) ListRolePermissions(context.Context, int64) ([]string, error) {
+	return nil, nil
+}
 
 func TestHandlerPublicListAndGet(t *testing.T) {
 	event := testEvent()

@@ -64,3 +64,10 @@ func uniqueStrings(values []string) []string {
 func (s *Service) ListSelfAssignableRoles(ctx context.Context) ([]Role, error) {
 	return s.repository.ListSelfAssignableRoles(ctx)
 }
+
+func (s *Service) ListRolePermissions(ctx context.Context, roleID int64) ([]string, error) {
+	if roleID <= 0 {
+		return nil, ErrRoleNotFound
+	}
+	return s.repository.ListRolePermissions(ctx, roleID)
+}
