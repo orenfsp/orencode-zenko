@@ -276,7 +276,7 @@ WHERE cj.competition_id = sqlc.arg(p_competition_id)
 ORDER BY lower(jp.name), u.last_name, u.first_name, u.id;
 
 -- name: ListAthleteResultHistory :many
-SELECT c.id AS competition_id, c.name AS competition_name, ce.id AS event_id,
+SELECT cr.id AS result_id, c.id AS competition_id, c.name AS competition_name, ce.id AS event_id,
        d.id AS discipline_id, d.name AS discipline_name, c.start_at,
        cr.place, cr.score, cr.result_status, ce.protocol_url
 FROM competition_result cr
