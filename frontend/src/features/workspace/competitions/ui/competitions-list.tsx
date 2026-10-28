@@ -39,6 +39,7 @@ export function CompetitionsList() {
   const { identity } = useAuth();
   const notify = useNotifications();
   const canCreate = identity?.permissions?.includes("competitions.create") ?? false;
+  const canManage = identity?.permissions?.includes("competitions.update") ?? false;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [formatFilter, setFormatFilter] = useState("all");
@@ -77,6 +78,9 @@ export function CompetitionsList() {
     return { disciplines, types, levels, calendarPlans };
   }, [identity?.permissions]);
   const state = useAsyncData(loadList);
+  const managedState = useAsyncData(
+    useCallback(() => canManage ? competitionApi.adminList({ limit: 100 }) : Promise.resolve([]), [canManage]),
+  );
   const references = useAsyncData(loadReferences);
   const competitions = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("ru");
@@ -85,8 +89,8 @@ export function CompetitionsList() {
       return matchesSearch && (statusFilter === "all" || competition.status === statusFilter) && (formatFilter === "all" || competition.format === formatFilter);
     });
   }, [formatFilter, search, state.data, statusFilter]);
-  const visibleDrafts = recentDrafts.filter((competition) =>
-    competition.name.toLocaleLowerCase("ru").includes(search.trim().toLocaleLowerCase("ru")),
+  const visibleManaged = [...(managedState.data ?? []), ...recentDrafts.filter((draft) => !(managedState.data ?? []).some((item) => item.id === draft.id))].filter((competition) =>
+    !(state.data ?? []).some((item) => item.id === competition.id) && competition.name.toLocaleLowerCase("ru").includes(search.trim().toLocaleLowerCase("ru")),
   );
 
   async function create(event: FormEvent<HTMLFormElement>) {
@@ -138,38 +142,38 @@ export function CompetitionsList() {
   return (
     <div className="mx-auto w-full max-w-6xl">
       <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти соревнование" filterContent={<><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все статусы</SelectItem><SelectItem value="published">Опубликовано</SelectItem><SelectItem value="registration_open">Регистрация открыта</SelectItem><SelectItem value="completed">Завершено</SelectItem></SelectContent></Select><Select value={formatFilter} onValueChange={setFormatFilter}><SelectTrigger><SelectValue placeholder="Формат" /></SelectTrigger><SelectContent><SelectItem value="all">Все форматы</SelectItem><SelectItem value="offline">Очно</SelectItem><SelectItem value="online">Онлайн</SelectItem><SelectItem value="mixed">Смешанный</SelectItem></SelectContent></Select></>} createLabel="Создать соревнование" onCreate={canCreate ? () => setCreateOpen(true) : undefined} />
-      {visibleDrafts.length ? (
-        <section className="mb-6" aria-label="Черновики, созданные в этой вкладке">
-          <h2 className="mb-2 text-sm font-medium">Созданные черновики</h2>
+      {visibleManaged.length ? (
+        <section className="mb-6" aria-label="Мои соревнования">
+          <h2 className="mb-2 text-sm font-medium">Мои соревнования</h2>
           <div className="grid gap-3">
-            {visibleDrafts.map((draft) => (
+            {visibleManaged.map((draft) => (
               <Card key={draft.id} className="bg-primary/5 p-4 shadow-none">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={draft.status} />
-                  <span className="text-xs text-muted-foreground">№{draft.id}</span>
                 </div>
                 <p className="font-medium">{draft.name}</p>
                 <p className="text-sm text-muted-foreground">{formatDate(draft.start_at)} — {formatDate(draft.end_at)}</p>
+                <Button asChild variant="link" size="sm" className="mt-1 h-auto px-0"><Link href={`/workspace/competitions/${draft.id}`}>Открыть и продолжить</Link></Button>
               </Card>
             ))}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Это записи, созданные в текущей вкладке. API пока не предоставляет список всех черновиков и их просмотр после повторного входа.
+            Здесь доступны черновики и соревнования, которыми вы можете управлять.
           </p>
         </section>
       ) : null}
       {state.loading ? <DataLoading rows={5} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
-      {!state.loading && !state.error && !competitions.length && !visibleDrafts.length ? (
+      {!state.loading && !state.error && !competitions.length && !visibleManaged.length ? (
         <DataEmpty
           title={search ? "Ничего не найдено" : "Соревнований пока нет"}
-          description={search ? "Попробуйте изменить запрос." : "Публичный API показывает только опубликованные соревнования. Новые черновики появятся выше после создания в этой вкладке."}
+          description={search ? "Попробуйте изменить запрос." : "Создайте соревнование или дождитесь публикации новых событий федерации."}
         />
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {competitions.map((competition) => (
-          <Card key={competition.id} className="min-h-[250px] justify-between gap-8 rounded-[20px] bg-white p-5 shadow-none sm:p-6">
+          <Card key={competition.id} className="min-h-[250px] justify-between gap-8 rounded-2xl bg-white p-5 shadow-none sm:p-6">
             <div className="flex flex-col gap-5">
               <div className="flex flex-wrap items-start justify-between gap-3 text-xs text-muted-foreground sm:text-sm"><span className="max-w-[260px]">{competition.discipline.name}</span><span>{formatDate(competition.start_at)} — {formatDate(competition.end_at)}</span></div>
               <div><div className="mb-3 flex flex-wrap gap-2"><StatusBadge status={competition.status} /><span className="text-xs text-muted-foreground">{competition.competition_type.name}</span></div><h3 className="max-w-[540px] text-2xl font-medium leading-tight tracking-tight">{competition.name}</h3>{competition.description ? <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{competition.description}</p> : null}</div>
@@ -180,7 +184,7 @@ export function CompetitionsList() {
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto scroll-mask-y sm:max-w-2xl"><DialogHeader><DialogTitle>Новое соревнование</DialogTitle><DialogDescription>Заполните основные параметры. Новый объект будет создан как черновик.</DialogDescription></DialogHeader>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>Новое соревнование</DialogTitle><DialogDescription>Заполните основные параметры. Новый объект будет создан как черновик.</DialogDescription></DialogHeader>
           <form className="grid gap-3" onSubmit={create}>
             <Label htmlFor="competition-name">Название</Label><Input id="competition-name" name="name" required />
             <Label htmlFor="competition-description">Описание</Label><Input id="competition-description" name="description" />

@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/shared/ui/input";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
 import { WorkspaceToolbar } from "@/shared/ui/workspace-toolbar";
+import { ScrollMask } from "@/shared/ui/scroll-mask";
 
 interface Candidate {
   id: number;
@@ -64,12 +65,12 @@ export function TeamsView() {
         userCoachApi.byCoach({ limit: 100 }),
         profileApi.me(),
       ]);
-      members = relations
-        .filter((relation) => relation.status === "confirmed")
-        .map((relation) => ({
-          id: relation.participant_user_id,
-          name: `Спортсмен #${relation.participant_user_id}`,
-        }));
+      const confirmedRelations = relations.filter((relation) => relation.status === "confirmed");
+      const participantProfiles = await Promise.allSettled(confirmedRelations.map((relation) => profileApi.public(relation.participant_user_id)));
+      members = confirmedRelations.map((relation, index) => ({
+        id: relation.participant_user_id,
+        name: participantProfiles[index]?.status === "fulfilled" ? nameOf(participantProfiles[index].value) : "Спортсмен",
+      }));
       coaches = [{ id: profile.id, name: nameOf(profile) }];
     }
     return {
@@ -126,8 +127,8 @@ export function TeamsView() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <WorkspaceToolbar search={search} searchPlaceholder="Найти сборную" onSearchChange={setSearch} filterContent={<p className="text-sm text-muted-foreground">Фильтры для сборных появятся после добавления разрезов по дисциплине и сезону.</p>} createLabel="Создать сборную" onCreate={() => setCreateOpen(true)} />
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent className="max-h-[90vh] overflow-y-auto scroll-mask-y sm:max-w-2xl"><DialogHeader><DialogTitle>Новая сборная</DialogTitle><DialogDescription>Выберите спортсменов и тренеров, которые войдут в состав.</DialogDescription></DialogHeader><form className="grid gap-4" onSubmit={(event) => void create(event)}>
+      <WorkspaceToolbar search={search} searchPlaceholder="Найти сборную" onSearchChange={setSearch} createLabel="Создать сборную" onCreate={() => setCreateOpen(true)} />
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>Новая сборная</DialogTitle><DialogDescription>Выберите спортсменов и тренеров, которые войдут в состав.</DialogDescription></DialogHeader><form className="grid gap-4" onSubmit={(event) => void create(event)}>
           <Input
             name="name"
             required
@@ -137,7 +138,7 @@ export function TeamsView() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="mb-2 font-medium">Спортсмены</p>
-              <div className="grid max-h-52 gap-2 overflow-y-auto scroll-mask-y">
+              <ScrollMask className="grid max-h-52 gap-2">
                 {state.data?.members.map((candidate) => (
                   <label
                     key={candidate.id}
@@ -152,11 +153,11 @@ export function TeamsView() {
                     {candidate.name}
                   </label>
                 ))}
-              </div>
+              </ScrollMask>
             </div>
             <div>
               <p className="mb-2 font-medium">Тренеры</p>
-              <div className="grid max-h-52 gap-2 overflow-y-auto scroll-mask-y">
+              <ScrollMask className="grid max-h-52 gap-2">
                 {state.data?.coaches.map((candidate) => (
                   <label
                     key={candidate.id}
@@ -177,7 +178,7 @@ export function TeamsView() {
                       : ""}
                   </label>
                 ))}
-              </div>
+              </ScrollMask>
             </div>
           </div>
           {!state.data?.members.length && !state.loading && !state.error ? (

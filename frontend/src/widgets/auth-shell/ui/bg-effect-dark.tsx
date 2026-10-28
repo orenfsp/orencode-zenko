@@ -184,7 +184,7 @@ function link(gl: WebGL2RenderingContext, frag: string, label: string): WebGLPro
         gl.shaderSource(sh, src)
         gl.compileShader(sh)
         if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-            console.error(`${NAME} ${label} shader:`, gl.getShaderInfoLog(sh))
+            if (process.env.NODE_ENV !== "production") console.error(`${NAME} ${label} shader:`, gl.getShaderInfoLog(sh))
             gl.deleteShader(sh)
             return null
         }
@@ -201,7 +201,7 @@ function link(gl: WebGL2RenderingContext, frag: string, label: string): WebGLPro
     gl.deleteShader(vs)
     gl.deleteShader(fs)
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-        console.error(`${NAME} ${label} link:`, gl.getProgramInfoLog(prog))
+        if (process.env.NODE_ENV !== "production") console.error(`${NAME} ${label} link:`, gl.getProgramInfoLog(prog))
         gl.deleteProgram(prog)
         return null
     }
@@ -340,7 +340,7 @@ function OriginkitBaseRibbonGlow(props: RibbonGlowProps) {
         if (!canvas || !root) return
         const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, depth: false, stencil: false })
         if (!gl) {
-            console.error(`${NAME}: WebGL2 unavailable`)
+            if (process.env.NODE_ENV !== "production") console.error(`${NAME}: WebGL2 unavailable`)
             return
         }
         const field = link(gl, FIELD_SRC, "field")

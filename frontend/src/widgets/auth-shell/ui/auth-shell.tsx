@@ -38,10 +38,12 @@ export function AuthShell({
         спортсмену и тренеру.
       </span>
 
-      <div className="-mx-5 -mb-5 min-h-0 flex-1">
-        <img
+      <div className="relative -mx-5 -mb-5 min-h-0 flex-1">
+        <Image
           src="/assets/phone-mockup.png"
           alt=""
+          fill
+          sizes="50vw"
           className="h-full w-full object-cover object-top"
         />
       </div>

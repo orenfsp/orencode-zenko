@@ -3,19 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 
-import { registryApi, type RegistryUser } from "@/entities/registry";
+import { userCoachApi, type CoachParticipant } from "@/entities/user-coach";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
+import { ScrollMask } from "@/shared/ui/scroll-mask";
 
-function fullName(user: RegistryUser) {
+function fullName(user: CoachParticipant) {
   return [user.last_name, user.first_name, user.middle_name].filter(Boolean).join(" ");
 }
 
-export function ParticipantPicker({ value, onChange }: { value: RegistryUser | null; onChange: (user: RegistryUser) => void }) {
+export function ParticipantPicker({ value, onChange }: { value: CoachParticipant | null; onChange: (user: CoachParticipant) => void }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [users, setUsers] = useState<RegistryUser[]>([]);
+  const [users, setUsers] = useState<CoachParticipant[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -25,7 +26,7 @@ export function ParticipantPicker({ value, onChange }: { value: RegistryUser | n
     if (!open) return;
     let active = true;
     const timer = setTimeout(() => {
-      void registryApi.users({ role: "participant", search: search.trim() || undefined, limit: 30 })
+      void userCoachApi.participants({ search: search.trim() || undefined, limit: 30 })
         .then((page) => { if (active) setUsers(page.items); })
         .catch(() => { if (active) { setUsers([]); setError(true); } })
         .finally(() => { if (active) setLoading(false); });
@@ -51,7 +52,7 @@ export function ParticipantPicker({ value, onChange }: { value: RegistryUser | n
           maxLength={100}
           autoComplete="off"
         />
-        <div className="mt-2 max-h-60 overflow-y-auto scroll-mask-y" aria-live="polite">
+        <ScrollMask className="mt-2 max-h-60" aria-live="polite">
           {loading ? <p className="px-2 py-3 text-sm text-muted-foreground">Ищем спортсменов…</p> : error ? (
             <div className="px-2 py-3 text-sm text-destructive">Не удалось загрузить список. <Button type="button" variant="link" className="h-auto p-0" onClick={() => { setLoading(true); setError(false); setRevision((current) => current + 1); }}>Повторить</Button></div>
           ) : users.length ? users.map((user, index) => (
@@ -66,7 +67,7 @@ export function ParticipantPicker({ value, onChange }: { value: RegistryUser | n
               {value?.id === user.id ? <Check aria-hidden="true" className="shrink-0" /> : null}
             </button>
           )) : <p className="px-2 py-3 text-sm text-muted-foreground">Спортсмены не найдены. Уточните ФИО.</p>}
-        </div>
+        </ScrollMask>
         {!search && users.length === 30 ? <p className="px-2 pt-2 text-xs text-muted-foreground">Показаны первые 30. Чтобы найти другого спортсмена, введите ФИО.</p> : null}
       </PopoverContent>
     </Popover>

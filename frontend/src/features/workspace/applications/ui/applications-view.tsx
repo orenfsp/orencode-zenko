@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useState } from "react";
-import { LoaderCircle, Plus } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import Link from "next/link";
 
 import { competitionApi } from "@/entities/competition";
@@ -24,6 +24,8 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { DatePicker } from "@/shared/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { WorkspaceToolbar } from "@/shared/ui/workspace-toolbar";
+import { ConfirmAction } from "@/shared/ui/confirm-action";
 
 interface ApplicationData {
   mode: "personal" | "review";
@@ -36,6 +38,7 @@ interface ApplicationData {
   competitions: Awaited<ReturnType<typeof competitionApi.list>>;
   athletes: UserCoachRelation[];
   competitionApplications: CompetitionApplication[];
+  userNames: Record<number, string>;
 }
 
 type ReviewTarget = { kind: "rank" | "judge"; id: number; status: "approved" | "rejected" };
@@ -50,17 +53,23 @@ export function ApplicationsView() {
   const [createOpen, setCreateOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
   const [pending, setPending] = useState(false);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async (): Promise<ApplicationData> => {
     const profile = await profileApi.me();
     const activeRole = profile.roles.find((role) => role.id === identity?.roleId)?.code ?? null;
     if (canReviewRank || canReviewJudge || canReviewCompetition) {
-      const [rank, judge, competitionApplications] = await Promise.all([
+      const [rank, judge, competitionApplications, ranks, disciplines] = await Promise.all([
         canReviewRank ? rankApplicationApi.pending({ limit: 100 }) : Promise.resolve([]),
         canReviewJudge ? judgeCategoryApi.pending({ limit: 100 }) : Promise.resolve([]),
         canReviewCompetition ? competitionApplicationApi.pending({ status: "pending", limit: 100 }) : Promise.resolve([]),
+        rankApi.list(),
+        referenceDataApi.disciplines(),
       ]);
-      return { mode: "review", activeRole, rank, judge, ranks: [], disciplines: [], currentCategory: null, competitions: [], athletes: [], competitionApplications };
+      const userIds = [...new Set(rank.map((item) => item.athlete_user_id))];
+      const profiles = await Promise.allSettled(userIds.map((userId) => profileApi.public(userId)));
+      const userNames = Object.fromEntries(profiles.flatMap((item, index) => item.status === "fulfilled" ? [[userIds[index], [item.value.last_name, item.value.first_name, item.value.middle_name].filter(Boolean).join(" ")]] : []));
+      return { mode: "review", activeRole, rank, judge, ranks, disciplines, currentCategory: null, competitions: [], athletes: [], competitionApplications, userNames };
     }
     const [ranks, disciplines, competitions, athletes] = await Promise.all([
       rankApi.list(),
@@ -70,10 +79,13 @@ export function ApplicationsView() {
     ]);
     if (activeRole === "judge") {
       const [judge, currentCategory] = await Promise.all([judgeCategoryApi.mine(), judgeCategoryApi.current()]);
-      return { mode: "personal", activeRole, rank: [], judge, ranks, disciplines, currentCategory, competitions, athletes, competitionApplications: await competitionApplicationApi.mine() };
+      return { mode: "personal", activeRole, rank: [], judge, ranks, disciplines, currentCategory, competitions, athletes, competitionApplications: await competitionApplicationApi.mine(), userNames: {} };
     }
     const [rank, competitionApplications] = await Promise.all([rankApplicationApi.mine(), competitionApplicationApi.mine()]);
-    return { mode: "personal", activeRole, rank, judge: [], ranks, disciplines, currentCategory: null, competitions, athletes, competitionApplications };
+    const userIds = [...new Set(athletes.map((item) => item.participant_user_id))];
+    const profiles = await Promise.allSettled(userIds.map((userId) => profileApi.public(userId)));
+    const userNames = Object.fromEntries(profiles.flatMap((item, index) => item.status === "fulfilled" ? [[userIds[index], [item.value.last_name, item.value.first_name, item.value.middle_name].filter(Boolean).join(" ")]] : []));
+    return { mode: "personal", activeRole, rank, judge: [], ranks, disciplines, currentCategory: null, competitions, athletes, competitionApplications, userNames };
   }, [canReviewJudge, canReviewRank, canReviewCompetition, identity?.roleId]);
 
   const state = useAsyncData(load);
@@ -151,12 +163,17 @@ export function ApplicationsView() {
 
   const canCreate = state.data?.mode === "personal" && (state.data.activeRole === "participant" || state.data.activeRole === "coach" || state.data.activeRole === "judge");
   const missingCoachAthletes = state.data?.activeRole === "coach" && state.data.athletes.length === 0;
+  const query = search.trim().toLocaleLowerCase("ru");
+  const matches = (value: string) => !query || value.toLocaleLowerCase("ru").includes(query);
+  const visibleCompetitionApplications = (state.data?.competitionApplications ?? []).filter((item) => matches(`${item.competition_name} ${item.discipline_name} ${item.athlete_last_name} ${item.athlete_first_name} ${item.status}`));
+  const visibleRankApplications = (state.data?.rank ?? []).filter((item) => matches(`${item.athlete_user_id} ${item.rank_id} ${item.discipline_id} ${item.status}`));
+  const visibleJudgeApplications = (state.data?.judge ?? []).filter((item) => matches(`${item.judge_name ?? ""} ${item.category_name ?? item.category_id} ${item.status}`));
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      {canCreate ? <div className="mb-4 flex justify-end"><Button onClick={() => setCreateOpen(true)} disabled={missingCoachAthletes} title={missingCoachAthletes ? "Сначала добавьте спортсмена и дождитесь подтверждения" : undefined}><Plus />Подать заявку</Button></div> : null}
+      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти заявку" createLabel="Подать заявку" onCreate={canCreate ? () => setCreateOpen(true) : undefined} />
       {state.data?.currentCategory ? (
-        <Card className="mb-4 bg-[#eeebff] p-4 shadow-none"><p className="font-medium">Текущая категория: {state.data.currentCategory.category_name}</p><p className="mt-1 text-xs text-muted-foreground">Назначена {formatDate(state.data.currentCategory.assigned_at)}{state.data.currentCategory.expires_at ? ` · до ${formatDate(state.data.currentCategory.expires_at)}` : ""}</p></Card>
+        <Card className="mb-4 border-primary/10 bg-primary/5 p-4 shadow-none"><p className="font-medium">Текущая категория: {state.data.currentCategory.category_name}</p><p className="mt-1 text-xs text-muted-foreground">Назначена {formatDate(state.data.currentCategory.assigned_at)}{state.data.currentCategory.expires_at ? ` · до ${formatDate(state.data.currentCategory.expires_at)}` : ""}</p></Card>
       ) : null}
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
@@ -165,28 +182,28 @@ export function ApplicationsView() {
       {!state.loading && !state.error && !total && state.data?.mode === "personal" ? <Button asChild variant="outline" className="mb-4"><Link href="/workspace/competitions">Найти соревнование</Link></Button> : null}
 
       <div className="grid gap-3">
-        {state.data?.competitionApplications.map((application) => (
+        {visibleCompetitionApplications.map((application) => (
           <Card key={`competition-${application.id}`} className="bg-white/75 p-5 shadow-none">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-              <div className="min-w-0"><p className="font-medium">Заявка на соревнование</p><p className="mt-1 text-sm">{application.competition_name} · {application.discipline_name}{application.age_group_name ? ` · ${application.age_group_name}` : ""}</p><p className="mt-1 text-sm text-muted-foreground">Спортсмен: {application.athlete_last_name} {application.athlete_first_name} · подана {formatDate(application.submitted_at, true)}</p><Button asChild variant="link" size="sm" className="mt-1 px-0"><Link href={`/workspace/competitions/${application.competition_id}`}>Открыть соревнование</Link></Button></div>
-              <div className="flex flex-wrap items-center gap-2"><StatusBadge status={application.status} />{state.data?.mode === "review" ? <><Button size="sm" disabled={pending} onClick={() => void changeCompetitionApplication(application, "approve")}>Одобрить</Button><Button size="sm" variant="outline" disabled={pending} onClick={() => void changeCompetitionApplication(application, "reject")}>Отклонить</Button></> : application.can_withdraw ? <Button size="sm" variant="outline" disabled={pending} onClick={() => void changeCompetitionApplication(application, "withdraw")}>Отозвать</Button> : null}</div>
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Заявка на соревнование</p><StatusBadge status={application.status} /></div><p className="mt-1 text-sm">{application.competition_name} · {application.discipline_name}{application.age_group_name ? ` · ${application.age_group_name}` : ""}</p><p className="mt-1 text-sm text-muted-foreground">Спортсмен: {application.athlete_last_name} {application.athlete_first_name} · подана {formatDate(application.submitted_at, true)}</p><Button asChild variant="link" size="sm" className="mt-1 px-0"><Link href={`/workspace/competitions/${application.competition_id}`}>Открыть соревнование</Link></Button></div>
+              {state.data?.mode === "review" ? <div className="flex w-full gap-2 sm:w-auto"><Button className="flex-1 sm:flex-none" size="sm" disabled={pending} onClick={() => void changeCompetitionApplication(application, "approve")}>Одобрить</Button><Button className="flex-1 sm:flex-none" size="sm" variant="outline" disabled={pending} onClick={() => void changeCompetitionApplication(application, "reject")}>Отклонить</Button></div> : application.can_withdraw ? <div className="flex w-full sm:w-auto"><ConfirmAction trigger={<Button className="w-full sm:w-auto" size="sm" variant="outline" disabled={pending}>Отозвать</Button>} title="Отозвать заявку?" description="Заявка перестанет участвовать в модерации. Это действие нельзя отменить." confirmLabel="Отозвать заявку" destructive onConfirm={() => changeCompetitionApplication(application, "withdraw")} /></div> : null}
             </div>
           </Card>
         ))}
-        {state.data?.rank.map((application) => (
+        {visibleRankApplications.map((application) => (
           <Card key={`rank-${application.id}`} className="bg-white/75 p-5 shadow-none">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-              <div className="flex min-w-0 gap-3"><div><p className="font-medium">Заявка на спортивный разряд</p><p className="mt-1 text-sm text-muted-foreground">Спортсмен #{application.athlete_user_id} · разряд #{application.rank_id} · дисциплина #{application.discipline_id}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.created_at, true)} · {application.application_type}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
-              <div className="flex shrink-0 items-center gap-2"><StatusBadge status={application.status} />{state.data?.mode === "review" ? <><Button size="sm" onClick={() => setReviewTarget({ kind: "rank", id: application.id, status: "approved" })}>Одобрить</Button><Button size="sm" variant="outline" onClick={() => setReviewTarget({ kind: "rank", id: application.id, status: "rejected" })}>Отклонить</Button></> : null}</div>
+              <div className="flex min-w-0 gap-3"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Заявка на спортивный разряд</p><StatusBadge status={application.status} /></div><p className="mt-1 text-sm text-muted-foreground">{state.data?.userNames[application.athlete_user_id] ?? "Спортсмен"} · {state.data?.ranks.find((item) => item.id === application.rank_id)?.name ?? "Разряд"} · {state.data?.disciplines.find((item) => item.id === application.discipline_id)?.name ?? "Дисциплина"}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.created_at, true)} · {application.application_type === "confirmation" ? "подтверждение" : "присвоение"}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
+              {state.data?.mode === "review" ? <div className="flex w-full shrink-0 gap-2 sm:w-auto"><Button className="flex-1 sm:flex-none" size="sm" onClick={() => setReviewTarget({ kind: "rank", id: application.id, status: "approved" })}>Одобрить</Button><Button className="flex-1 sm:flex-none" size="sm" variant="outline" onClick={() => setReviewTarget({ kind: "rank", id: application.id, status: "rejected" })}>Отклонить</Button></div> : null}
             </div>
           </Card>
         ))}
 
-        {state.data?.judge.map((application) => (
+        {visibleJudgeApplications.map((application) => (
           <Card key={`judge-${application.id}`} className="bg-white/75 p-5 shadow-none">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-              <div className="flex min-w-0 gap-3"><div><p className="font-medium">{application.category_name ?? `Судейская категория #${application.category_id}`}</p><p className="mt-1 text-sm text-muted-foreground">{application.judge_name ? `${application.judge_name} · ` : ""}{application.application_type}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.submitted_at, true)}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
-              <div className="flex shrink-0 items-center gap-2"><StatusBadge status={application.status} />{state.data?.mode === "review" ? <><Button size="sm" onClick={() => setReviewTarget({ kind: "judge", id: application.id, status: "approved" })}>Одобрить</Button><Button size="sm" variant="outline" onClick={() => setReviewTarget({ kind: "judge", id: application.id, status: "rejected" })}>Отклонить</Button></> : null}</div>
+              <div className="flex min-w-0 gap-3"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{application.category_name ?? `Судейская категория #${application.category_id}`}</p><StatusBadge status={application.status} /></div><p className="mt-1 text-sm text-muted-foreground">{application.judge_name ? `${application.judge_name} · ` : ""}{application.application_type}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.submitted_at, true)}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
+              {state.data?.mode === "review" ? <div className="flex w-full shrink-0 gap-2 sm:w-auto"><Button className="flex-1 sm:flex-none" size="sm" onClick={() => setReviewTarget({ kind: "judge", id: application.id, status: "approved" })}>Одобрить</Button><Button className="flex-1 sm:flex-none" size="sm" variant="outline" onClick={() => setReviewTarget({ kind: "judge", id: application.id, status: "rejected" })}>Отклонить</Button></div> : null}
             </div>
           </Card>
         ))}
@@ -198,7 +215,7 @@ export function ApplicationsView() {
             {state.data?.activeRole === "judge" ? <><Label htmlFor="category-id">ID судейской категории</Label><Input id="category-id" name="category_id" type="number" min="1" required /><p className="text-xs text-muted-foreground">Справочник категорий пока недоступен в API. Уточните ID у администратора федерации.</p></> : <>
               <Label htmlFor="rank-id">Разряд</Label><Select name="rank_id" required><SelectTrigger id="rank-id"><SelectValue placeholder="Выберите разряд" /></SelectTrigger><SelectContent>{state.data?.ranks.map((rank) => <SelectItem key={rank.id} value={String(rank.id)}>{rank.name}</SelectItem>)}</SelectContent></Select>
               <Label htmlFor="discipline-id">Дисциплина</Label><Select name="discipline_id" required><SelectTrigger id="discipline-id"><SelectValue placeholder="Выберите дисциплину" /></SelectTrigger><SelectContent>{state.data?.disciplines.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
-              {state.data?.activeRole === "coach" ? <div><Label htmlFor="athlete-id">Спортсмен</Label><Select name="athlete_user_id" required><SelectTrigger id="athlete-id"><SelectValue placeholder="Выберите спортсмена" /></SelectTrigger><SelectContent>{state.data.athletes.map((relation) => <SelectItem key={relation.participant_user_id} value={String(relation.participant_user_id)}>Спортсмен #{relation.participant_user_id}</SelectItem>)}</SelectContent></Select></div> : null}
+              {state.data?.activeRole === "coach" ? <div><Label htmlFor="athlete-id">Спортсмен</Label><Select name="athlete_user_id" required><SelectTrigger id="athlete-id"><SelectValue placeholder="Выберите спортсмена" /></SelectTrigger><SelectContent>{state.data.athletes.map((relation) => <SelectItem key={relation.participant_user_id} value={String(relation.participant_user_id)}>{state.data?.userNames[relation.participant_user_id] ?? "Спортсмен"}</SelectItem>)}</SelectContent></Select></div> : null}
               <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="competition-id">Соревнование</Label><Select name="competition_id" required><SelectTrigger id="competition-id"><SelectValue placeholder="Выберите соревнование" /></SelectTrigger><SelectContent>{state.data?.competitions.map((competition) => <SelectItem key={competition.id} value={String(competition.id)}>{competition.name}</SelectItem>)}</SelectContent></Select></div><div><Label htmlFor="result-id">ID результата</Label><Input id="result-id" name="result_id" type="number" min="1" required placeholder="Укажите результат-основание" /><p className="mt-1 text-xs text-muted-foreground">Результат должен быть завершён и относиться к выбранному спортсмену, дисциплине и соревнованию. ID результата можно уточнить у организатора.</p></div></div>
             </>}
             <Label htmlFor="application-type">Тип заявки</Label><Select name="application_type" defaultValue="assignment"><SelectTrigger id="application-type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="assignment">Присвоение</SelectItem><SelectItem value="confirmation">Подтверждение</SelectItem></SelectContent></Select>

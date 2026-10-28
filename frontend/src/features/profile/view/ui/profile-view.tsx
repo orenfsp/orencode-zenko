@@ -56,12 +56,14 @@ function fullName(profile: PublicProfile) {
 
 function formatDate(value?: string) {
   if (!value) return "Не указано";
+  const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+  const includeYear = date.getUTCFullYear() !== new Date().getFullYear();
   return new Intl.DateTimeFormat("ru-RU", {
     day: "numeric",
     month: "long",
-    year: "numeric",
+    ...(includeYear ? { year: "numeric" as const } : {}),
     timeZone: "UTC",
-  }).format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
+  }).format(date);
 }
 
 function InfoRow({
@@ -87,11 +89,9 @@ function InfoRow({
 }
 
 function ProfileMetric({
-  icon: _Icon,
   label,
   value,
 }: {
-  icon: typeof Mail;
   label: string;
   value: React.ReactNode;
 }) {
@@ -295,7 +295,7 @@ export function ProfileView(props: ProfileViewProps) {
                   alt={fullName(profile)}
                   className="rounded-[inherit] object-cover grayscale"
                 />
-                <AvatarFallback className="rounded-[inherit] bg-[#e8e5ff] text-[#402fff]">
+                <AvatarFallback className="rounded-[inherit] bg-brand-soft text-primary">
                   <UserRound className="size-10" />
                 </AvatarFallback>
               </Avatar>
@@ -338,17 +338,14 @@ export function ProfileView(props: ProfileViewProps) {
 
           <div className="grid gap-3 p-4 sm:grid-cols-3 sm:p-6">
             <ProfileMetric
-              icon={CalendarDays}
               label="Возраст"
               value={`${profile.age} лет`}
             />
             <ProfileMetric
-              icon={ShieldCheck}
               label="Роли"
               value={profile.roles.length}
             />
             <ProfileMetric
-              icon={Trophy}
               label="Разряды"
               value={profile.ranks.length}
             />
@@ -501,7 +498,7 @@ export function ProfileView(props: ProfileViewProps) {
       </div>
 
       {ownProfile ? (
-        <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto scroll-mask-y sm:max-w-xl">
+        <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-xl">
           <form onSubmit={saveProfile} className="grid gap-5">
             <DialogHeader>
               <DialogTitle>Редактирование профиля</DialogTitle>

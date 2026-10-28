@@ -4,7 +4,7 @@ import RibbonGlow from "@/widgets/auth-shell/ui/bg-effect";
 
 export function PublicProfilePage({ userId }: { userId: number }) {
   return (
-    <main className="relative min-h-svh min-w-0 overflow-hidden bg-[#f2efff]">
+    <main className="relative min-h-svh min-w-0 overflow-hidden bg-workspace">
       <div className="fixed inset-0">
         <RibbonGlow />
       </div>

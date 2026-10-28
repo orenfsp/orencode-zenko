@@ -21,6 +21,13 @@ export const antiDopingApi = {
         "/api/v1/anti-doping/self",
       )
     ).data,
+  adminList: async () =>
+    (
+      await api.get<ApiEnvelope<AntiDopingCertificate[]>>(
+        "/api/v1/admin/anti-doping",
+        { permission: "anti_doping.review" },
+      )
+    ).data,
   review: async (
     certificateId: number,
     body: ReviewAntiDopingCertificatePayload,

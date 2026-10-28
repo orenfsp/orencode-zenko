@@ -20,3 +20,36 @@ export interface UserCoachListQuery {
   limit?: number;
   offset?: number;
 }
+
+export interface CoachParticipantDiscipline {
+  id: number;
+  name: string;
+}
+
+export interface CoachParticipantRelation {
+  discipline_id: number;
+  status: UserCoachStatus;
+}
+
+export interface CoachParticipant {
+  id: number;
+  first_name: string;
+  last_name: string;
+  middle_name: string | null;
+  organization: string | null;
+  municipality: string | null;
+  disciplines: CoachParticipantDiscipline[];
+  coach_relations: CoachParticipantRelation[];
+}
+
+export interface CoachParticipantPage {
+  items: CoachParticipant[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface CoachParticipantQuery extends UserCoachListQuery {
+  search?: string;
+  discipline_id?: number;
+}

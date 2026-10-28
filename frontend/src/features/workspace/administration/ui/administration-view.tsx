@@ -3,15 +3,18 @@
 import { FormEvent, useCallback, useMemo, useState } from "react";
 import { Activity, Building2, LoaderCircle, Medal, ShieldCheck } from "lucide-react";
 
-import { antiDopingApi } from "@/entities/anti-doping";
+import { antiDopingApi, type AntiDopingCertificate } from "@/entities/anti-doping";
+import { fileApi } from "@/entities/file";
 import { auditLogApi } from "@/entities/audit-log";
 import { municipalityApi, type Municipality } from "@/entities/municipality";
+import { profileApi } from "@/entities/profile";
 import { rankApi, type Rank } from "@/entities/rank";
 import { rbacApi, type Permission, type Role } from "@/entities/rbac";
 import { useAuth } from "@/entities/session";
 import { formatDate, SectionHeading } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { useNotifications } from "@/shared/lib/notifications";
+import { downloadBlob } from "@/shared/lib/download";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
@@ -32,6 +35,8 @@ interface AdministrationData {
   municipalities: Municipality[];
   ranks: Rank[];
   audit: Awaited<ReturnType<typeof auditLogApi.list>>;
+  certificates: AntiDopingCertificate[];
+  certificateUsers: Record<number, string>;
 }
 
 export type AdministrationSection = "roles" | "directories" | "reviews" | "audit";
@@ -59,14 +64,18 @@ export function AdministrationView({ section }: { section: AdministrationSection
   const [auditSearch, setAuditSearch] = useState("");
 
   const load = useCallback(async (): Promise<AdministrationData> => {
-    const [roles, permissionItems, municipalities, ranks, audit] = await Promise.all([
+    const [roles, permissionItems, municipalities, ranks, audit, certificates] = await Promise.all([
       identity?.permissions?.includes("roles.read") ? rbacApi.roles() : Promise.resolve([]),
       identity?.permissions?.includes("permissions.read") ? rbacApi.permissions() : Promise.resolve([]),
       municipalityApi.list({ limit: 100 }),
       rankApi.list(),
       identity?.permissions?.includes("roles.read") ? auditLogApi.list({ limit: 100 }) : Promise.resolve([]),
+      identity?.permissions?.includes("anti_doping.review") ? antiDopingApi.adminList() : Promise.resolve([]),
     ]);
-    return { roles, permissions: permissionItems, municipalities, ranks, audit };
+    const userIds = [...new Set(certificates.map((item) => item.user_id))];
+    const profiles = await Promise.allSettled(userIds.map((userId) => profileApi.public(userId)));
+    const certificateUsers = Object.fromEntries(profiles.flatMap((item, index) => item.status === "fulfilled" ? [[userIds[index], [item.value.last_name, item.value.first_name, item.value.middle_name].filter(Boolean).join(" ")]] : []));
+    return { roles, permissions: permissionItems, municipalities, ranks, audit, certificates, certificateUsers };
   }, [identity?.permissions]);
   const state = useAsyncData(load);
   const visibleRoles = useMemo(() => {
@@ -150,6 +159,15 @@ export function AdministrationView({ section }: { section: AdministrationSection
     );
   }
 
+  async function downloadCertificate(fileId: number) {
+    try {
+      const file = await fileApi.download(fileId);
+      downloadBlob(file.blob, file.filename);
+    } catch (cause) {
+      notify.error(cause instanceof Error ? cause.message : "Не удалось скачать сертификат");
+    }
+  }
+
   if (state.loading) return <DataLoading rows={6} />;
   if (state.error) return <DataError message={state.error} retry={state.reload} />;
   const data = state.data;
@@ -178,16 +196,11 @@ export function AdministrationView({ section }: { section: AdministrationSection
       </div> : null}
 
       {section === "reviews" && permissions.has("anti_doping.review") ? (
-        <Card className="bg-white/75 p-5 shadow-none">
-          <SectionHeading title="Проверка антидопингового сертификата" description="Backend пока не предоставляет очередь сертификатов, поэтому укажите ID из реестра файлов." />
-          <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-5" onSubmit={reviewCertificate}>
-            <Input name="certificate_id" type="number" min="1" placeholder="ID сертификата" required />
-            <Select name="status" defaultValue="valid"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="valid">Действителен</SelectItem><SelectItem value="expired">Истёк</SelectItem><SelectItem value="rejected">Отклонён</SelectItem></SelectContent></Select>
-            <DatePicker id="certificate-completed-at" name="completed_at" />
-            <Input name="rejection_reason" placeholder="Причина отклонения" />
-            <Button disabled={pending !== null}>{pending === "certificate" ? <LoaderCircle className="animate-spin" /> : null}Сохранить</Button>
-          </form>
-        </Card>
+        <div className="grid gap-4">
+          <SectionHeading title="Проверка антидопинговых сертификатов" description="Очередь сертификатов загружается из административного API." />
+          {!data.certificates.length ? <Card className="border-0 bg-white/75 p-8 text-center shadow-none"><p className="font-medium">Сертификатов на проверку нет</p></Card> : null}
+          {data.certificates.map((certificate) => <Card key={certificate.id} className="border-0 bg-white/75 p-5 shadow-none"><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><p className="font-medium">{data.certificateUsers[certificate.user_id] ?? "Антидопинговый сертификат"}</p><p className="text-sm text-muted-foreground">Статус: {certificate.status}</p></div><Button type="button" size="sm" variant="outline" onClick={() => void downloadCertificate(certificate.file_id)}>Скачать файл</Button></div><form className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" onSubmit={reviewCertificate}><input type="hidden" name="certificate_id" value={certificate.id} /><Select name="status" defaultValue="valid"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="valid">Действителен</SelectItem><SelectItem value="expired">Истёк</SelectItem><SelectItem value="rejected">Отклонён</SelectItem></SelectContent></Select><DatePicker id={`certificate-completed-at-${certificate.id}`} name="completed_at" /><Input name="rejection_reason" placeholder="Причина отклонения" /><Button disabled={pending !== null}>{pending === "certificate" ? <LoaderCircle className="animate-spin" /> : null}Сохранить решение</Button></form></Card>)}
+        </div>
       ) : null}
 
       {section === "audit" && permissions.has("roles.read") ? (

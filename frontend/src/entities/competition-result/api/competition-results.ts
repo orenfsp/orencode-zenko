@@ -86,4 +86,20 @@ export const competitionResultApi = {
       ),
     };
   },
+  uploadProtocol: async (competitionId: number, eventId: number, file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return (
+      await api.put<ApiEnvelope<{ protocol_url: string }>>(
+        `/api/v1/admin/competitions/${competitionId}/events/${eventId}/protocol`,
+        body,
+        { permission: "competition_results.approve" },
+      )
+    ).data;
+  },
+  removeProtocol: (competitionId: number, eventId: number) =>
+    api.delete<void>(
+      `/api/v1/admin/competitions/${competitionId}/events/${eventId}/protocol`,
+      { permission: "competition_results.approve" },
+    ),
 };

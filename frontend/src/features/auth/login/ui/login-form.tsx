@@ -14,9 +14,7 @@ import {
 import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
 import { FormField } from "@/shared/ui/form-field";
-import { OAuthSeparator } from "@/shared/ui/oauth-separator";
 import { Spinner } from "@/shared/ui/spinner";
-import { VkButton } from "@/shared/ui/vk-button";
 import { FormHeading } from "@/widgets/auth-shell";
 
 export function LoginForm() {
@@ -92,9 +90,6 @@ export function LoginForm() {
         {pending ? <Spinner /> : null}
         {pending ? "Входим…" : "Войти"}
       </Button>
-
-      {/* <OAuthSeparator />
-      <VkButton /> */}
 
       <p className="text-center text-sm leading-5">
         Нет аккаунта?{" "}

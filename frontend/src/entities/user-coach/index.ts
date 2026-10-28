@@ -1,2 +1,2 @@
 export { userCoachApi } from "./api/user-coach";
-export type { CreateUserCoachPayload, UserCoachListQuery, UserCoachRelation, UserCoachStatus } from "./model/types";
+export type { CoachParticipant, CoachParticipantPage, CoachParticipantQuery, CreateUserCoachPayload, UserCoachListQuery, UserCoachRelation, UserCoachStatus } from "./model/types";

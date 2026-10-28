@@ -15,9 +15,7 @@ import { Button } from "@/shared/ui/button";
 import { DatePicker } from "@/shared/ui/date-picker";
 import { FormField } from "@/shared/ui/form-field";
 import { Label } from "@/shared/ui/label";
-import { OAuthSeparator } from "@/shared/ui/oauth-separator";
 import { Spinner } from "@/shared/ui/spinner";
-import { VkButton } from "@/shared/ui/vk-button";
 import { FormHeading } from "@/widgets/auth-shell";
 
 import { FileUploadField } from "./file-upload-field";
@@ -280,9 +278,6 @@ export function RegisterForm() {
       >
         Далее
       </Button>
-
-      {/* <OAuthSeparator />
-      <VkButton /> */}
 
       <p className="text-center text-sm leading-5 text-muted-foreground">
         Есть аккаунт?{" "}

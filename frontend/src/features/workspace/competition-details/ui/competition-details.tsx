@@ -22,6 +22,7 @@ import { competitionJudgeApi } from "@/entities/competition-judge";
 import { competitionResultApi, type CompetitionResultTable } from "@/entities/competition-result";
 import { profileApi } from "@/entities/profile";
 import { referenceDataApi } from "@/entities/reference-data";
+import { registryApi } from "@/entities/registry";
 import { userCoachApi } from "@/entities/user-coach";
 import { useAuth } from "@/entities/session";
 import { formatDate, fullName, StatusBadge } from "@/features/workspace/common";
@@ -31,11 +32,14 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { DataError, DataLoading } from "@/shared/ui/data-state";
 import { useNotifications } from "@/shared/lib/notifications";
+import { downloadBlob } from "@/shared/lib/download";
 import { Input } from "@/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
 import { Checkbox } from "@/shared/ui/checkbox";
+import { ConfirmAction } from "@/shared/ui/confirm-action";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { ScrollMask } from "@/shared/ui/scroll-mask";
 import { ResultEntryEditor } from "./result-entry-editor";
 
 interface EventEditor {
@@ -51,6 +55,7 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
   const permissions = new Set(identity?.permissions ?? []);
   const canUpdate = permissions.has("competitions.update");
   const canManageJudges = permissions.has("competition_judges.manage");
+  const canReadRegistry = permissions.has("registry.read");
   const canReadResults = permissions.has("competition_results.read");
   const canManageResults = permissions.has("competition_results.manage");
   const canApproveResults = permissions.has("competition_results.approve");
@@ -69,18 +74,24 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
   const [deletingEvent, setDeletingEvent] = useState<CompetitionEvent | null>(null);
   const load = useCallback(
     async () => {
-      const [competition, events, judges, profile, ageGroups] = await Promise.all([
-        competitionApi.get(competitionId),
+      const managedCompetition = canUpdate ? await competitionApi.adminGet(competitionId).catch(() => null) : null;
+      const [competition, events, judges, profile, ageGroups, judgePositions, judgeUsersPage] = await Promise.all([
+        managedCompetition ? Promise.resolve(managedCompetition) : competitionApi.get(competitionId),
         canReadEvents ? competitionEventApi.adminList(competitionId) : competitionEventApi.publicList(competitionId),
         canManageJudges ? competitionJudgeApi.adminList(competitionId) : competitionJudgeApi.publicList(competitionId),
         profileApi.me(),
         canCreateEvents || canUpdateEvents ? referenceDataApi.ageGroups() : Promise.resolve([]),
+        canManageJudges ? competitionJudgeApi.positions() : Promise.resolve([]),
+        canManageJudges && canReadRegistry ? registryApi.adminUsers({ role: "judge", limit: 100 }) : Promise.resolve(null),
       ]);
       const activeRole = profile.roles.find((role) => role.id === identity?.roleId)?.code;
       const athletes = activeRole === "coach" ? await userCoachApi.byCoach({ limit: 100 }) : [];
-      return { competition, events, judges, activeRole, athletes, ageGroups };
+      const athleteIds = [...new Set(athletes.map((item) => item.participant_user_id))];
+      const athleteProfiles = await Promise.allSettled(athleteIds.map((userId) => profileApi.public(userId)));
+      const athleteNames = Object.fromEntries(athleteProfiles.flatMap((item, index) => item.status === "fulfilled" ? [[athleteIds[index], fullName(item.value.last_name, item.value.first_name, item.value.middle_name)]] : []));
+      return { competition, events, judges, activeRole, athletes, ageGroups, judgePositions, judgeUsers: judgeUsersPage?.items ?? [], canManageCompetition: managedCompetition !== null, athleteNames };
     },
-    [canCreateEvents, canManageJudges, canReadEvents, canUpdateEvents, competitionId, identity?.roleId],
+    [canCreateEvents, canManageJudges, canReadEvents, canReadRegistry, canUpdate, canUpdateEvents, competitionId, identity?.roleId],
   );
   const state = useAsyncData(load);
 
@@ -95,6 +106,17 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     void run(() => competitionApi.update(competitionId, { name: String(form.get("name") ?? ""), description: String(form.get("description") ?? "") || null }), "Соревнование обновлено");
+  }
+
+  function transitionCompetition(action: "submit" | "publish" | "cancel" | "return") {
+    const actions = {
+      submit: () => competitionApi.submit(competitionId),
+      publish: () => competitionApi.publish(competitionId),
+      cancel: () => competitionApi.cancel(competitionId),
+      return: () => competitionApi.returnToDraft(competitionId),
+    };
+    const messages = { submit: "Соревнование отправлено на проверку", publish: "Соревнование опубликовано", cancel: "Соревнование отменено", return: "Соревнование возвращено на доработку" };
+    void run(actions[action], messages[action]);
   }
 
   function assignJudge(event: FormEvent<HTMLFormElement>) {
@@ -205,8 +227,7 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
     setPending(true);
     try {
       const file = await competitionResultApi.protocol(competitionId, eventId);
-      const url = URL.createObjectURL(file.blob);
-      const anchor = document.createElement("a"); anchor.href = url; anchor.download = file.filename; anchor.click(); URL.revokeObjectURL(url);
+      downloadBlob(file.blob, file.filename);
     } catch (cause) { notify.error(cause instanceof Error ? cause.message : "Не удалось скачать протокол"); }
     finally { setPending(false); }
   }
@@ -215,7 +236,7 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
   if (state.error) return <DataError message={state.error} retry={state.reload} />;
   if (!state.data) return null;
 
-  const { competition, events, judges, activeRole, athletes, ageGroups } = state.data;
+  const { competition, events, judges, activeRole, athletes, ageGroups, judgePositions, judgeUsers, canManageCompetition, athleteNames } = state.data;
   const canApply = activeRole === "participant" || activeRole === "coach";
   const applyingEvent = events.find((event) => event.id === applyingEventId);
   const eligibleAthletes = applyingEvent ? athletes.filter((relation) => relation.status === "confirmed" && relation.discipline_id === applyingEvent.discipline.id) : [];
@@ -243,6 +264,7 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
           </div>
         </div>
       </Card>
+      {canManageCompetition ? <div className="mt-4 flex flex-wrap gap-2">{competition.status === "draft" ? <Button disabled={pending} onClick={() => transitionCompetition("submit")}>Отправить на проверку</Button> : null}{competition.status === "under_review" ? <><Button disabled={pending} onClick={() => transitionCompetition("publish")}>Опубликовать</Button><Button variant="outline" disabled={pending} onClick={() => transitionCompetition("return")}>Вернуть на доработку</Button></> : null}{competition.status === "under_review" || competition.status === "published" ? <ConfirmAction trigger={<Button variant="outline" disabled={pending}>Отменить соревнование</Button>} title="Отменить соревнование?" description="Соревнование станет недоступно участникам. Вернуть его в публикацию через текущий API нельзя." confirmLabel="Отменить соревнование" destructive onConfirm={() => transitionCompetition("cancel")} /> : null}</div> : null}
       {canUpdate && competition.status === "draft" ? <Card className="mt-4 bg-white/75 p-4 shadow-none"><form className="grid gap-2 md:grid-cols-[1fr_1fr_auto]" onSubmit={updateCompetition}><Input name="name" defaultValue={competition.name} required /><Input name="description" defaultValue={competition.description ?? ""} placeholder="Описание" /><Button disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Сохранить карточку</Button></form></Card> : null}
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
@@ -276,7 +298,8 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
             <CardDescription>Назначенные судьи соревнования.</CardDescription>
           </CardHeader>
           <div className="mt-4 grid gap-3">
-            {canManageJudges && competition.status === "draft" ? <form className="grid gap-2 rounded-xl border p-3" onSubmit={assignJudge}><Input name="judge_user_id" type="number" min="1" placeholder="ID судьи" required /><Input name="position_id" type="number" min="1" placeholder="ID позиции" required /><Button size="sm" disabled={pending}>Назначить судью</Button></form> : null}
+            {canManageJudges && competition.status === "draft" && canReadRegistry ? <form className="grid gap-2 rounded-xl border p-3" onSubmit={assignJudge}><Select name="judge_user_id" required><SelectTrigger><SelectValue placeholder="Выберите судью" /></SelectTrigger><SelectContent>{judgeUsers.map((judge) => <SelectItem key={judge.id} value={String(judge.id)}>{fullName(judge.last_name, judge.first_name, judge.middle_name)}</SelectItem>)}</SelectContent></Select><Select name="position_id" required><SelectTrigger><SelectValue placeholder="Выберите должность" /></SelectTrigger><SelectContent>{judgePositions.map((position) => <SelectItem key={position.id} value={String(position.id)}>{position.name}</SelectItem>)}</SelectContent></Select><Button size="sm" disabled={pending || !judgeUsers.length || !judgePositions.length}>Назначить судью</Button></form> : null}
+            {canManageJudges && competition.status === "draft" && !canReadRegistry ? <p className="text-sm text-muted-foreground">Для выбора судьи требуется разрешение на просмотр реестра пользователей.</p> : null}
             {canManageJudges && competition.status !== "draft" ? <p className="text-sm text-muted-foreground">Состав судей можно менять только до публикации соревнования.</p> : null}
             {judges.map((assignment) => (
               <div key={assignment.id} className="flex gap-3 rounded-xl bg-muted/60 p-4">
@@ -284,21 +307,24 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
                   <p className="truncate text-sm font-medium">{fullName(assignment.judge.last_name, assignment.judge.first_name, assignment.judge.middle_name)}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{assignment.position.name}</p>
                 </div>
-                {canManageJudges && competition.status === "draft" ? <Button className="ml-auto" variant="outline" size="sm" disabled={pending} onClick={() => void run(() => competitionJudgeApi.remove(competitionId, assignment.id), "Судья снят")}>Снять</Button> : null}
+                {canManageJudges && competition.status === "draft" ? <div className="ml-auto"><ConfirmAction trigger={<Button variant="outline" size="sm" disabled={pending}>Снять</Button>} title="Снять судью с назначения?" description="Назначение будет удалено из судейской коллегии этого соревнования." confirmLabel="Снять судью" destructive onConfirm={() => run(() => competitionJudgeApi.remove(competitionId, assignment.id), "Судья снят")} /></div> : null}
               </div>
             ))}
             {!judges.length ? <p className="text-sm text-muted-foreground">Состав пока не опубликован.</p> : null}
           </div>
         </Card>
       </div>
-      {result && resultEventId ? <Card className="mt-5 bg-white/75 p-5 shadow-none"><CardHeader><CardTitle>Результаты: {result.event.discipline_name}</CardTitle><CardDescription>Статус {result.status}, задач: {result.task_count}.</CardDescription></CardHeader>
+      <Dialog open={Boolean(result && resultEventId)} onOpenChange={(open) => { if (!open && !pending) { setResult(null); setResultEventId(null); setResultInputError(null); } }}>
+        <DialogContent className="sm:max-w-4xl">
+          {result && resultEventId ? <><DialogHeader><DialogTitle>Результаты: {result.event.discipline_name}</DialogTitle><DialogDescription>Статус {result.status}, задач: {result.task_count}.</DialogDescription></DialogHeader>
         {canManageResults && result.status !== "approved" ? <div className="mt-4 grid gap-3"><form className="grid gap-2 sm:grid-cols-[140px_120px_1fr_auto]" onSubmit={configureResults}><Select name="mode" defaultValue={result.mode}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="individual">Индивидуальный</SelectItem><SelectItem value="team">Командный</SelectItem></SelectContent></Select><Input name="task_count" type="number" min="1" max="50" defaultValue={result.task_count || 1} required /><Input name="teams" defaultValue="[]" aria-label="Составы команд в JSON" placeholder='Команды: [{"team_id":1,"application_ids":[2]}]' /><Button disabled={pending}>Настроить</Button><label className="col-span-full flex items-center gap-2 text-sm"><Checkbox name="confirm_reset" />Сбросить введённые результаты при повторной настройке</label></form>
           <ResultEntryEditor key={`${resultEventId}-${resultVersion}`} table={result} pending={pending} onSave={(payload) => void resultAction(() => competitionResultApi.save(competitionId, resultEventId, payload), "Результат сохранён")} />
           <details className="rounded-xl border p-3"><summary className="cursor-pointer text-sm font-medium">Расширенный ввод JSON</summary><p className="mt-2 text-sm text-muted-foreground">Для массового изменения строк. Статусы: finished, did_not_start, disqualified; задачи: solved, attempted, not_attempted.</p><Textarea className="mt-2 min-h-64 font-mono text-xs" value={resultJson} onChange={(event) => { setResultJson(event.target.value); setResultInputError(null); }} aria-label="JSON результатов" aria-invalid={Boolean(resultInputError)} /><Button className="mt-2" type="button" disabled={pending || !result.entries.length} onClick={saveResultDraft}>Сохранить JSON</Button></details>
           {resultInputError ? <p role="alert" className="text-sm text-destructive">{resultInputError}</p> : null}
           <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={pending || !result.entries.length} onClick={() => void resultAction(() => competitionResultApi.calculate(competitionId, resultEventId), "Места рассчитаны")}>Рассчитать</Button>{canApproveResults ? <Button variant="outline" disabled={pending || !result.entries.length} onClick={() => void resultAction(() => competitionResultApi.approve(competitionId, resultEventId), "Результаты утверждены")}>Утвердить</Button> : null}</div>
-        </div> : <div className="mt-4 grid gap-2">{result.entries.map((entry) => <div key={entry.id} className="rounded-xl bg-muted/60 p-3 text-sm">#{entry.id} · место {entry.place ?? "—"} · решено {entry.solved_count}</div>)}</div>}
-      </Card> : null}
+        </div> : <div className="mt-4 grid gap-2">{result.entries.map((entry) => <div key={entry.id} className="rounded-xl bg-muted/60 p-3 text-sm">#{entry.id} · место {entry.place ?? "—"} · решено {entry.solved_count}</div>)}</div>}</> : null}
+        </DialogContent>
+      </Dialog>
       <Dialog open={eventEditor !== null} onOpenChange={(open) => { if (!open && !pending) setEventEditor(null); }}>
         <DialogContent>
           <DialogHeader>
@@ -306,10 +332,10 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
             <DialogDescription>Выберите возрастную группу для зачёта. Дисциплина берётся из соревнования.</DialogDescription>
           </DialogHeader>
           <form onSubmit={saveEvent} className="grid gap-4">
-            <div className="grid max-h-72 gap-2 overflow-y-auto scroll-mask-y pr-1">
+            <ScrollMask className="grid max-h-72 gap-2 pr-1">
               <Button type="button" variant={eventEditor?.ageGroupId === null ? "default" : "outline"} className="justify-start" onClick={() => setEventEditor((value) => value ? { ...value, ageGroupId: null } : value)}>Без возрастной группы</Button>
               {ageGroups.map((group) => <Button key={group.id} type="button" variant={eventEditor?.ageGroupId === group.id ? "default" : "outline"} className="justify-start" onClick={() => setEventEditor((value) => value ? { ...value, ageGroupId: group.id } : value)}>{group.name}</Button>)}
-            </div>
+            </ScrollMask>
             <DialogFooter>
               <Button type="button" variant="outline" disabled={pending} onClick={() => setEventEditor(null)}>Отмена</Button>
               <Button type="submit" disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Сохранить</Button>
@@ -329,7 +355,7 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
       <Dialog open={applyingEventId !== null} onOpenChange={(open) => { if (!open) setApplyingEventId(null); }}>
         <DialogContent><DialogHeader><DialogTitle>Заявка на соревнование</DialogTitle><DialogDescription>{applyingEvent?.discipline.name}{applyingEvent?.age_group ? ` · ${applyingEvent.age_group.name}` : ""}. Заявка будет отправлена на рассмотрение федерации.</DialogDescription></DialogHeader>
           {activeRole === "coach" && !eligibleAthletes.length ? <div className="grid gap-3 text-sm text-muted-foreground"><p>Нет подтверждённых спортсменов по этой дисциплине. Сначала создайте связь и дождитесь подтверждения спортсмена.</p><Button asChild variant="outline"><Link href="/workspace/coaches">К моим спортсменам</Link></Button></div> : <form className="grid gap-4" onSubmit={applyForEvent}>
-            {activeRole === "coach" ? <><label htmlFor="application-athlete" className="text-sm font-medium">Спортсмен</label><Select name="athlete_user_id" required><SelectTrigger id="application-athlete"><SelectValue placeholder="Выберите спортсмена" /></SelectTrigger><SelectContent>{eligibleAthletes.map((relation) => <SelectItem key={relation.participant_user_id} value={String(relation.participant_user_id)}>Спортсмен #{relation.participant_user_id}</SelectItem>)}</SelectContent></Select></> : <p className="text-sm text-muted-foreground">Заявка будет подана за вас.</p>}
+            {activeRole === "coach" ? <><label htmlFor="application-athlete" className="text-sm font-medium">Спортсмен</label><Select name="athlete_user_id" required><SelectTrigger id="application-athlete"><SelectValue placeholder="Выберите спортсмена" /></SelectTrigger><SelectContent>{eligibleAthletes.map((relation) => <SelectItem key={relation.participant_user_id} value={String(relation.participant_user_id)}>{athleteNames[relation.participant_user_id] ?? "Спортсмен"}</SelectItem>)}</SelectContent></Select></> : <p className="text-sm text-muted-foreground">Заявка будет подана за вас.</p>}
             <DialogFooter><Button type="submit" disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Отправить заявку</Button></DialogFooter>
           </form>}
         </DialogContent>

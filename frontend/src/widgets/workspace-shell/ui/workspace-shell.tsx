@@ -154,7 +154,7 @@ function ProfileAvatar({
         alt={name}
         className="rounded-[inherit] object-cover grayscale"
       />
-      <AvatarFallback className="rounded-[inherit] bg-[#e8e5ff] text-[#402fff]">
+      <AvatarFallback className="rounded-[inherit] bg-brand-soft text-primary">
         <UserRound className="size-4" />
       </AvatarFallback>
     </Avatar>
@@ -198,13 +198,8 @@ function useWorkspaceUser() {
         setProfile(result);
         setProfileLoading(false);
         setProfileError(false);
-      } catch (error) {
+      } catch {
         if (cancelled) return;
-
-        console.error(
-          "[WorkspaceShell] Не удалось загрузить профиль. Повтор через 3 секунды:",
-          error,
-        );
         setProfileLoading(false);
         setProfileError(true);
 
@@ -458,7 +453,7 @@ function WorkspaceNavigation({ user }: { user: WorkspaceUser }) {
           <>
             <Icon />
 
-            <span className="text-[14px] leading-5 font-normal transition-opacity duration-150 group-data-[collapsible=icon]:opacity-0">
+            <span className="text-sm leading-5 font-normal transition-opacity duration-150 group-data-[collapsible=icon]:opacity-0">
               {label}
             </span>
 
@@ -644,7 +639,7 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
           >
             <Link href="/workspace/notifications" onClick={() => setOpenMobile(false)}>
               <Bell />
-              <span className="text-[14px] leading-5 font-normal">Уведомления</span>
+              <span className="text-sm leading-5 font-normal">Уведомления</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -657,7 +652,7 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
             <SidebarMenuItem>
               <SidebarMenuButton disabled className={mobileMenuButtonClass}>
                 <LoaderCircle className="animate-spin" />
-                <span className="text-[14px] leading-5 font-normal">Загружаем роли…</span>
+                <span className="text-sm leading-5 font-normal">Загружаем роли…</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ) : user.profile?.roles.length ? (
@@ -673,7 +668,7 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
                       user.pendingRoleId !== null ||
                       (!isActive && !user.rolesCanBeReordered)
                     }
-                    className={`${mobileMenuButtonClass} data-[active=true]:bg-primary/10 data-[active=true]:text-primary`}
+                    className={`${mobileMenuButtonClass} data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90`}
                     onClick={() => void user.switchRole(role)}
                   >
                     {isPending ? (
@@ -681,19 +676,19 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
                     ) : (
                       <RoleIcon role={role} />
                     )}
-                    <span className="flex-1 text-[14px] leading-5 font-normal">{role.name}</span>
+                    <span className="flex-1 text-sm leading-5 font-normal">{role.name}</span>
                     {isActive ? <Check /> : null}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );
             })
           ) : user.profileError ? (
-            <SidebarMenuItem><SidebarMenuButton className={mobileMenuButtonClass} onClick={() => user.retryProfile()}><ShieldCheck /><span className="text-[14px] leading-5 font-normal">Повторить загрузку профиля</span></SidebarMenuButton></SidebarMenuItem>
+            <SidebarMenuItem><SidebarMenuButton className={mobileMenuButtonClass} onClick={() => user.retryProfile()}><ShieldCheck /><span className="text-sm leading-5 font-normal">Повторить загрузку профиля</span></SidebarMenuButton></SidebarMenuItem>
           ) : (
             <SidebarMenuItem>
               <SidebarMenuButton disabled className={mobileMenuButtonClass}>
                 <ShieldCheck />
-                <span className="text-[14px] leading-5 font-normal">Роли пока не назначены</span>
+                <span className="text-sm leading-5 font-normal">Роли пока не назначены</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
@@ -710,7 +705,7 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
         }}
       >
         <LogOut />
-        <span className="text-[14px] leading-5 font-normal">Выйти</span>
+        <span className="text-sm leading-5 font-normal">Выйти</span>
       </Button>
     </div>
   );
@@ -758,7 +753,7 @@ export function WorkspaceShell({
   const title = pageTitle(pathname);
 
   return (
-    <main className="relative h-svh min-w-0 overflow-hidden bg-[#f2efff] md:min-w-[1200px]">
+    <main className="relative h-svh min-w-0 overflow-hidden bg-workspace">
       <div className="absolute inset-0">
         <RibbonGlow />
       </div>
@@ -803,10 +798,10 @@ export function WorkspaceShell({
             <MobileHeader user={user} />
             <header className="hidden h-14 shrink-0 items-center gap-3 px-3 md:flex">
               <SidebarTrigger aria-label="Свернуть боковое меню" />
-              <h1 className="text-sm font-semibold tracking-[-0.01em]">{title}</h1>
+              <h1 className="text-base font-semibold leading-6 tracking-[-0.01em]">{title}</h1>
             </header>
             <div className="px-4 pb-2 text-center md:hidden">
-              <h1 className="text-xl leading-7 font-medium tracking-[-0.01em]">
+              <h1 className="text-base leading-6 font-semibold tracking-[-0.01em]">
                 {title}
               </h1>
             </div>

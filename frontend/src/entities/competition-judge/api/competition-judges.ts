@@ -2,6 +2,7 @@ import { api, type ApiEnvelope } from "@/shared/api/client";
 import type {
   AssignCompetitionJudgePayload,
   CompetitionJudge,
+  CompetitionJudgePosition,
   CreatedCompetitionJudge,
   JudgeAssignment,
   JudgeCompetitionReference,
@@ -21,6 +22,13 @@ export const competitionJudgeApi = {
       await api.get<ApiEnvelope<JudgeAssignment[]>>(
         "/api/v1/profile/assignments",
         { params: { ...query } },
+      )
+    ).data,
+  positions: async () =>
+    (
+      await api.get<ApiEnvelope<CompetitionJudgePosition[]>>(
+        "/api/v1/judge-positions",
+        { auth: false },
       )
     ).data,
   publicList: async (competitionId: number) =>
