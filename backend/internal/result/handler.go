@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"io"
 	"net/http"
 	"strconv"
@@ -256,7 +257,7 @@ func handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrProtocolNotFound):
 		writeMessage(w, http.StatusNotFound, "протокол не найден")
 	case errors.Is(err, ErrProtocolNotApproved):
-		writeMessage(w, http.StatusConflict, "результаты зачёта не утверждены")
+		httpx.WriteError(w, http.StatusConflict, "result_not_approved", "результаты зачёта не утверждены")
 	case errors.Is(err, ErrInvalidPDF):
 		writeMessage(w, http.StatusBadRequest, "файл не является PDF")
 	case errors.Is(err, ErrProtocolTooLarge):
@@ -286,7 +287,5 @@ func writeData(w http.ResponseWriter, status int, data any) {
 }
 
 func writeMessage(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"message": message})
+	httpx.WriteError(w, status, httpx.ErrorCode(status), message)
 }

@@ -3,6 +3,7 @@ package competition
 import (
 	"encoding/json"
 	"errors"
+	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"io"
 	"net/http"
 	"strconv"
@@ -297,9 +298,9 @@ func handleServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, competitionerrs.ErrNameConflict):
 		writeError(w, http.StatusConflict, "соревнование с таким названием уже существует")
 	case errors.Is(err, competitionerrs.ErrNotDraft):
-		writeError(w, http.StatusConflict, "редактировать можно только черновик соревнования")
+		httpx.WriteError(w, http.StatusConflict, "invalid_competition_status", "редактировать можно только черновик соревнования")
 	case errors.Is(err, competitionerrs.ErrInvalidTransition):
-		writeError(w, http.StatusConflict, "недопустимый переход статуса соревнования")
+		httpx.WriteError(w, http.StatusConflict, "invalid_competition_status", "недопустимый переход статуса соревнования")
 	case errors.Is(err, competitionerrs.ErrNotOwner):
 		writeError(w, http.StatusForbidden, "соревнование принадлежит другому администратору")
 	case errors.Is(err, competitionerrs.ErrForbidden):
@@ -313,9 +314,7 @@ func handleServiceError(w http.ResponseWriter, err error) {
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(ErrorResponse{Message: message})
+	httpx.WriteError(w, status, httpx.ErrorCode(status), message)
 }
 
 func writeSuccess(w http.ResponseWriter, status int, data any) {

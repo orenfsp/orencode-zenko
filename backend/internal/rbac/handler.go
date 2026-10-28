@@ -3,6 +3,7 @@ package rbac
 import (
 	"encoding/json"
 	"errors"
+	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"io"
 	"net/http"
 	"strconv"
@@ -116,9 +117,7 @@ func handleError(w http.ResponseWriter, err error) {
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"message": message})
+	httpx.WriteError(w, status, httpx.ErrorCode(status), message)
 }
 
 func writeData(w http.ResponseWriter, status int, data any) {

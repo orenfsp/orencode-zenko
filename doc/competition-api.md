@@ -8,6 +8,8 @@
 }
 ```
 
+Ошибка возвращается как `{"code":"...","message":"..."}`; коды описаны в [общем контракте](./mvp-backend-api.md#формат-ошибок-основных-api). Неизвестные поля JSON и второе значение после основного JSON-объекта отклоняются с `400 Bad Request`.
+
 ## Административный жизненный цикл
 
 Список собственных соревнований администратора:
@@ -30,7 +32,6 @@ POST /api/v1/admin/competitions/{id}/return
 
 Переходы: `draft -> under_review`, `under_review -> published`, `under_review|published -> cancelled`, `under_review -> draft` (возврат на доработку). История доступна через `GET /api/v1/admin/competitions/{id}/history`.
 
-Ошибка возвращается как `{"message":"..."}`. Неизвестные поля JSON и второе значение после основного JSON-объекта отклоняются с `400 Bad Request`.
 
 ## Маршруты и доступ
 

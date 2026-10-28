@@ -3,6 +3,7 @@ package rankuser
 import (
 	"encoding/json"
 	"errors"
+	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"io"
 	"net/http"
 	"strconv"
@@ -144,7 +145,7 @@ func handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrForbidden):
 		writeError(w, http.StatusForbidden, "недостаточно прав для подачи заявки")
 	case errors.Is(err, ErrConflict):
-		writeError(w, http.StatusConflict, "такая активная заявка уже существует")
+		httpx.WriteError(w, http.StatusConflict, "application_already_exists", "такая активная заявка уже существует")
 	case errors.Is(err, ErrEVSKNotMet):
 		writeError(w, http.StatusUnprocessableEntity, "EVSK standard is not met")
 	case errors.Is(err, ErrNotFound):
@@ -161,7 +162,5 @@ func writeSuccess(w http.ResponseWriter, status int, data any) {
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"message": message})
+	httpx.WriteError(w, status, httpx.ErrorCode(status), message)
 }

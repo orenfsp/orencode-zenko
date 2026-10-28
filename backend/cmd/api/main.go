@@ -211,35 +211,35 @@ func main() {
 		return rbacMiddleware.Authenticate(rbacMiddleware.Require(permission)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			identity, ok := rbac.IdentityFromContext(r.Context())
 			if !ok || identity.UserID <= 0 {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized")
 				return
 			}
 			isAdmin, err := roleChecker.HasRole(r.Context(), identity.UserID, "admin")
 			if err != nil {
-				http.Error(w, "internal server error", http.StatusInternalServerError)
+				httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 				return
 			}
 			if !isAdmin {
 				isAdmin, err = roleChecker.HasRole(r.Context(), identity.UserID, "super_admin")
 				if err != nil {
-					http.Error(w, "internal server error", http.StatusInternalServerError)
+					httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 					return
 				}
 			}
 			if !isAdmin {
 				isJudge, err := roleChecker.HasRole(r.Context(), identity.UserID, "judge")
 				if err != nil {
-					http.Error(w, "internal server error", http.StatusInternalServerError)
+					httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 					return
 				}
 				competitionID, parseErr := strconv.ParseInt(r.PathValue("competitionID"), 10, 64)
 				if !isJudge || parseErr != nil || competitionID <= 0 {
-					http.Error(w, "forbidden", http.StatusForbidden)
+					httpx.WriteError(w, http.StatusForbidden, "forbidden", "forbidden")
 					return
 				}
 				assignments, err := judgeRepository.ListAdminCompetitionJudges(r.Context(), competitionID)
 				if err != nil {
-					http.Error(w, "internal server error", http.StatusInternalServerError)
+					httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 					return
 				}
 				assigned := false
@@ -250,7 +250,7 @@ func main() {
 					}
 				}
 				if !assigned {
-					http.Error(w, "forbidden", http.StatusForbidden)
+					httpx.WriteError(w, http.StatusForbidden, "forbidden", "forbidden")
 					return
 				}
 			}

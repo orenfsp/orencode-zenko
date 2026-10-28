@@ -90,7 +90,7 @@ DECLARE
     message_text text;
 BEGIN
     SELECT r.name INTO rank_name FROM rank r WHERE r.id = NEW.rank_id;
-    
+
     INSERT INTO notification_outbox (recipient_id, payload)
     VALUES (
         NEW.athlete_user_id,

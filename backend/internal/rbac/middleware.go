@@ -2,7 +2,7 @@ package rbac
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"net/http"
 	"strings"
 
@@ -74,7 +74,5 @@ func bearerToken(header string) (string, bool) {
 }
 
 func writeMiddlewareError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"message": message})
+	httpx.WriteError(w, status, httpx.ErrorCode(status), message)
 }

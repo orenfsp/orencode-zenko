@@ -3,6 +3,7 @@ package competitionapplication
 import (
 	"encoding/json"
 	"errors"
+	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"io"
 	"net/http"
 	"strconv"
@@ -195,13 +196,13 @@ func handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrNotFound):
 		writeError(w, http.StatusNotFound, "мероприятие или заявка не найдены")
 	case errors.Is(err, ErrConflict):
-		writeError(w, http.StatusConflict, "заявка на это мероприятие уже существует")
+		httpx.WriteError(w, http.StatusConflict, "application_already_exists", "заявка на это мероприятие уже существует")
 	case errors.Is(err, ErrRegistrationClosed):
-		writeError(w, http.StatusUnprocessableEntity, "регистрация на соревнование закрыта")
+		httpx.WriteError(w, http.StatusUnprocessableEntity, "registration_closed", "регистрация на соревнование закрыта")
 	case errors.Is(err, ErrAntiDopingRequired):
-		writeError(w, http.StatusUnprocessableEntity, "для подачи нужен действующий антидопинговый сертификат")
+		httpx.WriteError(w, http.StatusUnprocessableEntity, "antidoping_required", "для подачи нужен действующий антидопинговый сертификат")
 	case errors.Is(err, ErrAlreadyReviewed):
-		writeError(w, http.StatusConflict, "заявка уже рассмотрена или недоступна для изменения")
+		httpx.WriteError(w, http.StatusConflict, "application_already_reviewed", "заявка уже рассмотрена или недоступна для изменения")
 	default:
 		writeError(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
 	}
@@ -213,7 +214,5 @@ func writeSuccess(w http.ResponseWriter, status int, data any) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
 }
 func writeError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"message": message})
+	httpx.WriteError(w, status, httpx.ErrorCode(status), message)
 }
