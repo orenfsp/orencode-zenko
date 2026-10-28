@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useCallback, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, LoaderCircle, MapPin, Plus, Search, Video } from "lucide-react";
 import Link from "next/link";
 
 import { competitionApi } from "@/entities/competition";
+import type { Competition } from "@/entities/competition/model/types";
 import { referenceDataApi } from "@/entities/reference-data";
 import { useAuth } from "@/entities/session";
 import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
@@ -25,24 +26,41 @@ export function CompetitionsList() {
   const canCreate = identity?.permissions?.includes("competitions.create") ?? false;
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [format, setFormat] = useState("offline");
   const [pending, setPending] = useState(false);
-  const load = useCallback(async () => {
-    const now = new Date();
-    const from = new Date(now.getFullYear() - 1, 0, 1).toISOString();
-    const to = new Date(now.getFullYear() + 2, 0, 1).toISOString();
-    const [list, calendar, disciplines, types, levels] = await Promise.all([
-      competitionApi.list({ limit: 100 }),
-      competitionApi.calendar({ from, to, limit: 100 }),
+  const [recentDrafts, setRecentDrafts] = useState<Competition[]>([]);
+  const draftStorageKey = identity ? `workspace-competition-drafts-${identity.userId}` : null;
+  useEffect(() => {
+    if (!draftStorageKey) return;
+    let active = true;
+    let drafts: Competition[] = [];
+    try {
+      const stored: unknown = JSON.parse(sessionStorage.getItem(draftStorageKey) ?? "[]");
+      if (Array.isArray(stored)) {
+        drafts = stored.filter((item): item is Competition =>
+          typeof item === "object" && item !== null && typeof item.id === "number" && item.status === "draft" && typeof item.name === "string",
+        );
+      }
+    } catch { /* Invalid or unavailable tab storage. */ }
+    queueMicrotask(() => {
+      if (active) setRecentDrafts(drafts);
+    });
+    return () => { active = false; };
+  }, [draftStorageKey]);
+  const loadList = useCallback(() => competitionApi.list({ limit: 100 }), []);
+  const loadReferences = useCallback(async () => {
+    const [disciplines, types, levels] = await Promise.all([
       referenceDataApi.disciplines(),
       referenceDataApi.competitionTypes(),
       referenceDataApi.competitionLevels(),
     ]);
-    return { list, calendar, disciplines, types, levels };
+    return { disciplines, types, levels };
   }, []);
-  const state = useAsyncData(load);
+  const state = useAsyncData(loadList);
+  const references = useAsyncData(loadReferences);
   const competitions = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("ru");
-    return (state.data?.list ?? []).filter((competition) =>
+    return (state.data ?? []).filter((competition) =>
       !query
         ? true
         : [competition.name, competition.discipline.name, competition.competition_type.name]
@@ -51,14 +69,26 @@ export function CompetitionsList() {
             .includes(query),
     );
   }, [search, state.data]);
+  const visibleDrafts = recentDrafts.filter((competition) =>
+    competition.name.toLocaleLowerCase("ru").includes(search.trim().toLocaleLowerCase("ru")),
+  );
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const nullable = (name: string) => String(form.get(name) ?? "").trim() || null;
+    const timestamps = ["start_at", "end_at", "registration_starts_at", "registration_ends_at"].map((name) => new Date(String(form.get(name))).getTime());
+    if (timestamps.some((value) => !Number.isFinite(value))) {
+      notify.error("Укажите даты соревнования и регистрации");
+      return;
+    }
+    if (timestamps[0] >= timestamps[1] || timestamps[2] >= timestamps[3] || timestamps[3] > timestamps[0]) {
+      notify.error("Проверьте даты: регистрация должна закончиться до начала соревнования, начало — быть раньше окончания");
+      return;
+    }
     setPending(true);
     try {
-      await competitionApi.create({
+      const created = await competitionApi.create({
         name: String(form.get("name") ?? "").trim(),
         description: nullable("description"),
         discipline_id: Number(form.get("discipline_id")),
@@ -72,7 +102,14 @@ export function CompetitionsList() {
         venue_address: nullable("venue_address"),
         online_url: nullable("online_url"),
       });
-      notify.success("Соревнование создано");
+      if (draftStorageKey) {
+        const drafts = [created, ...recentDrafts.filter((draft) => draft.id !== created.id)];
+        setRecentDrafts(drafts);
+        try {
+          sessionStorage.setItem(draftStorageKey, JSON.stringify(drafts));
+        } catch { /* Storage may be unavailable. */ }
+      }
+      notify.success("Черновик соревнования создан");
       setCreateOpen(false);
       state.reload();
     } catch (cause) { notify.error(cause instanceof Error ? cause.message : "Не удалось создать соревнование"); }
@@ -83,10 +120,29 @@ export function CompetitionsList() {
     <div className="mx-auto w-full max-w-6xl">
       <SectionHeading
         title="Соревнования"
-        description="Опубликованные соревнования и сроки регистрации."
+        description="Опубликованные соревнования и созданные здесь черновики."
         action={canCreate ? <Button onClick={() => setCreateOpen(true)}><Plus />Создать</Button> : undefined}
       />
-      {state.data ? <p className="mb-3 text-xs text-muted-foreground">В календаре на текущий период: {state.data.calendar.length}</p> : null}
+      {visibleDrafts.length ? (
+        <section className="mb-6" aria-label="Черновики, созданные в этой вкладке">
+          <h2 className="mb-2 text-sm font-medium">Созданные черновики</h2>
+          <div className="grid gap-3">
+            {visibleDrafts.map((draft) => (
+              <Card key={draft.id} className="bg-primary/5 p-4 shadow-none">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge status={draft.status} />
+                  <span className="text-xs text-muted-foreground">№{draft.id}</span>
+                </div>
+                <p className="font-medium">{draft.name}</p>
+                <p className="text-sm text-muted-foreground">{formatDate(draft.start_at)} — {formatDate(draft.end_at)}</p>
+              </Card>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Это записи, созданные в текущей вкладке. API пока не предоставляет список всех черновиков и их просмотр после повторного входа.
+          </p>
+        </section>
+      ) : null}
       <div className="relative mb-4 max-w-md">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -99,10 +155,10 @@ export function CompetitionsList() {
 
       {state.loading ? <DataLoading rows={5} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
-      {!state.loading && !state.error && !competitions.length ? (
+      {!state.loading && !state.error && !competitions.length && !visibleDrafts.length ? (
         <DataEmpty
           title={search ? "Ничего не найдено" : "Соревнований пока нет"}
-          description={search ? "Попробуйте изменить запрос." : "Опубликованные мероприятия появятся здесь."}
+          description={search ? "Попробуйте изменить запрос." : "Публичный API показывает только опубликованные соревнования. Новые черновики появятся выше после создания в этой вкладке."}
         />
       ) : null}
 
@@ -139,14 +195,15 @@ export function CompetitionsList() {
             <Label htmlFor="competition-name">Название</Label><Input id="competition-name" name="name" required />
             <Label htmlFor="competition-description">Описание</Label><Input id="competition-description" name="description" />
             <div className="grid gap-3 sm:grid-cols-3">
-              <Select name="discipline_id"><SelectTrigger><SelectValue placeholder="Дисциплина" /></SelectTrigger><SelectContent>{state.data?.disciplines.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
-              <Select name="competition_type_id"><SelectTrigger><SelectValue placeholder="Тип" /></SelectTrigger><SelectContent>{state.data?.types.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
-              <Select name="competition_level_id"><SelectTrigger><SelectValue placeholder="Уровень" /></SelectTrigger><SelectContent>{state.data?.levels.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name ?? item.code ?? `#${item.id}`}</SelectItem>)}</SelectContent></Select>
+              <Select name="discipline_id"><SelectTrigger><SelectValue placeholder="Дисциплина" /></SelectTrigger><SelectContent>{references.data?.disciplines.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
+              <Select name="competition_type_id"><SelectTrigger><SelectValue placeholder="Тип" /></SelectTrigger><SelectContent>{references.data?.types.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
+              <Select name="competition_level_id"><SelectTrigger><SelectValue placeholder="Уровень" /></SelectTrigger><SelectContent>{references.data?.levels.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name ?? item.code ?? `#${item.id}`}</SelectItem>)}</SelectContent></Select>
             </div>
-            <Label htmlFor="competition-format">Формат</Label><Select name="format" defaultValue="offline"><SelectTrigger id="competition-format"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="offline">Очно</SelectItem><SelectItem value="online">Онлайн</SelectItem><SelectItem value="hybrid">Гибрид</SelectItem></SelectContent></Select>
+            <Label htmlFor="competition-format">Формат</Label><Select name="format" value={format} onValueChange={setFormat}><SelectTrigger id="competition-format"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="offline">Очно</SelectItem><SelectItem value="online">Онлайн</SelectItem><SelectItem value="mixed">Смешанный</SelectItem></SelectContent></Select>
             <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="start-at">Начало</Label><DateTimePicker id="start-at" name="start_at" required /></div><div><Label htmlFor="end-at">Окончание</Label><DateTimePicker id="end-at" name="end_at" required /></div><div><Label htmlFor="registration-starts-at">Начало регистрации</Label><DateTimePicker id="registration-starts-at" name="registration_starts_at" required /></div><div><Label htmlFor="registration-ends-at">Конец регистрации</Label><DateTimePicker id="registration-ends-at" name="registration_ends_at" required /></div></div>
-            <Input name="venue_address" placeholder="Адрес площадки" /><Input name="online_url" type="url" placeholder="Ссылка на онлайн-площадку" />
-            <DialogFooter><Button type="submit" disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Создать</Button></DialogFooter>
+            <Label htmlFor="venue-address">Адрес площадки{format !== "online" ? " *" : ""}</Label><Input id="venue-address" name="venue_address" required={format !== "online"} placeholder="Адрес площадки…" /><Label htmlFor="online-url">Ссылка на онлайн-площадку{format !== "offline" ? " *" : ""}</Label><Input id="online-url" name="online_url" type="url" required={format !== "offline"} placeholder="https://…" />
+            {references.error ? <DataError message={references.error} retry={references.reload} /> : null}
+            <DialogFooter><Button type="submit" disabled={pending || references.loading || Boolean(references.error)}>{pending ? <LoaderCircle className="animate-spin" /> : null}Создать</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

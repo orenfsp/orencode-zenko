@@ -14,10 +14,7 @@ function Select({ name, required, defaultValue = "", onValueChange, ...props }: 
   };
 
   return (
-    <>
-      <SelectPrimitive.Root value={value} onValueChange={handleChange} {...props} />
-      {name ? <input type="hidden" name={name} value={value} required={required} /> : null}
-    </>
+    <SelectPrimitive.Root name={name} required={required} value={value} onValueChange={handleChange} {...props} />
   );
 }
 

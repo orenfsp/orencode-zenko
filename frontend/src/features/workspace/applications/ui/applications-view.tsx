@@ -2,8 +2,10 @@
 
 import { FormEvent, useCallback, useState } from "react";
 import { Gavel, LoaderCircle, Medal, Plus } from "lucide-react";
+import Link from "next/link";
 
 import { competitionApi } from "@/entities/competition";
+import { competitionApplicationApi, type CompetitionApplication } from "@/entities/competition-application";
 import { judgeCategoryApi, type CurrentJudgeCategory, type JudgeCategoryApplication } from "@/entities/judge-category";
 import { profileApi } from "@/entities/profile";
 import { rankApi, type Rank } from "@/entities/rank";
@@ -33,6 +35,7 @@ interface ApplicationData {
   currentCategory: CurrentJudgeCategory | null;
   competitions: Awaited<ReturnType<typeof competitionApi.list>>;
   athletes: UserCoachRelation[];
+  competitionApplications: CompetitionApplication[];
 }
 
 type ReviewTarget = { kind: "rank" | "judge"; id: number; status: "approved" | "rejected" };
@@ -43,6 +46,7 @@ export function ApplicationsView() {
   const permissions = identity?.permissions ?? [];
   const canReviewRank = permissions?.includes("rank_applications.review") ?? false;
   const canReviewJudge = permissions?.includes("judge_categories.review") ?? false;
+  const canReviewCompetition = permissions?.includes("competition_applications.review") ?? false;
   const [createOpen, setCreateOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
   const [pending, setPending] = useState(false);
@@ -50,29 +54,43 @@ export function ApplicationsView() {
   const load = useCallback(async (): Promise<ApplicationData> => {
     const profile = await profileApi.me();
     const activeRole = profile.roles.find((role) => role.id === identity?.roleId)?.code ?? null;
-    const isFederationRole = activeRole === "federation" || activeRole === "super_admin";
-    if (canReviewRank || canReviewJudge || isFederationRole) {
-      const [rank, judge] = await Promise.all([
-        canReviewRank || isFederationRole ? rankApplicationApi.pending({ limit: 100 }) : Promise.resolve([]),
-        canReviewJudge || isFederationRole ? judgeCategoryApi.pending({ limit: 100 }) : Promise.resolve([]),
+    if (canReviewRank || canReviewJudge || canReviewCompetition) {
+      const [rank, judge, competitionApplications] = await Promise.all([
+        canReviewRank ? rankApplicationApi.pending({ limit: 100 }) : Promise.resolve([]),
+        canReviewJudge ? judgeCategoryApi.pending({ limit: 100 }) : Promise.resolve([]),
+        canReviewCompetition ? competitionApplicationApi.pending({ status: "pending", limit: 100 }) : Promise.resolve([]),
       ]);
-      return { mode: "review", activeRole, rank, judge, ranks: [], disciplines: [], currentCategory: null, competitions: [], athletes: [] };
+      return { mode: "review", activeRole, rank, judge, ranks: [], disciplines: [], currentCategory: null, competitions: [], athletes: [], competitionApplications };
     }
     const [ranks, disciplines, competitions, athletes] = await Promise.all([
       rankApi.list(),
       referenceDataApi.disciplines(),
       competitionApi.list({ limit: 100 }),
-      activeRole === "coach" ? userCoachApi.byCoach({ limit: 100 }) : Promise.resolve([]),
+      activeRole === "coach" ? userCoachApi.byCoach({ limit: 100 }).then((items) => items.filter((item) => item.status === "confirmed")) : Promise.resolve([]),
     ]);
     if (activeRole === "judge") {
       const [judge, currentCategory] = await Promise.all([judgeCategoryApi.mine(), judgeCategoryApi.current()]);
-      return { mode: "personal", activeRole, rank: [], judge, ranks, disciplines, currentCategory, competitions, athletes };
+      return { mode: "personal", activeRole, rank: [], judge, ranks, disciplines, currentCategory, competitions, athletes, competitionApplications: await competitionApplicationApi.mine() };
     }
-    return { mode: "personal", activeRole, rank: await rankApplicationApi.mine(), judge: [], ranks, disciplines, currentCategory: null, competitions, athletes };
-  }, [canReviewJudge, canReviewRank, identity?.roleId]);
+    const [rank, competitionApplications] = await Promise.all([rankApplicationApi.mine(), competitionApplicationApi.mine()]);
+    return { mode: "personal", activeRole, rank, judge: [], ranks, disciplines, currentCategory: null, competitions, athletes, competitionApplications };
+  }, [canReviewJudge, canReviewRank, canReviewCompetition, identity?.roleId]);
 
   const state = useAsyncData(load);
-  const total = (state.data?.rank.length ?? 0) + (state.data?.judge.length ?? 0);
+  const total = (state.data?.rank.length ?? 0) + (state.data?.judge.length ?? 0) + (state.data?.competitionApplications.length ?? 0);
+
+  async function changeCompetitionApplication(application: CompetitionApplication, action: "approve" | "reject" | "withdraw") {
+    setPending(true);
+    try {
+      if (action === "approve") await competitionApplicationApi.approve(application.id);
+      else if (action === "reject") await competitionApplicationApi.reject(application.id);
+      else await competitionApplicationApi.withdraw(application.id);
+      notify.success(action === "approve" ? "Заявка одобрена" : action === "reject" ? "Заявка отклонена" : "Заявка отозвана");
+      state.reload();
+    } catch (cause) {
+      notify.error(cause instanceof Error ? cause.message : "Не удалось изменить заявку");
+    } finally { setPending(false); }
+  }
 
   async function submitApplication(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -131,23 +149,34 @@ export function ApplicationsView() {
     }
   }
 
-  const canCreate = state.data?.mode === "personal";
+  const canCreate = state.data?.mode === "personal" && (state.data.activeRole === "participant" || state.data.activeRole === "coach" || state.data.activeRole === "judge");
+  const missingCoachAthletes = state.data?.activeRole === "coach" && state.data.athletes.length === 0;
 
   return (
     <div className="mx-auto w-full max-w-6xl">
       <SectionHeading
         title={state.data?.mode === "review" ? "Заявки на рассмотрение" : "Мои заявки"}
         description={state.data?.mode === "review" ? "Очередь заявок, доступная активной роли." : "Статусы заявок на разряд или судейскую категорию."}
-        action={canCreate ? <Button onClick={() => setCreateOpen(true)}><Plus />Подать заявку</Button> : undefined}
+        action={canCreate ? <Button onClick={() => setCreateOpen(true)} disabled={missingCoachAthletes} title={missingCoachAthletes ? "Сначала добавьте спортсмена и дождитесь подтверждения" : undefined}><Plus />Подать заявку</Button> : undefined}
       />
       {state.data?.currentCategory ? (
         <Card className="mb-4 bg-[#eeebff] p-4 shadow-none"><p className="font-medium">Текущая категория: {state.data.currentCategory.category_name}</p><p className="mt-1 text-xs text-muted-foreground">Назначена {formatDate(state.data.currentCategory.assigned_at)}{state.data.currentCategory.expires_at ? ` · до ${formatDate(state.data.currentCategory.expires_at)}` : ""}</p></Card>
       ) : null}
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
-      {!state.loading && !state.error && !total ? <DataEmpty title="Заявок пока нет" description="Поданные заявки и решения появятся на этой странице." /> : null}
+      {!state.loading && !state.error && !total ? <DataEmpty title={state.data?.mode === "review" ? "Очередь пуста" : "Заявок пока нет"} description={state.data?.mode === "review" ? "Новые заявки появятся здесь после подачи." : missingCoachAthletes ? "Подать заявку за спортсмена можно после подтверждения связи с ним." : "Подайте заявку, чтобы отслеживать её статус здесь."} /> : null}
+      {missingCoachAthletes ? <Button asChild variant="outline" className="mb-4"><Link href="/workspace/coaches">Добавить спортсмена</Link></Button> : null}
+      {!state.loading && !state.error && !total && state.data?.mode === "personal" ? <Button asChild variant="outline" className="mb-4"><Link href="/workspace/competitions">Найти соревнование</Link></Button> : null}
 
       <div className="grid gap-3">
+        {state.data?.competitionApplications.map((application) => (
+          <Card key={`competition-${application.id}`} className="bg-white/75 p-5 shadow-none">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div className="min-w-0"><p className="font-medium">Заявка на соревнование</p><p className="mt-1 text-sm">{application.competition_name} · {application.discipline_name}{application.age_group_name ? ` · ${application.age_group_name}` : ""}</p><p className="mt-1 text-sm text-muted-foreground">Спортсмен: {application.athlete_last_name} {application.athlete_first_name} · подана {formatDate(application.submitted_at, true)}</p><Button asChild variant="link" size="sm" className="mt-1 px-0"><Link href={`/workspace/competitions/${application.competition_id}`}>Открыть соревнование</Link></Button></div>
+              <div className="flex flex-wrap items-center gap-2"><StatusBadge status={application.status} />{state.data?.mode === "review" ? <><Button size="sm" disabled={pending} onClick={() => void changeCompetitionApplication(application, "approve")}>Одобрить</Button><Button size="sm" variant="outline" disabled={pending} onClick={() => void changeCompetitionApplication(application, "reject")}>Отклонить</Button></> : application.can_withdraw ? <Button size="sm" variant="outline" disabled={pending} onClick={() => void changeCompetitionApplication(application, "withdraw")}>Отозвать</Button> : null}</div>
+            </div>
+          </Card>
+        ))}
         {state.data?.rank.map((application) => (
           <Card key={`rank-${application.id}`} className="bg-white/75 p-5 shadow-none">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -170,11 +199,11 @@ export function ApplicationsView() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent><DialogHeader><DialogTitle>Новая заявка</DialogTitle><DialogDescription>{state.data?.activeRole === "judge" ? "Укажите категорию и основание." : "Укажите разряд, дисциплину и результат-основание."}</DialogDescription></DialogHeader>
           <form className="grid gap-3" onSubmit={submitApplication}>
-            {state.data?.activeRole === "judge" ? <><Label htmlFor="category-id">ID судейской категории</Label><Input id="category-id" name="category_id" type="number" min="1" required /></> : <>
+            {state.data?.activeRole === "judge" ? <><Label htmlFor="category-id">ID судейской категории</Label><Input id="category-id" name="category_id" type="number" min="1" required /><p className="text-xs text-muted-foreground">Справочник категорий пока недоступен в API. Уточните ID у администратора федерации.</p></> : <>
               <Label htmlFor="rank-id">Разряд</Label><Select name="rank_id" required><SelectTrigger id="rank-id"><SelectValue placeholder="Выберите разряд" /></SelectTrigger><SelectContent>{state.data?.ranks.map((rank) => <SelectItem key={rank.id} value={String(rank.id)}>{rank.name}</SelectItem>)}</SelectContent></Select>
               <Label htmlFor="discipline-id">Дисциплина</Label><Select name="discipline_id" required><SelectTrigger id="discipline-id"><SelectValue placeholder="Выберите дисциплину" /></SelectTrigger><SelectContent>{state.data?.disciplines.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
               {state.data?.activeRole === "coach" ? <div><Label htmlFor="athlete-id">Спортсмен</Label><Select name="athlete_user_id" required><SelectTrigger id="athlete-id"><SelectValue placeholder="Выберите спортсмена" /></SelectTrigger><SelectContent>{state.data.athletes.map((relation) => <SelectItem key={relation.participant_user_id} value={String(relation.participant_user_id)}>Спортсмен #{relation.participant_user_id}</SelectItem>)}</SelectContent></Select></div> : null}
-              <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="competition-id">Соревнование</Label><Select name="competition_id" required><SelectTrigger id="competition-id"><SelectValue placeholder="Выберите соревнование" /></SelectTrigger><SelectContent>{state.data?.competitions.map((competition) => <SelectItem key={competition.id} value={String(competition.id)}>{competition.name}</SelectItem>)}</SelectContent></Select></div><div><Label htmlFor="result-id">ID результата</Label><Input id="result-id" name="result_id" type="number" min="1" required placeholder="Укажите результат-основание" /></div></div>
+              <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="competition-id">Соревнование</Label><Select name="competition_id" required><SelectTrigger id="competition-id"><SelectValue placeholder="Выберите соревнование" /></SelectTrigger><SelectContent>{state.data?.competitions.map((competition) => <SelectItem key={competition.id} value={String(competition.id)}>{competition.name}</SelectItem>)}</SelectContent></Select></div><div><Label htmlFor="result-id">ID результата</Label><Input id="result-id" name="result_id" type="number" min="1" required placeholder="Укажите результат-основание" /><p className="mt-1 text-xs text-muted-foreground">Результат должен быть завершён и относиться к выбранному спортсмену, дисциплине и соревнованию. ID результата можно уточнить у организатора.</p></div></div>
             </>}
             <Label htmlFor="application-type">Тип заявки</Label><Select name="application_type" defaultValue="assignment"><SelectTrigger id="application-type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="assignment">Присвоение</SelectItem><SelectItem value="confirmation">Подтверждение</SelectItem></SelectContent></Select>
             <DialogFooter><Button type="submit" disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Подать</Button></DialogFooter>

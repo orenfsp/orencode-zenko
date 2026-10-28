@@ -86,10 +86,20 @@ async function request<T>(
     refreshPromise ??= options.refresh().finally(() => {
       refreshPromise = null;
     });
-    const token = await refreshPromise.catch(() => null);
+    let token: string | null;
+    try {
+      token = await refreshPromise;
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) options.onAuthFailure();
+      throw cause;
+    }
     if (token) return request<T>(path, init, { ...requestOptions, retry: true });
     options.onAuthFailure();
     throw new ApiError("Необходима авторизация", 401);
+  }
+
+  if (response.status === 401 && requiresAuth && requestOptions.retry) {
+    options.onAuthFailure();
   }
 
   return parse<T>(response, requestOptions.responseType);

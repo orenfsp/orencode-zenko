@@ -1,6 +1,6 @@
 "use client";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { logout as requestLogout, refreshSession } from "../api/auth";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { ApiError, logout as requestLogout, refreshSession } from "../api/auth";
 import { getAccessIdentity } from "./jwt";
 import { AUTH_CHANGE_EVENT, AUTH_FAILURE_EVENT, tokenStorage } from "./storage";
 import type { AuthIdentity } from "./types";
@@ -8,10 +8,13 @@ import { useApiReady } from "@/_app/providers/api-provider";
 import { rbacApi } from "@/entities/rbac";
 import { setApiPermissions } from "@/shared/api/client";
 
-type AuthContextValue = { identity: AuthIdentity | null; isAuthenticated: boolean; isLoading: boolean; logout: () => Promise<void> };
+type AuthContextValue = { identity: AuthIdentity | null; isAuthenticated: boolean; isLoading: boolean; permissionsError: boolean; sessionError: boolean; retry: () => void; logout: () => Promise<void> };
 const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const ready = useApiReady(); const [identity, setIdentity] = useState<AuthIdentity | null>(null); const [isLoading, setLoading] = useState(true);
+  const [permissionsError, setPermissionsError] = useState(false);
+  const [sessionError, setSessionError] = useState(false);
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
     if (!ready) return;
     let active = true;
@@ -26,7 +29,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // пробуем бесшумно обновить сессию по refresh-токену и только затем
       // считаем пользователя разлогиненным.
       if (storedTokens && (!next || next.expiresAt <= Date.now())) {
-        const refreshed = await refreshSession().catch(() => null);
+        let refreshed = null;
+        try {
+          refreshed = await refreshSession();
+        } catch (cause) {
+          if (!(cause instanceof ApiError) || cause.status !== 401) {
+            if (active && version === syncVersion) {
+              setSessionError(true);
+              setLoading(false);
+            }
+            return;
+          }
+        }
         if (refreshed) {
           token = refreshed.access_token;
           next = getAccessIdentity(token);
@@ -36,6 +50,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!next || next.expiresAt <= Date.now()) {
         if (token) tokenStorage.clear();
         if (active && version === syncVersion) {
+          setSessionError(false);
+          setPermissionsError(false);
           setApiPermissions(null);
           setIdentity(null);
           setLoading(false);
@@ -44,15 +60,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setLoading(true);
+      setSessionError(false);
       let resolved = next;
+      let failedPermissions = false;
       if (next.roleId !== null) {
         try {
           resolved = { ...next, permissions: await rbacApi.myPermissions() };
         } catch {
-          // Keep permissions from the JWT if the permissions endpoint is unavailable.
+          resolved = { ...next, permissions: null };
+          failedPermissions = true;
         }
       }
       if (active && version === syncVersion) {
+        setPermissionsError(failedPermissions);
         setApiPermissions(resolved.permissions);
         setIdentity(resolved);
         setLoading(false);
@@ -67,8 +87,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
       window.removeEventListener(AUTH_FAILURE_EVENT, handleAuthChange);
     };
-  }, [ready]);
-  const value = useMemo(() => ({ identity, isAuthenticated: Boolean(identity), isLoading, logout: requestLogout }), [identity, isLoading]);
+  }, [ready, revision]);
+  const retry = useCallback(() => setRevision((value) => value + 1), []);
+  const value = useMemo(() => ({ identity, isAuthenticated: Boolean(identity), isLoading, permissionsError, sessionError, retry, logout: requestLogout }), [identity, isLoading, permissionsError, sessionError, retry]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 export function useAuth() { const context = useContext(AuthContext); if (!context) throw new Error("useAuth must be used inside AuthProvider"); return context; }

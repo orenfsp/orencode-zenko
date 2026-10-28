@@ -138,6 +138,8 @@ function useWorkspaceUser() {
 
   const [profile, setProfile] = useState<OwnProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState(false);
+  const [profileRevision, setProfileRevision] = useState(0);
   const [pendingRoleId, setPendingRoleId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -148,6 +150,7 @@ function useWorkspaceUser() {
       if (cancelled) return;
       setProfile(null);
       setProfileLoading(true);
+      setProfileError(false);
     });
 
     if (!identity) {
@@ -164,6 +167,7 @@ function useWorkspaceUser() {
 
         setProfile(result);
         setProfileLoading(false);
+        setProfileError(false);
       } catch (error) {
         if (cancelled) return;
 
@@ -171,6 +175,8 @@ function useWorkspaceUser() {
           "[WorkspaceShell] Не удалось загрузить профиль. Повтор через 3 секунды:",
           error,
         );
+        setProfileLoading(false);
+        setProfileError(true);
 
         retryTimer = setTimeout(() => {
           void fetchProfile();
@@ -187,7 +193,7 @@ function useWorkspaceUser() {
         clearTimeout(retryTimer);
       }
     };
-  }, [identity]);
+  }, [identity, profileRevision]);
 
   const activeRole = useMemo(
     () => profile?.roles.find((role) => role.id === identity?.roleId) ?? null,
@@ -244,7 +250,11 @@ function useWorkspaceUser() {
   }
 
   async function signOut() {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // Локальные токены удаляются в logout даже при сетевой ошибке.
+    }
     router.replace("/login");
   }
 
@@ -252,6 +262,8 @@ function useWorkspaceUser() {
     identity,
     profile,
     profileLoading,
+    profileError,
+    retryProfile: () => setProfileRevision((value) => value + 1),
     pendingRoleId,
     activeRole,
     displayName: profileName(profile),
@@ -272,7 +284,6 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
     { label: "Соревнования", icon: Trophy, href: "/workspace/competitions" },
     {
       label:
-        isFederationRole ||
         permissions.has("rank_applications.review") ||
         permissions.has("judge_categories.review")
           ? "Заявки"
@@ -308,24 +319,24 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
     });
   }
   const administration: NavigationItem[] = [];
-  if (isFederationRole || permissions.has("registry.read")) {
+  if (permissions.has("registry.read")) {
     administration.push({
       label: "Реестр",
       icon: Building2,
       href: "/workspace/registry",
     });
   }
-  if (isFederationRole || permissions.has("calendar_plans.read")) {
+  if (permissions.has("calendar_plans.read")) {
     administration.push({
       label: "Календарные планы",
       icon: CalendarRange,
       href: "/workspace/calendar-plans",
     });
   }
-  if (isFederationRole || permissions.has("competition_events.read")) {
+  if (permissions.has("competition_events.read")) {
     administration.push({ label: "Зачёты", icon: ListTree, href: "/workspace/events" });
   }
-  if (isFederationRole || permissions.has("files.read")) {
+  if (permissions.has("files.read")) {
     administration.push({ label: "Файлы", icon: FileText, href: "/workspace/files" });
   }
   if (permissions.has("rating.read")) {
@@ -338,7 +349,6 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
     administration.push({ label: "Нормативы разрядов", icon: Medal, href: "/workspace/administration/rank-standards" });
   }
   const canAdminister =
-    isFederationRole ||
     [
       "roles.read",
       "roles.create",
@@ -349,21 +359,16 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
       "rank_applications.review",
     ].some((permission) => permissions.has(permission));
   if (canAdminister) {
-    administration.push({
-      label: "Администрирование",
-      icon: ShieldCheck,
-      href: "/workspace/administration",
-    });
-    if (isFederationRole || permissions.has("roles.read") || permissions.has("roles.create") || permissions.has("roles.assign")) {
+    if (permissions.has("roles.read") || permissions.has("roles.create") || permissions.has("roles.assign")) {
       administration.push({ label: "Роли и права", icon: ShieldCheck, href: "/workspace/administration/roles" });
     }
-    if (isFederationRole || permissions.has("municipalities.create") || permissions.has("rank_applications.review")) {
+    if (permissions.has("municipalities.create") || permissions.has("rank_applications.review")) {
       administration.push({ label: "Справочники", icon: ListTree, href: "/workspace/administration/directories" });
     }
-    if (isFederationRole || permissions.has("anti_doping.review")) {
+    if (permissions.has("anti_doping.review")) {
       administration.push({ label: "Проверки", icon: FileCheck2, href: "/workspace/administration/reviews" });
     }
-    if (isFederationRole || permissions.has("roles.read")) {
+    if (permissions.has("roles.read")) {
       administration.push({ label: "Журнал аудита", icon: ClipboardList, href: "/workspace/administration/audit" });
     }
   }
@@ -398,8 +403,7 @@ function WorkspaceNavigation({ user }: { user: WorkspaceUser }) {
 
   const navigation = workspaceNavigation(user);
 
-  const isNavigationLoading =
-    user.profileLoading || !user.profile || !user.activeRole;
+  const isNavigationLoading = user.profileLoading;
 
   if (isNavigationLoading) {
     return <NavigationSkeleton />;
@@ -465,14 +469,19 @@ function RoleDropdownItems({ user }: { user: WorkspaceUser }) {
 
   if (!user.profile?.roles.length) {
     return (
-      <DropdownMenuItem disabled>
-        <LoaderCircle className="animate-spin" />
-        Загружаем роли…
+      <DropdownMenuItem onSelect={() => user.retryProfile()}>
+        {user.profileError ? "Профиль недоступен · повторить" : "Роли не назначены"}
       </DropdownMenuItem>
     );
   }
 
-  return user.profile.roles.map((role) => {
+  return <>
+    {!user.rolesCanBeReordered && user.profile.roles.length > 1 ? (
+      <DropdownMenuLabel className="max-w-64 whitespace-normal text-xs font-normal text-muted-foreground">
+        Для смены роли с административными правами обратитесь к администратору.
+      </DropdownMenuLabel>
+    ) : null}
+    {user.profile.roles.map((role) => {
     const isActive = role.id === user.identity?.roleId;
     const isPending = role.id === user.pendingRoleId;
 
@@ -494,7 +503,8 @@ function RoleDropdownItems({ user }: { user: WorkspaceUser }) {
         {isActive ? <Check className="text-primary!" /> : null}
       </DropdownMenuItem>
     );
-  });
+    })}
+  </>;
 }
 
 function DesktopUserMenu({ user }: { user: WorkspaceUser }) {
@@ -640,6 +650,8 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
                 </SidebarMenuItem>
               );
             })
+          ) : user.profileError ? (
+            <SidebarMenuItem><SidebarMenuButton onClick={() => user.retryProfile()}><ShieldCheck /><span>Повторить загрузку профиля</span></SidebarMenuButton></SidebarMenuItem>
           ) : (
             <SidebarMenuItem>
               <SidebarMenuButton disabled>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
@@ -42,17 +42,23 @@ export function DatePicker({
   const [date, setDate] = useState<Date | undefined>(() =>
     dateFromValue(defaultValue),
   );
+  const [invalid, setInvalid] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   return (
     <>
       <Popover>
         <PopoverTrigger asChild>
           <Button
+            ref={triggerRef}
             id={id}
             type="button"
             variant="outline"
             disabled={disabled}
             data-empty={!date}
+            aria-required={required}
+            aria-invalid={invalid}
+            aria-describedby={invalid ? `${id}-error` : undefined}
             className={cn(
               "h-8 w-full justify-between px-2.5 text-left font-normal data-[empty=true]:text-muted-foreground",
               className,
@@ -66,7 +72,7 @@ export function DatePicker({
           <Calendar
             mode="single"
             selected={date}
-            onSelect={setDate}
+            onSelect={(selected) => { setDate(selected); if (selected) setInvalid(false); }}
             locale={ru}
             captionLayout="dropdown"
             startMonth={new Date(new Date().getFullYear() - 120, 0, 1)}
@@ -76,11 +82,17 @@ export function DatePicker({
         </PopoverContent>
       </Popover>
       <input
-        type="hidden"
+        type="text"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
         name={name}
         value={date ? format(date, "yyyy-MM-dd") : ""}
         required={required}
+        onChange={() => {}}
+        onInvalid={(event) => { event.preventDefault(); setInvalid(true); triggerRef.current?.focus(); }}
       />
+      {invalid ? <p id={`${id}-error`} className="mt-1 text-xs text-destructive">Выберите дату</p> : null}
     </>
   );
 }

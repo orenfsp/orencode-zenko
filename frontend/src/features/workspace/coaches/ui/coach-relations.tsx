@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useState } from "react";
 import { Dumbbell, LoaderCircle, Plus, UserRoundCheck } from "lucide-react";
 
 import { profileApi } from "@/entities/profile";
+import type { RegistryUser } from "@/entities/registry";
 import { referenceDataApi, type Discipline } from "@/entities/reference-data";
 import { useAuth } from "@/entities/session";
 import { userCoachApi, type UserCoachRelation } from "@/entities/user-coach";
@@ -13,8 +14,8 @@ import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
-import { Input } from "@/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { ParticipantPicker } from "./participant-picker";
 
 interface RelationData {
   role: "coach" | "participant";
@@ -26,6 +27,9 @@ export function CoachRelations() {
   const { identity } = useAuth();
   const notify = useNotifications();
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const [selectedParticipant, setSelectedParticipant] = useState<RegistryUser | null>(null);
+  const [formVersion, setFormVersion] = useState(0);
+  const canSearchParticipants = identity?.permissions?.includes("registry.read") ?? false;
   const load = useCallback(async (): Promise<RelationData> => {
     const profile = await profileApi.me();
     const role = profile.roles.find((item) => item.id === identity?.roleId)?.code === "coach" ? "coach" : "participant";
@@ -39,15 +43,17 @@ export function CoachRelations() {
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!selectedParticipant) return;
     const form = new FormData(event.currentTarget);
     setPendingId(0);
     try {
       await userCoachApi.create({
-        participant_user_id: Number(form.get("participant_user_id")),
+        participant_user_id: selectedParticipant.id,
         discipline_id: Number(form.get("discipline_id")),
       });
       notify.success("Запрос спортсмену отправлен");
-      event.currentTarget.reset();
+      setSelectedParticipant(null);
+      setFormVersion((version) => version + 1);
       state.reload();
     } catch (cause) {
       notify.error(cause instanceof Error ? cause.message : "Не удалось создать связь");
@@ -78,11 +84,11 @@ export function CoachRelations() {
       />
       {state.data?.role === "coach" ? (
         <Card className="mb-4 bg-white/75 p-4 shadow-none">
-          <form className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={create}>
-            <Input name="participant_user_id" type="number" min="1" required placeholder="ID спортсмена" />
-            <Select name="discipline_id"><SelectTrigger><SelectValue placeholder="Выберите дисциплину" /></SelectTrigger><SelectContent>{state.data.disciplines.map((discipline) => <SelectItem key={discipline.id} value={String(discipline.id)}>{discipline.name}</SelectItem>)}</SelectContent></Select>
-            <Button disabled={pendingId !== null}>{pendingId === 0 ? <LoaderCircle className="animate-spin" /> : <Plus />}Добавить спортсмена</Button>
-          </form>
+          {canSearchParticipants ? <form key={formVersion} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={create}>
+            <ParticipantPicker value={selectedParticipant} onChange={setSelectedParticipant} />
+            <Select name="discipline_id" required><SelectTrigger className="min-h-11"><SelectValue placeholder="Выберите дисциплину" /></SelectTrigger><SelectContent>{state.data.disciplines.map((discipline) => <SelectItem key={discipline.id} value={String(discipline.id)}>{discipline.name}</SelectItem>)}</SelectContent></Select>
+            <Button disabled={pendingId !== null || !selectedParticipant || !state.data.disciplines.length} className="min-h-11">{pendingId === 0 ? <LoaderCircle className="animate-spin" /> : <Plus />}Добавить спортсмена</Button>
+          </form> : <p className="text-sm text-muted-foreground">Чтобы найти и привязать спортсмена, нужен доступ к реестру. Обратитесь к администратору федерации.</p>}
         </Card>
       ) : null}
       {state.loading ? <DataLoading rows={4} /> : null}

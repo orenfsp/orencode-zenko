@@ -1,8 +1,7 @@
 "use client";
 
-import { FormEvent, useCallback, useState } from "react";
-import { Activity, ArrowRight, Building2, LoaderCircle, Medal, ShieldCheck } from "lucide-react";
-import Link from "next/link";
+import { FormEvent, useCallback, useDeferredValue, useState } from "react";
+import { Activity, Building2, LoaderCircle, Medal, ShieldCheck } from "lucide-react";
 
 import { antiDopingApi } from "@/entities/anti-doping";
 import { auditLogApi } from "@/entities/audit-log";
@@ -31,9 +30,9 @@ interface AdministrationData {
   users: RegistryUser[];
 }
 
-export type AdministrationSection = "overview" | "roles" | "directories" | "reviews" | "audit";
+export type AdministrationSection = "roles" | "directories" | "reviews" | "audit";
 
-export function AdministrationView({ section = "overview" }: { section?: AdministrationSection }) {
+export function AdministrationView({ section }: { section: AdministrationSection }) {
   const { identity } = useAuth();
   const notify = useNotifications();
   const permissions = new Set(identity?.permissions ?? []);
@@ -41,6 +40,8 @@ export function AdministrationView({ section = "overview" }: { section?: Adminis
   const [selectedPermissionCodes, setSelectedPermissionCodes] = useState<string[]>([]);
   const [selectedMunicipality, setSelectedMunicipality] = useState<Municipality | null>(null);
   const [selectedRank, setSelectedRank] = useState<Rank | null>(null);
+  const [userSearch, setUserSearch] = useState("");
+  const deferredUserSearch = useDeferredValue(userSearch);
 
   const load = useCallback(async (): Promise<AdministrationData> => {
     const [roles, permissionItems, municipalities, ranks, audit, users] = await Promise.all([
@@ -50,11 +51,11 @@ export function AdministrationView({ section = "overview" }: { section?: Adminis
       rankApi.list(),
       identity?.permissions?.includes("roles.read") ? auditLogApi.list({ limit: 100 }) : Promise.resolve([]),
       identity?.permissions?.includes("roles.assign") && identity?.permissions?.includes("registry.read")
-        ? registryApi.users({ limit: 100 }).then((page) => page.items)
+        ? registryApi.users({ search: deferredUserSearch || undefined, limit: 100 }).then((page) => page.items)
         : Promise.resolve([]),
     ]);
     return { roles, permissions: permissionItems, municipalities, ranks, audit, users };
-  }, [identity?.permissions]);
+  }, [identity?.permissions, deferredUserSearch]);
   const state = useAsyncData(load);
 
   async function run(key: string, action: () => Promise<unknown>, success: string) {
@@ -138,32 +139,6 @@ export function AdministrationView({ section = "overview" }: { section?: Adminis
   const data = state.data;
   if (!data) return null;
 
-  if (section === "overview") {
-    const cards = [
-      { href: "/workspace/administration/roles", title: "Роли и права", description: "Роли, permissions и назначение ролей пользователям.", visible: permissions.has("roles.read") || permissions.has("roles.create") || permissions.has("roles.assign") },
-      { href: "/workspace/administration/directories", title: "Справочники", description: "Муниципалитеты и спортивные разряды.", visible: permissions.has("municipalities.create") || permissions.has("rank_applications.review") },
-      { href: "/workspace/administration/reviews", title: "Проверки", description: "Проверка антидопинговых сертификатов и заявок.", visible: permissions.has("anti_doping.review") },
-      { href: "/workspace/administration/audit", title: "Журнал аудита", description: "История административных действий.", visible: permissions.has("roles.read") },
-      { href: "/workspace/administration/rank-standards", title: "Нормативы разрядов", description: "Условия ЕВСК для проверки заявок на разряд.", visible: permissions.has("rank_applications.review") },
-    ].filter((item) => item.visible);
-
-    return (
-      <div className="mx-auto grid w-full max-w-5xl gap-6">
-        <SectionHeading title="Администрирование" description="Выберите раздел для управления данными и доступами." />
-        <div className="grid gap-4 md:grid-cols-2">
-          {cards.map((card) => (
-            <Link key={card.href} href={card.href} className="group rounded-2xl border bg-white/75 p-5 shadow-none transition hover:border-primary/40 hover:shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div><h2 className="font-medium">{card.title}</h2><p className="mt-2 text-sm text-muted-foreground">{card.description}</p></div>
-                <ArrowRight className="size-5 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-primary" />
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-6">
       <SectionHeading title="Администрирование" description="Роли, справочники, проверки и журнал действий." />
@@ -203,12 +178,16 @@ export function AdministrationView({ section = "overview" }: { section?: Adminis
                 </form>
               ) : null}
               {permissions.has("roles.assign") ? (
-                <form className="grid gap-3 rounded-xl border p-4" onSubmit={assignRole}>
+                <div className="grid gap-3 rounded-xl border p-4">
                   <p className="font-medium">Назначить роль</p>
-                  {data.users.length ? <Select name="user_id"><SelectTrigger><SelectValue placeholder="Выберите пользователя" /></SelectTrigger><SelectContent>{data.users.map((user) => <SelectItem key={user.id} value={String(user.id)}>{user.last_name} {user.first_name}{user.middle_name ? ` ${user.middle_name}` : ""} · #{user.id}</SelectItem>)}</SelectContent></Select> : <p className="text-sm text-muted-foreground">Список пользователей недоступен. Нужен permission `registry.read`.</p>}
-                  <Select name="role_id"><SelectTrigger><SelectValue placeholder="Выберите роль" /></SelectTrigger><SelectContent>{data.roles.map((role) => <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>)}</SelectContent></Select>
-                  <Button disabled={pending !== null || !data.users.length}>{pending === "assign" ? <LoaderCircle className="animate-spin" /> : null}Назначить</Button>
-                </form>
+                  {permissions.has("registry.read") ? <Input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Поиск по имени пользователя" aria-label="Поиск пользователя для назначения роли" /> : <p className="text-sm text-muted-foreground">Для выбора пользователя требуется право просмотра реестра. Обратитесь к администратору.</p>}
+                  {!permissions.has("roles.read") ? <p className="text-sm text-muted-foreground">Для выбора роли требуется право просмотра ролей. Обратитесь к администратору.</p> : null}
+                  <form className="grid gap-3" onSubmit={assignRole}>
+                    {data.users.length ? <Select key={deferredUserSearch} name="user_id" required><SelectTrigger><SelectValue placeholder="Выберите пользователя" /></SelectTrigger><SelectContent>{data.users.map((user) => <SelectItem key={user.id} value={String(user.id)}>{user.last_name} {user.first_name}{user.middle_name ? ` ${user.middle_name}` : ""} · #{user.id}</SelectItem>)}</SelectContent></Select> : permissions.has("registry.read") ? <p className="text-sm text-muted-foreground">Пользователи не найдены. Попробуйте другой запрос.</p> : null}
+                    {data.roles.length ? <Select name="role_id" required><SelectTrigger><SelectValue placeholder="Выберите роль" /></SelectTrigger><SelectContent>{data.roles.map((role) => <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>)}</SelectContent></Select> : null}
+                    <Button disabled={pending !== null || !data.users.length || !data.roles.length}>{pending === "assign" ? <LoaderCircle className="animate-spin" /> : null}Назначить</Button>
+                  </form>
+                </div>
               ) : null}
             </div>
           </div>

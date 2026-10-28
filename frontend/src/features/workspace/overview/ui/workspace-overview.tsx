@@ -2,16 +2,16 @@
 import * as React from "react";
 import { CalendarDays, ClipboardList, Medal, Trophy, Users } from "lucide-react";
 import Link from "next/link";
-import { LoaderCircle } from "lucide-react";
 
 import { dashboardApi, type DashboardData } from "@/entities/dashboard";
 import { deadlineApi, type DeadlineItem } from "@/entities/deadline";
-import { profileApi } from "@/entities/profile";
 import { useAuth } from "@/entities/session";
 import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
 import { Button } from "@/shared/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { DataEmpty } from "@/shared/ui/data-state";
+import { DataError, DataLoading } from "@/shared/ui/data-state";
+import { useAsyncData } from "@/shared/lib/use-async-data";
 
 type OverviewData =
   | { kind: "federation"; dashboard: DashboardData }
@@ -31,28 +31,8 @@ export function WorkspaceOverview() {
   const canReadDashboard =
     identity?.permissions?.includes("dashboard.read") ?? false;
 
-  const [data, setData] = React.useState<OverviewData | null>(null);
-
-  const [loading, setLoading] = React.useState(true);
-
   const load = React.useCallback(async (): Promise<OverviewData> => {
     if (canReadDashboard) {
-      return {
-        kind: "federation",
-        dashboard: await dashboardApi.get(),
-      };
-    }
-
-    const profile = await profileApi.me();
-
-    const activeRole = profile.roles.find(
-      (role) => role.id === identity?.roleId,
-    )?.code;
-
-    if (
-      activeRole === "federation" ||
-      activeRole === "super_admin"
-    ) {
       return {
         kind: "federation",
         dashboard: await dashboardApi.get(),
@@ -63,60 +43,13 @@ export function WorkspaceOverview() {
       kind: "personal",
       deadlines: await deadlineApi.list(),
     };
-  }, [canReadDashboard, identity?.roleId]);
+  }, [canReadDashboard]);
 
-  React.useEffect(() => {
-    let cancelled = false;
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-
-    const fetchData = async () => {
-      try {
-        const result = await load();
-
-        if (cancelled) return;
-
-        setData(result);
-        setLoading(false);
-      } catch (error) {
-        if (cancelled) return;
-
-        // Ошибку не показываем пользователю.
-        // Повторяем запрос через 3 секунды.
-        console.error(
-          "[WorkspaceOverview] Ошибка загрузки. Повтор через 3 секунды:",
-          error,
-        );
-
-        retryTimer = setTimeout(fetchData, 3000);
-      }
-    };
-
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setLoading(true);
-      setData(null);
-    });
-
-    void fetchData();
-
-    return () => {
-      cancelled = true;
-
-      if (retryTimer !== undefined) {
-        clearTimeout(retryTimer);
-      }
-    };
-  }, [load]);
-
-  
-
-if (loading || !data) {
-  return (
-    <div className="flex min-h-[60vh] w-full h-full items-center justify-center">
-      <LoaderCircle className="size-8 animate-spin text-primary" />
-    </div>
-  );
-}
+  const state = useAsyncData(load);
+  const data = state.data;
+  if (state.loading) return <DataLoading rows={4} />;
+  if (state.error) return <DataError message={state.error} retry={state.reload} />;
+  if (!data) return <DataEmpty title="Данные пока недоступны" description="Попробуйте обновить страницу позже." />;
 
   if (data.kind === "personal") {
     return (
