@@ -18,6 +18,7 @@ SELECT
     c.venue_address,
     c.online_url,
     c.status,
+    c.created_by,
     c.calendar_plan_id,
     cp.name AS calendar_plan_name,
     cp.year AS calendar_plan_year,
@@ -218,6 +219,7 @@ SELECT
     c.venue_address,
     c.online_url,
     c.status,
+    c.created_by,
     c.calendar_plan_id,
     cp.name AS calendar_plan_name,
     cp.year AS calendar_plan_year,
@@ -234,6 +236,42 @@ WHERE c.id = sqlc.arg(id);
 SELECT status
 FROM competition
 WHERE id = sqlc.arg(id);
+
+-- name: ListAdminCompetitions :many
+SELECT
+    c.id, c.name, c.description, c.discipline_id, d.name AS discipline_name,
+    c.competition_type_id, ct.name AS competition_type_name,
+    c.competition_level_id, cl.code AS competition_level_code, cl.name AS competition_level_name,
+    c.format, c.start_at, c.end_at, c.registration_starts_at, c.registration_ends_at,
+    c.venue_address, c.online_url, c.status, c.created_by,
+    c.calendar_plan_id, cp.name AS calendar_plan_name, cp.year AS calendar_plan_year,
+    c.calendar_plan_number, c.regulation_url
+FROM competition c
+JOIN discipline d ON d.id = c.discipline_id
+JOIN competition_type ct ON ct.id = c.competition_type_id
+JOIN competition_level cl ON cl.id = c.competition_level_id
+LEFT JOIN calendar_plan cp ON cp.id = c.calendar_plan_id
+WHERE c.created_by = sqlc.arg(created_by)
+  AND (sqlc.narg(status)::varchar IS NULL OR c.status = sqlc.narg(status))
+ORDER BY c.updated_at DESC NULLS LAST, c.id DESC;
+
+-- name: TransitionCompetition :one
+WITH changed AS (
+    UPDATE competition AS target
+    SET status = sqlc.arg(to_status), updated_at = now()
+    WHERE target.id = sqlc.arg(id) AND target.status = sqlc.arg(from_status)
+    RETURNING id, status
+), history AS (
+    INSERT INTO competition_status_history (competition_id, from_status, to_status, changed_by)
+    SELECT id, sqlc.arg(from_status), status, sqlc.arg(changed_by) FROM changed
+)
+SELECT id, status FROM changed;
+
+-- name: ListCompetitionStatusHistory :many
+SELECT id, competition_id, from_status, to_status, changed_by, changed_at
+FROM competition_status_history
+WHERE competition_id = sqlc.arg(competition_id)
+ORDER BY changed_at ASC, id ASC;
 
 -- name: UpdateDraftCompetition :one
 WITH updated AS (

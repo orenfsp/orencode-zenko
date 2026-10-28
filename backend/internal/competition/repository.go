@@ -33,11 +33,21 @@ type Competition struct {
 	VenueAddress         *string
 	OnlineURL            *string
 	Status               string
+	CreatedBy            int64
 	CalendarPlanID       *int64
 	CalendarPlanName     *string
 	CalendarPlanYear     *int16
 	CalendarPlanNumber   *string
 	RegulationURL        *string
+}
+
+type StatusHistory struct {
+	ID            int64     `json:"id"`
+	CompetitionID int64     `json:"competition_id"`
+	FromStatus    *string   `json:"from_status,omitempty"`
+	ToStatus      string    `json:"to_status"`
+	ChangedBy     int64     `json:"changed_by"`
+	ChangedAt     time.Time `json:"changed_at"`
 }
 
 type CompetitionReferences struct {
@@ -102,4 +112,11 @@ type Repository interface {
 	Create(ctx context.Context, input CreateCompetition) (Competition, error)
 	GetByID(ctx context.Context, id int64) (Competition, error)
 	UpdateDraft(ctx context.Context, input UpdateCompetition) (Competition, error)
+}
+
+type WorkflowRepository interface {
+	Repository
+	ListAdmin(ctx context.Context, createdBy int64, status *string) ([]Competition, error)
+	Transition(ctx context.Context, id, actorID int64, fromStatus, toStatus string) error
+	ListHistory(ctx context.Context, id int64) ([]StatusHistory, error)
 }

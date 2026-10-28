@@ -213,6 +213,7 @@ SELECT
     c.venue_address,
     c.online_url,
     c.status,
+    c.created_by,
     c.calendar_plan_id,
     cp.name AS calendar_plan_name,
     cp.year AS calendar_plan_year,
@@ -245,6 +246,7 @@ type GetCompetitionRow struct {
 	VenueAddress         pgtype.Text
 	OnlineUrl            pgtype.Text
 	Status               string
+	CreatedBy            int64
 	CalendarPlanID       pgtype.Int8
 	CalendarPlanName     pgtype.Text
 	CalendarPlanYear     pgtype.Int2
@@ -274,6 +276,7 @@ func (q *Queries) GetCompetition(ctx context.Context, id int64) (GetCompetitionR
 		&i.VenueAddress,
 		&i.OnlineUrl,
 		&i.Status,
+		&i.CreatedBy,
 		&i.CalendarPlanID,
 		&i.CalendarPlanName,
 		&i.CalendarPlanYear,
@@ -392,6 +395,102 @@ func (q *Queries) GetPublicCompetition(ctx context.Context, arg GetPublicCompeti
 	return i, err
 }
 
+const listAdminCompetitions = `-- name: ListAdminCompetitions :many
+SELECT
+    c.id, c.name, c.description, c.discipline_id, d.name AS discipline_name,
+    c.competition_type_id, ct.name AS competition_type_name,
+    c.competition_level_id, cl.code AS competition_level_code, cl.name AS competition_level_name,
+    c.format, c.start_at, c.end_at, c.registration_starts_at, c.registration_ends_at,
+    c.venue_address, c.online_url, c.status, c.created_by,
+    c.calendar_plan_id, cp.name AS calendar_plan_name, cp.year AS calendar_plan_year,
+    c.calendar_plan_number, c.regulation_url
+FROM competition c
+JOIN discipline d ON d.id = c.discipline_id
+JOIN competition_type ct ON ct.id = c.competition_type_id
+JOIN competition_level cl ON cl.id = c.competition_level_id
+LEFT JOIN calendar_plan cp ON cp.id = c.calendar_plan_id
+WHERE c.created_by = $1
+  AND ($2::varchar IS NULL OR c.status = $2)
+ORDER BY c.updated_at DESC NULLS LAST, c.id DESC
+`
+
+type ListAdminCompetitionsParams struct {
+	CreatedBy int64
+	Status    pgtype.Text
+}
+
+type ListAdminCompetitionsRow struct {
+	ID                   int64
+	Name                 string
+	Description          pgtype.Text
+	DisciplineID         int64
+	DisciplineName       string
+	CompetitionTypeID    int64
+	CompetitionTypeName  string
+	CompetitionLevelID   int64
+	CompetitionLevelCode pgtype.Text
+	CompetitionLevelName pgtype.Text
+	Format               string
+	StartAt              pgtype.Timestamptz
+	EndAt                pgtype.Timestamptz
+	RegistrationStartsAt pgtype.Timestamptz
+	RegistrationEndsAt   pgtype.Timestamptz
+	VenueAddress         pgtype.Text
+	OnlineUrl            pgtype.Text
+	Status               string
+	CreatedBy            int64
+	CalendarPlanID       pgtype.Int8
+	CalendarPlanName     pgtype.Text
+	CalendarPlanYear     pgtype.Int2
+	CalendarPlanNumber   pgtype.Text
+	RegulationUrl        pgtype.Text
+}
+
+func (q *Queries) ListAdminCompetitions(ctx context.Context, arg ListAdminCompetitionsParams) ([]ListAdminCompetitionsRow, error) {
+	rows, err := q.db.Query(ctx, listAdminCompetitions, arg.CreatedBy, arg.Status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminCompetitionsRow
+	for rows.Next() {
+		var i ListAdminCompetitionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.DisciplineID,
+			&i.DisciplineName,
+			&i.CompetitionTypeID,
+			&i.CompetitionTypeName,
+			&i.CompetitionLevelID,
+			&i.CompetitionLevelCode,
+			&i.CompetitionLevelName,
+			&i.Format,
+			&i.StartAt,
+			&i.EndAt,
+			&i.RegistrationStartsAt,
+			&i.RegistrationEndsAt,
+			&i.VenueAddress,
+			&i.OnlineUrl,
+			&i.Status,
+			&i.CreatedBy,
+			&i.CalendarPlanID,
+			&i.CalendarPlanName,
+			&i.CalendarPlanYear,
+			&i.CalendarPlanNumber,
+			&i.RegulationUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCalendarCompetitions = `-- name: ListCalendarCompetitions :many
 SELECT
     c.id,
@@ -489,6 +588,40 @@ func (q *Queries) ListCalendarCompetitions(ctx context.Context, arg ListCalendar
 			&i.VenueAddress,
 			&i.OnlineUrl,
 			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCompetitionStatusHistory = `-- name: ListCompetitionStatusHistory :many
+SELECT id, competition_id, from_status, to_status, changed_by, changed_at
+FROM competition_status_history
+WHERE competition_id = $1
+ORDER BY changed_at ASC, id ASC
+`
+
+func (q *Queries) ListCompetitionStatusHistory(ctx context.Context, competitionID int64) ([]CompetitionStatusHistory, error) {
+	rows, err := q.db.Query(ctx, listCompetitionStatusHistory, competitionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CompetitionStatusHistory
+	for rows.Next() {
+		var i CompetitionStatusHistory
+		if err := rows.Scan(
+			&i.ID,
+			&i.CompetitionID,
+			&i.FromStatus,
+			&i.ToStatus,
+			&i.ChangedBy,
+			&i.ChangedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -685,6 +818,7 @@ SELECT
     c.venue_address,
     c.online_url,
     c.status,
+    c.created_by,
     c.calendar_plan_id,
     cp.name AS calendar_plan_name,
     cp.year AS calendar_plan_year,
@@ -725,6 +859,7 @@ type ListPublicCompetitionsRow struct {
 	VenueAddress         pgtype.Text
 	OnlineUrl            pgtype.Text
 	Status               string
+	CreatedBy            int64
 	CalendarPlanID       pgtype.Int8
 	CalendarPlanName     pgtype.Text
 	CalendarPlanYear     pgtype.Int2
@@ -760,6 +895,7 @@ func (q *Queries) ListPublicCompetitions(ctx context.Context, arg ListPublicComp
 			&i.VenueAddress,
 			&i.OnlineUrl,
 			&i.Status,
+			&i.CreatedBy,
 			&i.CalendarPlanID,
 			&i.CalendarPlanName,
 			&i.CalendarPlanYear,
@@ -774,6 +910,43 @@ func (q *Queries) ListPublicCompetitions(ctx context.Context, arg ListPublicComp
 		return nil, err
 	}
 	return items, nil
+}
+
+const transitionCompetition = `-- name: TransitionCompetition :one
+WITH changed AS (
+    UPDATE competition AS target
+    SET status = $1, updated_at = now()
+    WHERE target.id = $2 AND target.status = $3
+    RETURNING id, status
+), history AS (
+    INSERT INTO competition_status_history (competition_id, from_status, to_status, changed_by)
+    SELECT id, $3, status, $4 FROM changed
+)
+SELECT id, status FROM changed
+`
+
+type TransitionCompetitionParams struct {
+	ToStatus   string
+	ID         int64
+	FromStatus string
+	ChangedBy  int64
+}
+
+type TransitionCompetitionRow struct {
+	ID     int64
+	Status string
+}
+
+func (q *Queries) TransitionCompetition(ctx context.Context, arg TransitionCompetitionParams) (TransitionCompetitionRow, error) {
+	row := q.db.QueryRow(ctx, transitionCompetition,
+		arg.ToStatus,
+		arg.ID,
+		arg.FromStatus,
+		arg.ChangedBy,
+	)
+	var i TransitionCompetitionRow
+	err := row.Scan(&i.ID, &i.Status)
+	return i, err
 }
 
 const updateDraftCompetition = `-- name: UpdateDraftCompetition :one

@@ -998,6 +998,22 @@ This endpoint is public and does not require an access token. It returns only sa
 ```
 
 For an invalid or unknown `userId`, the API returns `404 Not Found`.
+
+## Competition workflow (administrator)
+
+Use `GET /api/v1/admin/competitions?status=draft` to restore the current administrator's own competitions. A single draft is available through `GET /api/v1/admin/competitions/{id}`.
+
+Status actions:
+
+```http
+POST /api/v1/admin/competitions/{id}/submit
+POST /api/v1/admin/competitions/{id}/publish
+POST /api/v1/admin/competitions/{id}/cancel
+POST /api/v1/admin/competitions/{id}/return
+GET  /api/v1/admin/competitions/{id}/history
+```
+
+Allowed transitions are `draft -> under_review`, `under_review -> published`, `under_review|published -> cancelled` and `under_review -> draft`. All workflow endpoints require `competitions.update`; only the competition creator can operate on it.
 ## Anti-doping certificates
 
 The current user's certificates are loaded with:
