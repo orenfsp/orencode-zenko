@@ -14,10 +14,13 @@ import {
 import Link from "next/link";
 
 import { competitionApi } from "@/entities/competition";
+import { competitionApplicationApi } from "@/entities/competition-application";
 import { competitionEventApi } from "@/entities/competition-event";
 import { competitionJudgeApi } from "@/entities/competition-judge";
 import { competitionResultApi, type CompetitionResultTable } from "@/entities/competition-result";
+import { profileApi } from "@/entities/profile";
 import { useAuth } from "@/entities/session";
+import { userCoachApi } from "@/entities/user-coach";
 import { formatDate, fullName, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Badge } from "@/shared/ui/badge";
@@ -40,16 +43,25 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
   const [result, setResult] = useState<CompetitionResultTable | null>(null);
   const [resultEventId, setResultEventId] = useState<number | null>(null);
   const [resultJson, setResultJson] = useState("");
+  const [athleteByEvent, setAthleteByEvent] = useState<Record<number, string>>({});
   const load = useCallback(
     async () => {
-      const [competition, events, judges] = await Promise.all([
+      const profile = await profileApi.me();
+      const activeRole = profile.roles.find((role) => role.id === identity?.roleId)?.code ?? null;
+      const [competition, events, judges, applications, coachRelations] = await Promise.all([
         competitionApi.get(competitionId),
         competitionEventApi.publicList(competitionId),
         canManageJudges ? competitionJudgeApi.adminList(competitionId) : competitionJudgeApi.publicList(competitionId),
+        competitionApplicationApi.mine(),
+        activeRole === "coach" ? userCoachApi.byCoach({ limit: 100 }) : Promise.resolve([]),
       ]);
-      return { competition, events, judges };
+      const now = Date.now();
+      const registrationOpen = competition.status === "registration_open" &&
+        now >= new Date(competition.registration_starts_at).getTime() &&
+        now <= new Date(competition.registration_ends_at).getTime();
+      return { competition, events, judges, applications: applications.filter((item) => item.competition_id === competitionId), coachRelations, activeRole, registrationOpen };
     },
-    [canManageJudges, competitionId],
+    [canManageJudges, competitionId, identity?.roleId],
   );
   const state = useAsyncData(load);
 
@@ -70,6 +82,14 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     void run(() => competitionJudgeApi.assign(competitionId, { judge_user_id: Number(form.get("judge_user_id")), position_id: Number(form.get("position_id")) }), "Судья назначен");
+  }
+
+  function submitApplication(eventId: number) {
+    const selected = Number(athleteByEvent[eventId]);
+    void run(
+      () => competitionApplicationApi.create({ event_id: eventId, athlete_user_id: selected > 0 ? selected : undefined }),
+      "Заявка на соревнование подана",
+    );
   }
 
   async function openResults(eventId: number) {
@@ -109,7 +129,7 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
   if (state.error) return <DataError message={state.error} retry={state.reload} />;
   if (!state.data) return null;
 
-  const { competition, events, judges } = state.data;
+  const { competition, events, judges, applications, coachRelations, activeRole, registrationOpen } = state.data;
   return (
     <div className="mx-auto w-full max-w-6xl">
       <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
@@ -152,7 +172,12 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
                     <p className="mt-1 text-sm text-muted-foreground">{event.age_group?.name ?? "Без возрастной группы"}</p>
                   </div>
                 </div>
-                <div className="flex gap-2">{canReadResults ? <Button variant="outline" size="sm" disabled={pending} onClick={() => void openResults(event.id)}>Результаты</Button> : null}{event.protocol_url ? <Button variant="outline" size="sm" disabled={pending} onClick={() => void downloadProtocol(event.id)}><FileText />Протокол</Button> : null}</div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {activeRole === "coach" && registrationOpen ? <select value={athleteByEvent[event.id] ?? ""} onChange={(change) => setAthleteByEvent((current) => ({ ...current, [event.id]: change.target.value }))} className="h-8 rounded-[10px] border border-border bg-background px-2 text-xs"><option value="">Выберите спортсмена</option>{coachRelations.filter((relation) => relation.status === "confirmed" && relation.discipline_id === event.discipline.id).map((relation) => <option key={relation.id} value={relation.participant_user_id}>Спортсмен #{relation.participant_user_id}</option>)}</select> : null}
+                  {registrationOpen && !applications.some((application) => application.event_id === event.id && (activeRole !== "coach" || application.athlete_user_id === Number(athleteByEvent[event.id]))) ? <Button size="sm" disabled={pending || (activeRole === "coach" && !athleteByEvent[event.id])} onClick={() => submitApplication(event.id)}>Подать заявку</Button> : null}
+                  {applications.filter((application) => application.event_id === event.id && (activeRole !== "coach" || !athleteByEvent[event.id] || application.athlete_user_id === Number(athleteByEvent[event.id]))).map((application) => <StatusBadge key={application.id} status={application.status} />)}
+                  {canReadResults ? <Button variant="outline" size="sm" disabled={pending} onClick={() => void openResults(event.id)}>Результаты</Button> : null}{event.protocol_url ? <Button variant="outline" size="sm" disabled={pending} onClick={() => void downloadProtocol(event.id)}><FileText />Протокол</Button> : null}
+                </div>
               </div>
             ))}
             {!events.length ? <p className="text-sm text-muted-foreground">Зачёты пока не опубликованы.</p> : null}
