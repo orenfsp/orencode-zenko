@@ -24,7 +24,6 @@ export type PermissionCode =
   | "registry.read"
   | "judge_categories.review"
   | "rank_applications.review"
-  | "competition_applications.review"
   | "deadlines.manage";
 
 export interface Permission {

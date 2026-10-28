@@ -4,7 +4,6 @@ const statusLabels: Record<string, string> = {
   pending: "На рассмотрении",
   approved: "Одобрено",
   rejected: "Отклонено",
-  withdrawn: "Отозвано",
   active: "Активно",
   draft: "Черновик",
   published: "Опубликовано",

@@ -275,7 +275,7 @@ if (loading || !data) {
               variant="outline"
               className="mt-1 w-full"
             >
-              <Link href="/workspace/applications?type=competition">
+              <Link href="/workspace/applications">
                 Открыть заявки
               </Link>
             </Button>

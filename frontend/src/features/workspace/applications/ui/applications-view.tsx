@@ -3,7 +3,6 @@
 import { FormEvent, useCallback, useState } from "react";
 import { Gavel, LoaderCircle, Medal, Plus } from "lucide-react";
 
-import { competitionApplicationApi, type CompetitionApplication, type CompetitionApplicationStatus } from "@/entities/competition-application";
 import { judgeCategoryApi, type CurrentJudgeCategory, type JudgeCategoryApplication } from "@/entities/judge-category";
 import { profileApi } from "@/entities/profile";
 import { rankApi, type Rank } from "@/entities/rank";
@@ -30,7 +29,6 @@ interface ApplicationData {
   ranks: Rank[];
   disciplines: Discipline[];
   currentCategory: CurrentJudgeCategory | null;
-  competition: CompetitionApplication[];
 }
 
 type ReviewTarget = { kind: "rank" | "judge"; id: number; status: "approved" | "rejected" };
@@ -39,58 +37,33 @@ export function ApplicationsView() {
   const { identity } = useAuth();
   const notify = useNotifications();
   const permissions = identity?.permissions ?? [];
-  const canReviewCompetition = permissions?.includes("competition_applications.review") ?? false;
   const canReviewRank = permissions?.includes("rank_applications.review") ?? false;
   const canReviewJudge = permissions?.includes("judge_categories.review") ?? false;
   const [createOpen, setCreateOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
   const [pending, setPending] = useState(false);
-  const [tab, setTab] = useState<"competition" | "rank" | "judge">("competition");
-  const [competitionStatus, setCompetitionStatus] = useState<CompetitionApplicationStatus | "">("");
-  const [competitionEvent, setCompetitionEvent] = useState("");
 
   const load = useCallback(async (): Promise<ApplicationData> => {
     const profile = await profileApi.me();
     const activeRole = profile.roles.find((role) => role.id === identity?.roleId)?.code ?? null;
     const isFederationRole = activeRole === "federation" || activeRole === "super_admin";
-    if (canReviewCompetition || canReviewRank || canReviewJudge || isFederationRole) {
-      const [competition, rank, judge] = await Promise.all([
-        canReviewCompetition ? competitionApplicationApi.reviewList({ limit: 100 }) : Promise.resolve([]),
+    if (canReviewRank || canReviewJudge || isFederationRole) {
+      const [rank, judge] = await Promise.all([
         canReviewRank || isFederationRole ? rankApplicationApi.pending({ limit: 100 }) : Promise.resolve([]),
         canReviewJudge || isFederationRole ? judgeCategoryApi.pending({ limit: 100 }) : Promise.resolve([]),
       ]);
-      return { mode: "review", activeRole, competition, rank, judge, ranks: [], disciplines: [], currentCategory: null };
+      return { mode: "review", activeRole, rank, judge, ranks: [], disciplines: [], currentCategory: null };
     }
     const [ranks, disciplines] = await Promise.all([rankApi.list(), referenceDataApi.disciplines()]);
     if (activeRole === "judge") {
       const [judge, currentCategory] = await Promise.all([judgeCategoryApi.mine(), judgeCategoryApi.current()]);
-      return { mode: "personal", activeRole, competition: await competitionApplicationApi.mine(), rank: [], judge, ranks, disciplines, currentCategory };
+      return { mode: "personal", activeRole, rank: [], judge, ranks, disciplines, currentCategory };
     }
-    const [competition, rank] = await Promise.all([competitionApplicationApi.mine(), rankApplicationApi.mine()]);
-    return { mode: "personal", activeRole, competition, rank, judge: [], ranks, disciplines, currentCategory: null };
-  }, [canReviewCompetition, canReviewJudge, canReviewRank, identity?.roleId]);
+    return { mode: "personal", activeRole, rank: await rankApplicationApi.mine(), judge: [], ranks, disciplines, currentCategory: null };
+  }, [canReviewJudge, canReviewRank, identity?.roleId]);
 
   const state = useAsyncData(load);
-  const total = (state.data?.competition.length ?? 0) + (state.data?.rank.length ?? 0) + (state.data?.judge.length ?? 0);
-  const competitionItems = (state.data?.competition ?? []).filter((application) =>
-    (!competitionStatus || application.status === competitionStatus) &&
-    (!competitionEvent || application.event_id === Number(competitionEvent)),
-  );
-
-  async function competitionAction(applicationId: number, action: "approve" | "reject" | "withdraw") {
-    setPending(true);
-    try {
-      if (action === "approve") await competitionApplicationApi.approve(applicationId);
-      else if (action === "reject") await competitionApplicationApi.reject(applicationId);
-      else await competitionApplicationApi.withdraw(applicationId);
-      notify.success(action === "approve" ? "Заявка одобрена" : action === "reject" ? "Заявка отклонена" : "Заявка отозвана");
-      state.reload();
-    } catch (cause) {
-      notify.error(cause instanceof Error ? cause.message : "Не удалось изменить заявку");
-    } finally {
-      setPending(false);
-    }
-  }
+  const total = (state.data?.rank.length ?? 0) + (state.data?.judge.length ?? 0);
 
   async function submitApplication(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -155,14 +128,9 @@ export function ApplicationsView() {
     <div className="mx-auto w-full max-w-6xl">
       <SectionHeading
         title={state.data?.mode === "review" ? "Заявки на рассмотрение" : "Мои заявки"}
-        description={state.data?.mode === "review" ? "Очередь заявок, доступная активной роли." : "Статусы заявок на соревнования, разряд или судейскую категорию."}
-        action={canCreate && tab !== "competition" ? <Button onClick={() => setCreateOpen(true)}><Plus />Подать заявку</Button> : undefined}
+        description={state.data?.mode === "review" ? "Очередь заявок, доступная активной роли." : "Статусы заявок на разряд или судейскую категорию."}
+        action={canCreate ? <Button onClick={() => setCreateOpen(true)}><Plus />Подать заявку</Button> : undefined}
       />
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Button type="button" variant={tab === "competition" ? "default" : "outline"} onClick={() => setTab("competition")}>Заявки на соревнования</Button>
-        <Button type="button" variant={tab === "rank" ? "default" : "outline"} onClick={() => setTab("rank")}>Разряды</Button>
-        <Button type="button" variant={tab === "judge" ? "default" : "outline"} onClick={() => setTab("judge")}>Судейские категории</Button>
-      </div>
       {state.data?.currentCategory ? (
         <Card className="mb-4 bg-[#eeebff] p-4 shadow-none"><p className="font-medium">Текущая категория: {state.data.currentCategory.category_name}</p><p className="mt-1 text-xs text-muted-foreground">Назначена {formatDate(state.data.currentCategory.assigned_at)}{state.data.currentCategory.expires_at ? ` · до ${formatDate(state.data.currentCategory.expires_at)}` : ""}</p></Card>
       ) : null}
@@ -171,42 +139,23 @@ export function ApplicationsView() {
       {!state.loading && !state.error && !total ? <DataEmpty title="Заявок пока нет" description="Поданные заявки и решения появятся на этой странице." /> : null}
 
       <div className="grid gap-3">
-        {tab === "competition" && state.data?.mode === "review" ? (
-          <Card className="bg-white/75 p-4 shadow-none">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Input value={competitionEvent} onChange={(event) => setCompetitionEvent(event.target.value)} type="number" min="1" placeholder="ID мероприятия" />
-              <select value={competitionStatus} onChange={(event) => setCompetitionStatus(event.target.value as CompetitionApplicationStatus | "")} className={selectClassName}>
-                <option value="">Все статусы</option><option value="pending">Ожидает</option><option value="approved">Одобрена</option><option value="rejected">Отклонена</option><option value="withdrawn">Отозвана</option>
-              </select>
-            </div>
-          </Card>
-        ) : null}
-        {tab === "competition" ? competitionItems.map((application) => (
-          <Card key={`competition-${application.id}`} className="bg-white/75 p-5 shadow-none">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-              <div className="flex min-w-0 gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary"><Medal className="size-5" /></span><div><p className="font-medium">{application.competition_name}</p><p className="mt-1 text-sm text-muted-foreground">{application.discipline_name}{application.age_group_name ? ` · ${application.age_group_name}` : ""} · мероприятие #{application.event_id}</p><p className="mt-1 text-sm text-muted-foreground">Спортсмен: {application.athlete_last_name} {application.athlete_first_name} · {application.athlete_email}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.submitted_at, true)} · соревнование {formatDate(application.competition_start_at)}</p></div></div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2"><StatusBadge status={application.status} />{state.data?.mode === "review" && application.status === "pending" ? <><Button size="sm" disabled={pending} onClick={() => void competitionAction(application.id, "approve")}>Одобрить</Button><Button size="sm" variant="outline" disabled={pending} onClick={() => void competitionAction(application.id, "reject")}>Отклонить</Button></> : null}{state.data?.mode === "personal" && application.can_withdraw ? <Button size="sm" variant="outline" disabled={pending} onClick={() => void competitionAction(application.id, "withdraw")}>Отозвать</Button> : null}</div>
-            </div>
-          </Card>
-        )) : null}
-
-        {tab === "rank" ? state.data?.rank.map((application) => (
+        {state.data?.rank.map((application) => (
           <Card key={`rank-${application.id}`} className="bg-white/75 p-5 shadow-none">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
               <div className="flex min-w-0 gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary"><Medal className="size-5" /></span><div><p className="font-medium">Заявка на спортивный разряд</p><p className="mt-1 text-sm text-muted-foreground">Спортсмен #{application.athlete_user_id} · разряд #{application.rank_id} · дисциплина #{application.discipline_id}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.created_at, true)} · {application.application_type}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
               <div className="flex shrink-0 items-center gap-2"><StatusBadge status={application.status} />{state.data?.mode === "review" ? <><Button size="sm" onClick={() => setReviewTarget({ kind: "rank", id: application.id, status: "approved" })}>Одобрить</Button><Button size="sm" variant="outline" onClick={() => setReviewTarget({ kind: "rank", id: application.id, status: "rejected" })}>Отклонить</Button></> : null}</div>
             </div>
           </Card>
-        )) : null}
+        ))}
 
-        {tab === "judge" ? state.data?.judge.map((application) => (
+        {state.data?.judge.map((application) => (
           <Card key={`judge-${application.id}`} className="bg-white/75 p-5 shadow-none">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
               <div className="flex min-w-0 gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary"><Gavel className="size-5" /></span><div><p className="font-medium">{application.category_name ?? `Судейская категория #${application.category_id}`}</p><p className="mt-1 text-sm text-muted-foreground">{application.judge_name ? `${application.judge_name} · ` : ""}{application.application_type}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.submitted_at, true)}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
               <div className="flex shrink-0 items-center gap-2"><StatusBadge status={application.status} />{state.data?.mode === "review" ? <><Button size="sm" onClick={() => setReviewTarget({ kind: "judge", id: application.id, status: "approved" })}>Одобрить</Button><Button size="sm" variant="outline" onClick={() => setReviewTarget({ kind: "judge", id: application.id, status: "rejected" })}>Отклонить</Button></> : null}</div>
             </div>
           </Card>
-        )) : null}
+        ))}
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

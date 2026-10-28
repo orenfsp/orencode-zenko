@@ -268,7 +268,6 @@ function workspaceNavigation(user: WorkspaceUser): NavigationItem[] {
       label:
         isFederationRole ||
         permissions.has("rank_applications.review") ||
-        permissions.has("competition_applications.review") ||
         permissions.has("judge_categories.review")
           ? "Заявки"
           : "Мои заявки",
