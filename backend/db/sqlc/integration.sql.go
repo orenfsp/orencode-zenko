@@ -145,13 +145,13 @@ func (q *Queries) DeleteWebhookSubscription(ctx context.Context, arg DeleteWebho
 
 const enqueueWebhookDeliveries = `-- name: EnqueueWebhookDeliveries :exec
 INSERT INTO webhook_delivery (subscription_id, event_type, payload)
-SELECT ws.id, $1, $2::jsonb
+SELECT ws.id, $1::varchar(100), $2::jsonb
 FROM webhook_subscription AS ws
 JOIN webhook_subscription_event AS wse ON wse.subscription_id = ws.id
 JOIN integration_client AS ic ON ic.id = ws.client_id
 WHERE ws.is_active = true
   AND ic.is_active = true
-  AND wse.event_type = $1
+  AND wse.event_type = $1::varchar(100)
 `
 
 type EnqueueWebhookDeliveriesParams struct {

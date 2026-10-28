@@ -81,13 +81,13 @@ WHERE id = sqlc.arg(subscription_id) AND client_id = sqlc.arg(client_id);
 
 -- name: EnqueueWebhookDeliveries :exec
 INSERT INTO webhook_delivery (subscription_id, event_type, payload)
-SELECT ws.id, sqlc.arg(event_type), sqlc.arg(payload)::jsonb
+SELECT ws.id, sqlc.arg(event_type)::varchar(100), sqlc.arg(payload)::jsonb
 FROM webhook_subscription AS ws
 JOIN webhook_subscription_event AS wse ON wse.subscription_id = ws.id
 JOIN integration_client AS ic ON ic.id = ws.client_id
 WHERE ws.is_active = true
   AND ic.is_active = true
-  AND wse.event_type = sqlc.arg(event_type);
+  AND wse.event_type = sqlc.arg(event_type)::varchar(100);
 
 -- name: ClaimWebhookDeliveries :many
 WITH claimed AS (
