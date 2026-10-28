@@ -33,6 +33,7 @@ const (
 	EventProtocolDeleted               = "competition_protocol.deleted"
 	EventRatingSelectionSaved          = "rating_selection.saved"
 	EventRatingSelectionLocked         = "rating_selection.locked"
+	EventIntegrationResultsImported    = "integration.results.imported"
 )
 
 type EventCreate struct {

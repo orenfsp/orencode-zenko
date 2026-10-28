@@ -220,6 +220,22 @@ type InappNotification struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type IntegrationClient struct {
+	ID          int64
+	ClientKey   string
+	Name        string
+	SecretHash  string
+	OwnerUserID int64
+	IsActive    bool
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+type IntegrationClientPermission struct {
+	ClientID       int64
+	PermissionCode string
+}
+
 type JudgeCategory struct {
 	ID   int64
 	Name string
@@ -499,4 +515,33 @@ type UserSession struct {
 	ExpiresAt        pgtype.Timestamptz
 	CreatedAt        pgtype.Timestamptz
 	UpdatedAt        pgtype.Timestamptz
+}
+
+type WebhookDelivery struct {
+	ID             int64
+	SubscriptionID int64
+	EventType      string
+	Payload        []byte
+	Status         string
+	Attempts       int32
+	NextAttemptAt  pgtype.Timestamptz
+	ResponseStatus pgtype.Int4
+	LastError      pgtype.Text
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+	SentAt         pgtype.Timestamptz
+}
+
+type WebhookSubscription struct {
+	ID            int64
+	ClientID      int64
+	Url           string
+	SigningSecret string
+	IsActive      bool
+	CreatedAt     pgtype.Timestamptz
+}
+
+type WebhookSubscriptionEvent struct {
+	SubscriptionID int64
+	EventType      string
 }

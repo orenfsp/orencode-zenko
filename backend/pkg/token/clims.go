@@ -16,13 +16,18 @@ type DeviceTokenPayload struct {
 	DeviceSessionID string
 }
 
+type IntegrationTokenPayload struct {
+	ClientID int64
+}
+
 type Claims struct {
-	UserID          int64  `json:"user_id,omitempty"`
-	RoleID          *int64 `json:"role_id,omitempty"`
-	PrincipalType   string `json:"principal_type,omitempty"`
-	DeviceID        string `json:"device_id,omitempty"`
-	DeviceSessionID string `json:"device_session_id,omitempty"`
-	Type            string `json:"type,omitempty"`
+	UserID              int64  `json:"user_id,omitempty"`
+	RoleID              *int64 `json:"role_id,omitempty"`
+	PrincipalType       string `json:"principal_type,omitempty"`
+	DeviceID            string `json:"device_id,omitempty"`
+	DeviceSessionID     string `json:"device_session_id,omitempty"`
+	IntegrationClientID int64  `json:"integration_client_id,omitempty"`
+	Type                string `json:"type,omitempty"`
 	jwt.RegisteredClaims
 }
 

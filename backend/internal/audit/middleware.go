@@ -203,6 +203,8 @@ func auditedRoute(method, path string) (routeRule, bool) {
 		return routeRule{eventType: EventRatingSelectionSaved, entityType: "rating_selection", entityIDFromResponse: true, route: path}, true
 	case method == http.MethodPost && len(segments) == 7 && segments[0] == "api" && segments[1] == "v1" && segments[2] == "admin" && segments[3] == "rating" && segments[4] == "selections" && segments[6] == "lock":
 		return ruleWithPathID(EventRatingSelectionLocked, "rating_selection", segments[5], "/api/v1/admin/rating/selections/{selectionID}/lock")
+	case method == http.MethodPost && len(segments) == 9 && segments[0] == "api" && segments[1] == "v1" && segments[2] == "integrations" && segments[3] == "competitions" && segments[5] == "events" && segments[7] == "results" && segments[8] == "import":
+		return ruleWithPathID(EventIntegrationResultsImported, "competition_event", segments[6], "/api/v1/integrations/competitions/{competitionID}/events/{eventID}/results/import")
 	default:
 		return routeRule{}, false
 	}

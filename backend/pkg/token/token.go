@@ -42,6 +42,17 @@ func (m *Manager) GenerateRefreshToken(payload TokenPayload) (string, error) {
 	}, time.Now().Add(m.refreshTTL))
 }
 
+func (m *Manager) GenerateIntegrationAccessToken(payload IntegrationTokenPayload) (string, error) {
+	if payload.ClientID <= 0 {
+		return "", errors.New("integration client id is required")
+	}
+	return m.generateToken(Claims{
+		IntegrationClientID: payload.ClientID,
+		PrincipalType:       "integration",
+		Type:                "access",
+	}, time.Now().Add(m.accessTTL))
+}
+
 func (m *Manager) GenerateDeviceAccessToken(
 	payload DeviceTokenPayload,
 	sessionExpiresAt time.Time,
@@ -116,4 +127,8 @@ func HashRefresh(token string) string {
 
 func (m *Manager) RefreshTTL() time.Duration {
 	return m.refreshTTL
+}
+
+func (m *Manager) AccessTTL() time.Duration {
+	return m.accessTTL
 }

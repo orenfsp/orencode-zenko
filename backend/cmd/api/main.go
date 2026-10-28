@@ -21,6 +21,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/evsk"
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
+	"github.com/orenfsp/orencode-zenko.git/internal/integration"
 	"github.com/orenfsp/orencode-zenko.git/internal/judgecategory"
 	"github.com/orenfsp/orencode-zenko.git/internal/municipality"
 	"github.com/orenfsp/orencode-zenko.git/internal/notification" // <-- ДОБАВЛЕНО
@@ -194,6 +195,14 @@ func main() {
 	resultRepository := result.NewRepository(queries, pool)
 	resultService := result.NewService(resultRepository, fileStorage, result.NewPDFProtocolGenerator())
 	resultHandler := result.NewHandler(resultService)
+	integrationRepository := integration.NewRepository(queries, pool)
+	integrationService := integration.NewService(integrationRepository, jwtManager, resultService)
+	integrationHandler := integration.NewHandler(integrationService)
+	integrationMiddleware := integration.NewMiddleware(jwtManager, integrationRepository)
+	platformEventMiddleware := integration.NewPlatformEventMiddleware(integrationService)
+	integrationWorkerCtx, cancelIntegrationWorker := context.WithCancel(context.Background())
+	defer cancelIntegrationWorker()
+	go integration.RunWebhookWorker(integrationWorkerCtx, integrationRepository, 5*time.Second)
 	calendarPlanRepository := calendarplan.NewRepository(queries)
 	calendarPlanService := calendarplan.NewService(calendarPlanRepository)
 	calendarPlanHandler := calendarplan.NewHandler(calendarPlanService)
@@ -336,9 +345,22 @@ func main() {
 	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
 	mux.HandleFunc("POST /api/v1/auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /api/v1/auth/logout", authHandler.Logout)
-	
+
+	// External system integrations.
+	mux.HandleFunc("POST /api/v1/integrations/token", integrationHandler.Token)
+	mux.Handle("GET /api/v1/integrations/webhooks",
+		integrationMiddleware.Require(integration.PermissionWebhooksManage, http.HandlerFunc(integrationHandler.ListWebhooks)))
+	mux.Handle("POST /api/v1/integrations/webhooks",
+		integrationMiddleware.Require(integration.PermissionWebhooksManage, http.HandlerFunc(integrationHandler.CreateWebhook)))
+	mux.Handle("DELETE /api/v1/integrations/webhooks/{subscriptionID}",
+		integrationMiddleware.Require(integration.PermissionWebhooksManage, http.HandlerFunc(integrationHandler.DeleteWebhook)))
+	mux.Handle("POST /api/v1/integrations/competitions/{competitionID}/events/{eventID}/results/import",
+		integrationMiddleware.Require(integration.PermissionResultsImport, http.HandlerFunc(integrationHandler.ImportResults)))
+	mux.Handle("GET /api/v1/integrations/competitions/{competitionID}/events/{eventID}/results",
+		integrationMiddleware.Require(integration.PermissionResultsImport, http.HandlerFunc(integrationHandler.GetResults)))
+
 	mux.Handle("POST /api/v1/session/active-role", authenticated(authHandler.SwitchActiveRole))
-	
+
 	mux.Handle("GET /api/v1/profile", authenticated(authHandler.GetProfile))
 	mux.HandleFunc("GET /api/v1/profiles/{userID}", authHandler.GetPublicProfile)
 	mux.HandleFunc("PATCH /api/v1/profile", authHandler.PatchProfile)
@@ -480,7 +502,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/judge-categories", judgeCategoryHandler.ListCategories)
 
 	address := ":" + cfg.HTTP.Port
-	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(auditMiddleware.Wrap(mux))
+	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(auditMiddleware.Wrap(platformEventMiddleware.Wrap(mux)))
 
 	logger.Log.Info("server started", zap.String("address", address))
 	if err := http.ListenAndServe(address, handler); err != nil {
