@@ -41,7 +41,7 @@ docker compose down -v
 ```
 2.1 Запустите сборку и старт контейнеров:
    ```bash
-   docker compose up --build -d
+   docker compose --env-file backend/.env up --build -d
    ```
 
 3. Откройте приложение в браузере:

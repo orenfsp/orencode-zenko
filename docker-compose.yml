@@ -1,0 +1,100 @@
+name: orencode-zenko
+
+services:
+  postgres:
+    image: postgres:18
+    env_file:
+      - ./backend/.env
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  migrate:
+    image: migrate/migrate:v4.19.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/db/migrations:/migrations:ro
+    command:
+      - "-path=/migrations"
+      - "-database=${DATABASE_URL_DOCKER}"
+      - "up"
+    restart: "no"
+
+  rbac-seed:
+    build:
+      context: ./backend
+      dockerfile: dockerfile
+    image: orencode-zenko-backend:local
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
+    entrypoint: ["/seed-rbac"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  seed-demo:
+    build:
+      context: ./backend
+      dockerfile: dockerfile
+    image: orencode-zenko-backend:local
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
+    entrypoint: ["/seed-demo"]
+    depends_on:
+      rbac-seed:
+        condition: service_completed_successfully
+    restart: "no"
+
+  server:
+    build:
+      context: ./backend
+      dockerfile: dockerfile
+    image: orencode-zenko-backend:local
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
+      STORAGE_PATH: /app/private_uploads
+      BACKEND_PORT: "8080"
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      seed-demo:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    volumes:
+      - uploaded_files:/app/private_uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        BACKEND_URL: http://server:8080
+    environment:
+      BACKEND_URL: http://server:8080
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      server:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploaded_files:

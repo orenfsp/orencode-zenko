@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/orenfsp/orencode-zenko.git/config"
@@ -97,6 +96,9 @@ func main() {
 
 	protected := func(permission string, handler http.HandlerFunc) http.Handler {
 		return rbacMiddleware.Authenticate(rbacMiddleware.Require(permission)(handler))
+	}
+	authenticated := func(handler http.HandlerFunc) http.Handler {
+		return rbacMiddleware.Authenticate(http.HandlerFunc(handler))
 	}
 
 	// File service.
@@ -247,39 +249,6 @@ func main() {
 	rankApplicationService := rankuser.NewService(rankApplicationRepository)
 	rankApplicationHandler := rankuser.NewHandler(rankApplicationService)
 
-	// Adds the authenticated user's ID to the context expected by usercoach.Handler.
-	// The token is verified by the existing RBAC middleware first.
-	withUserCoachIdentity := func(next http.Handler) http.Handler {
-		return rbacMiddleware.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			const bearerPrefix = "Bearer "
-			authorization := strings.TrimSpace(r.Header.Get("Authorization"))
-
-			if len(authorization) <= len(bearerPrefix) ||
-				!strings.EqualFold(authorization[:len(bearerPrefix)], bearerPrefix) {
-				http.Error(w, "требуется авторизация", http.StatusUnauthorized)
-				return
-			}
-
-			rawToken := strings.TrimSpace(authorization[len(bearerPrefix):])
-			if rawToken == "" || strings.ContainsAny(rawToken, " \t\r\n") {
-				http.Error(w, "недействительный токен", http.StatusUnauthorized)
-				return
-			}
-
-			claims, err := jwtManager.Parse(rawToken)
-			if err != nil || claims == nil ||
-				claims.Type != "access" ||
-				claims.PrincipalType != "user" ||
-				claims.UserID <= 0 {
-				http.Error(w, "недействительный токен", http.StatusUnauthorized)
-				return
-			}
-
-			ctx := usercoach.WithAuthenticatedUser(r.Context(), claims.UserID)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		}))
-	}
-
 	// --- Инициализация уведомлений для фронта ---
 	notificationRepo := notification.NewRepository(queries)
 	notificationHandler := notification.NewHandler(notificationRepo)
@@ -297,62 +266,81 @@ func main() {
 	// Files.
 	mux.Handle("GET /api/v1/files/{fileID}/download", rbacMiddleware.Authenticate(http.HandlerFunc(fileHandler.Download)))
 	mux.Handle("GET /api/v1/admin/files", protected(rbac.PermissionFilesRead, fileHandler.ListAll))
-	registerAntiDopingRoutes(
-		mux,
-		antiDopingHandler,
-		func(handler http.HandlerFunc) http.Handler {
-			return rbacMiddleware.Authenticate(handler)
-		},
-		protected,
-	)
-	
+	mux.Handle("POST /api/v1/anti-doping/self", authenticated(antiDopingHandler.Upload))
+	mux.Handle("GET /api/v1/anti-doping/self", authenticated(antiDopingHandler.ListMine))
+	mux.Handle("PATCH /api/v1/admin/anti-doping/{certificateID}", protected(rbac.PermissionAntiDopingReview, antiDopingHandler.Review))
+
 	// RBAC administration.
 	mux.Handle("GET /api/v1/admin/roles", protected(rbac.PermissionRolesRead, rbacHandler.ListRoles))
 	mux.Handle("POST /api/v1/admin/roles", protected(rbac.PermissionRolesCreate, rbacHandler.CreateRole))
 	mux.Handle("POST /api/v1/admin/users/{userID}/roles", protected(rbac.PermissionRolesAssign, rbacHandler.AssignRole))
 	mux.Handle("GET /api/v1/admin/permissions", protected(rbac.PermissionPermissionsRead, rbacHandler.ListPermissions))
 	mux.Handle("GET /api/v1/roles/self-assignable", rbacMiddleware.Authenticate(http.HandlerFunc(rbacHandler.ListSelfAssignableRoles)))
-	
+
 	// User-coach relations.
-	mux.Handle("POST /api/v1/coach/user-coaches", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.Create)))
-	mux.Handle("GET /api/v1/coach/user-coaches", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.ListByCoach)))
-	mux.Handle("GET /api/v1/participant/coaches", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.ListByParticipant)))
-	mux.Handle("PATCH /api/v1/user-coaches/{id}/confirm", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.Confirm)))
-	mux.Handle("PATCH /api/v1/user-coaches/{id}/end", withUserCoachIdentity(http.HandlerFunc(userCoachHandler.End)))
+	mux.Handle("POST /api/v1/coach/user-coaches", rbacMiddleware.Authenticate(http.HandlerFunc(userCoachHandler.Create)))
+	mux.Handle("GET /api/v1/coach/user-coaches", rbacMiddleware.Authenticate(http.HandlerFunc(userCoachHandler.ListByCoach)))
+	mux.Handle("GET /api/v1/participant/coaches", rbacMiddleware.Authenticate(http.HandlerFunc(userCoachHandler.ListByParticipant)))
+	mux.Handle("PATCH /api/v1/user-coaches/{id}/confirm", rbacMiddleware.Authenticate(http.HandlerFunc(userCoachHandler.Confirm)))
+	mux.Handle("PATCH /api/v1/user-coaches/{id}/end", rbacMiddleware.Authenticate(http.HandlerFunc(userCoachHandler.End)))
 	mux.Handle("GET /api/v1/admin/audit-logs", protected(rbac.PermissionRolesRead, auditHandler.List))
 	// Competition, calendar plans and reference data.
-	registerCompetitionRoutes(mux, competitionHandler, protected)
-	registerCompetitionEventRoutes(mux, competitionEventHandler, protected)
-	registerCompetitionJudgeRoutes(mux, judgeHandler, protected)
-	registerCompetitionResultRoutes(mux, resultHandler, protected)
+	mux.HandleFunc("GET /api/v1/calendar/competitions", competitionHandler.Calendar)
+	mux.HandleFunc("GET /api/v1/competitions", competitionHandler.List)
+	mux.HandleFunc("GET /api/v1/competitions/{id}", competitionHandler.Get)
+	mux.Handle("POST /api/v1/competitions", protected(competition.PermissionCreate, competitionHandler.Create))
+	mux.Handle("PATCH /api/v1/competitions/{id}", protected(competition.PermissionUpdate, competitionHandler.Update))
+	mux.HandleFunc("GET /api/v1/competitions/{competitionID}/events", competitionEventHandler.ListPublic)
+	mux.HandleFunc("GET /api/v1/competitions/{competitionID}/events/{eventID}", competitionEventHandler.GetPublic)
+	mux.Handle("GET /api/v1/admin/competitions/{competitionID}/events", protected(competitionevent.PermissionRead, competitionEventHandler.ListAdmin))
+	mux.Handle("GET /api/v1/admin/competitions/{competitionID}/events/{eventID}", protected(competitionevent.PermissionRead, competitionEventHandler.GetAdmin))
+	mux.Handle("POST /api/v1/competitions/{competitionID}/events", protected(competitionevent.PermissionCreate, competitionEventHandler.Create))
+	mux.Handle("PATCH /api/v1/competitions/{competitionID}/events/{eventID}", protected(competitionevent.PermissionUpdate, competitionEventHandler.Update))
+	mux.Handle("DELETE /api/v1/competitions/{competitionID}/events/{eventID}", protected(competitionevent.PermissionDelete, competitionEventHandler.Delete))
+	mux.HandleFunc("GET /api/v1/competitions/{id}/judges", judgeHandler.List)
+	mux.Handle("GET /api/v1/admin/competitions/{id}/judges", protected(competition.PermissionManageJudges, judgeHandler.ListAdmin))
+	mux.Handle("POST /api/v1/competitions/{id}/judges", protected(competition.PermissionManageJudges, judgeHandler.Assign))
+	mux.Handle("DELETE /api/v1/competitions/{id}/judges/{assignmentId}", protected(competition.PermissionManageJudges, judgeHandler.Remove))
+	resultBase := "/api/v1/admin/competitions/{competitionID}/events/{eventID}/results"
+	mux.Handle("GET "+resultBase, protected(result.PermissionRead, resultHandler.Get))
+	mux.Handle("PUT "+resultBase+"/settings", protected(result.PermissionManage, resultHandler.Configure))
+	mux.Handle("PUT "+resultBase, protected(result.PermissionManage, resultHandler.Save))
+	mux.Handle("POST "+resultBase+"/calculate", protected(result.PermissionManage, resultHandler.Calculate))
+	mux.Handle("POST "+resultBase+"/approve", protected(result.PermissionApprove, resultHandler.Approve))
+	mux.HandleFunc("GET /api/v1/competitions/{competitionID}/events/{eventID}/protocol", resultHandler.DownloadProtocol)
 	mux.Handle("GET /api/v1/profile/competition-results", rbacMiddleware.Authenticate(http.HandlerFunc(resultHandler.History)))
-	registerCalendarPlanRoutes(mux, calendarPlanHandler, protected)
-	registerReferenceRoutes(mux, referenceHandler)
-	registerDashboardRoutes(mux, dashboardHandler, protected)
-	registerRegistryRoutes(mux, registryHandler, protected)
-	registerJudgeCategoryRoutes(
-		mux,
-		judgeCategoryHandler,
-		func(handler http.HandlerFunc) http.Handler { return rbacMiddleware.Authenticate(handler) },
-		protected,
-	)
-	registerDeadlineRoutes(
-		mux,
-		deadlineHandler,
-		func(handler http.HandlerFunc) http.Handler { return rbacMiddleware.Authenticate(handler) },
-		protected,
-	)
+	mux.Handle("GET /api/v1/admin/calendar-plans", protected(calendarplan.PermissionRead, calendarPlanHandler.List))
+	mux.Handle("GET /api/v1/admin/calendar-plans/{id}", protected(calendarplan.PermissionRead, calendarPlanHandler.Get))
+	mux.Handle("POST /api/v1/admin/calendar-plans", protected(calendarplan.PermissionCreate, calendarPlanHandler.Create))
+	mux.Handle("PATCH /api/v1/admin/calendar-plans/{id}", protected(calendarplan.PermissionUpdate, calendarPlanHandler.Update))
+	mux.Handle("GET /api/v1/admin/calendar-plans/{id}/competitions", protected(calendarplan.PermissionRead, calendarPlanHandler.ListCompetitions))
+	mux.HandleFunc("GET /api/v1/disciplines", referenceHandler.ListDisciplines)
+	mux.HandleFunc("GET /api/v1/competition-types", referenceHandler.ListCompetitionTypes)
+	mux.HandleFunc("GET /api/v1/competition-levels", referenceHandler.ListCompetitionLevels)
+	mux.HandleFunc("GET /api/v1/age-groups", referenceHandler.ListAgeGroups)
+	mux.Handle("GET /api/v1/admin/dashboard", protected(dashboard.PermissionRead, dashboardHandler.Get))
+	mux.Handle("GET /api/v1/admin/registry/users", protected(registry.PermissionRead, registryHandler.ListUsers))
+	mux.Handle("GET /api/v1/admin/registry/organizations", protected(registry.PermissionRead, registryHandler.ListOrganizations))
+	mux.Handle("POST /api/v1/judge-category-applications", authenticated(judgeCategoryHandler.Create))
+	mux.Handle("GET /api/v1/judge-category-applications/mine", authenticated(judgeCategoryHandler.ListMine))
+	mux.Handle("GET /api/v1/judge-category/current", authenticated(judgeCategoryHandler.GetCurrent))
+	mux.Handle("GET /api/v1/judge/competitions", authenticated(judgeCategoryHandler.ListAssignments))
+	mux.Handle("GET /api/v1/admin/judge-category-applications", protected(judgecategory.PermissionReview, judgeCategoryHandler.ListPending))
+	mux.Handle("PATCH /api/v1/admin/judge-category-applications/{id}", protected(judgecategory.PermissionReview, judgeCategoryHandler.Review))
+	mux.Handle("GET /api/v1/deadlines", authenticated(deadlineHandler.List))
+	mux.Handle("GET /api/v1/admin/report-deadlines", protected(deadline.PermissionManage, deadlineHandler.ListReports))
+	mux.Handle("POST /api/v1/admin/report-deadlines", protected(deadline.PermissionManage, deadlineHandler.CreateReport))
+	mux.Handle("PATCH /api/v1/admin/report-deadlines/{id}", protected(deadline.PermissionManage, deadlineHandler.UpdateReport))
 
 	// Rankings.
 	mux.HandleFunc("POST /api/v1/admin/rank", rankHandler.CreateRank)
 	mux.HandleFunc("GET /api/v1/rank/{id}", rankHandler.GetRank)
 	mux.HandleFunc("GET /api/v1/rank/", rankHandler.ListRank)
-	registerRankApplicationRoutes(
-		mux,
-		rankApplicationHandler,
-		func(handler http.HandlerFunc) http.Handler { return rbacMiddleware.Authenticate(handler) },
-		protected,
-	)
+	mux.Handle("POST /api/v1/rank-applications", authenticated(rankApplicationHandler.Create))
+	mux.Handle("GET /api/v1/rank-applications/mine", authenticated(rankApplicationHandler.ListMine))
+	mux.Handle("GET /api/v1/ranks/history", authenticated(rankApplicationHandler.ListHistory))
+	mux.Handle("GET /api/v1/admin/rank-applications", protected(rbac.PermissionRankApplicationsReview, rankApplicationHandler.ListPending))
+	mux.Handle("PATCH /api/v1/admin/rank-applications/{applicationID}", protected(rbac.PermissionRankApplicationsReview, rankApplicationHandler.Review))
 
 	mux.HandleFunc("GET /api/v1/municipalities", municipalityHandler.List)
 	mux.HandleFunc("GET /api/v1/municipalities/{id}", municipalityHandler.Get)
@@ -376,17 +364,6 @@ func main() {
 		logger.Log.Fatal("http server stopped", zap.Error(err))
 	}
 }
-func registerReferenceRoutes(mux *http.ServeMux, handler *reference.Handler) {
-	mux.HandleFunc("GET /api/v1/disciplines", handler.ListDisciplines)
-	mux.HandleFunc("GET /api/v1/competition-types", handler.ListCompetitionTypes)
-	mux.HandleFunc("GET /api/v1/competition-levels", handler.ListCompetitionLevels)
-	mux.HandleFunc("GET /api/v1/age-groups", handler.ListAgeGroups)
-}
-func registerRegistryRoutes(mux *http.ServeMux, handler *registry.Handler, protected protectedHandler) {
-		mux.Handle("GET /api/v1/admin/registry/users", protected(registry.PermissionRead, handler.ListUsers))
-		mux.Handle("GET /api/v1/admin/registry/organizations", protected(registry.PermissionRead, handler.ListOrganizations))
-	}
-
 func runAntiDopingExpiration(ctx context.Context, service *antidoping.Service) {
 	expire := func() {
 		rows, err := service.Expire(ctx)
