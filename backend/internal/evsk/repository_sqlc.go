@@ -2,8 +2,10 @@ package evsk
 
 import (
 	"context"
+	"errors"
 	"github.com/jackc/pgx/v5/pgtype"
 	db "github.com/orenfsp/orencode-zenko.git/db/sqlc"
+	"strings"
 	"time"
 )
 
@@ -11,11 +13,9 @@ type sqlRepository struct{ queries *db.Queries }
 
 func NewRepository(q *db.Queries) Repository { return &sqlRepository{queries: q} }
 func (r *sqlRepository) Upsert(ctx context.Context, req UpsertRequest) (Standard, error) {
-	numeric := pgtype.Numeric{}
-	if req.MinimumScore != nil {
-		if err := numeric.Scan([]byte(*req.MinimumScore)); err != nil {
-			return Standard{}, err
-		}
+	numeric, err := optionalNumeric(req.MinimumScore)
+	if err != nil {
+		return Standard{}, err
 	}
 	row, err := r.queries.UpsertEVSKStandard(ctx, db.UpsertEVSKStandardParams{RankID: req.RankID, DisciplineID: req.DisciplineID, MinimumPlace: optionalInt(req.MinimumPlace), MinimumScore: numeric, ValidFrom: optionalDate(req.ValidFrom), ValidTo: optionalDate(req.ValidTo)})
 	if err != nil {
@@ -42,6 +42,16 @@ func optionalInt(v *int32) pgtype.Int4 {
 		return pgtype.Int4{}
 	}
 	return pgtype.Int4{Int32: *v, Valid: true}
+}
+func optionalNumeric(v *string) (pgtype.Numeric, error) {
+	if v == nil {
+		return pgtype.Numeric{}, nil
+	}
+	var numeric pgtype.Numeric
+	if err := numeric.Scan(strings.TrimSpace(*v)); err != nil {
+		return pgtype.Numeric{}, errors.Join(ErrInvalidInput, err)
+	}
+	return numeric, nil
 }
 func optionalDate(v *string) pgtype.Date {
 	if v == nil {

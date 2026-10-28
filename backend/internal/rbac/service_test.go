@@ -60,3 +60,13 @@ func TestCreateRoleRejectsInvalidCode(t *testing.T) {
 		t.Fatalf("CreateRole() error = %v, want ErrInvalidRole", err)
 	}
 }
+
+func TestListRolePermissionsReturnsEmptySlice(t *testing.T) {
+	permissions, err := NewService(&repositoryStub{}).ListRolePermissions(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("ListRolePermissions() error = %v", err)
+	}
+	if permissions == nil || len(permissions) != 0 {
+		t.Fatalf("permissions = %#v, want non-nil empty slice", permissions)
+	}
+}

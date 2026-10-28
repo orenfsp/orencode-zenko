@@ -142,11 +142,14 @@ func (s *Service) Download(ctx context.Context, fileID, requesterUserID int64, c
 	if fileID <= 0 || requesterUserID <= 0 {
 		return Download{}, ErrInvalidInput
 	}
+	if canReadAny {
+		return s.DownloadStored(ctx, fileID)
+	}
 	record, err := s.repo.GetAttachedForDownload(ctx, fileID)
 	if err != nil {
 		return Download{}, err
 	}
-	if record.OwnerUserID != requesterUserID && !canReadAny {
+	if record.OwnerUserID != requesterUserID {
 		return Download{}, ErrFileForbidden
 	}
 	content, err := s.storage.Open(ctx, record.StorageKey)

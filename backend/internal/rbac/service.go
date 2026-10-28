@@ -69,5 +69,12 @@ func (s *Service) ListRolePermissions(ctx context.Context, roleID int64) ([]stri
 	if roleID <= 0 {
 		return nil, ErrRoleNotFound
 	}
-	return s.repository.ListRolePermissions(ctx, roleID)
+	permissions, err := s.repository.ListRolePermissions(ctx, roleID)
+	if err != nil {
+		return nil, err
+	}
+	if permissions == nil {
+		permissions = make([]string, 0)
+	}
+	return permissions, nil
 }

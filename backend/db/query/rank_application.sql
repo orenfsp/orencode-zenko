@@ -92,7 +92,7 @@ SELECT EXISTS (
 -- name: ReviewRankApplication :one
 UPDATE rank_application
 SET
-    status = sqlc.arg(status),
+    status = sqlc.arg(status)::varchar,
     reviewed_by_user_id = sqlc.arg(reviewed_by_user_id),
     reviewed_at = now(),
     rejection_reason = sqlc.narg(rejection_reason),
@@ -100,7 +100,7 @@ SET
     expires_at = COALESCE(
         sqlc.narg(expires_at),
         CASE
-            WHEN sqlc.arg(status) = 'approved' AND rank.ttl IS NOT NULL
+            WHEN sqlc.arg(status)::varchar = 'approved'::varchar AND rank.ttl IS NOT NULL
             THEN (COALESCE(sqlc.narg(assigned_at), CURRENT_DATE) + make_interval(years => rank.ttl))::date
             ELSE NULL
         END

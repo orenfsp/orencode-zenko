@@ -2,6 +2,7 @@ package team
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"net/http"
 )
@@ -22,7 +23,14 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	squad, err := h.service.Create(r.Context(), identity.UserID, req)
 	if err != nil {
-		write(w, http.StatusBadRequest, map[string]string{"message": err.Error()})
+		switch {
+		case errors.Is(err, ErrForbidden):
+			write(w, http.StatusForbidden, map[string]string{"message": "недостаточно прав"})
+		case errors.Is(err, ErrInvalidInput):
+			write(w, http.StatusBadRequest, map[string]string{"message": "некорректные данные"})
+		default:
+			write(w, http.StatusInternalServerError, map[string]string{"message": "внутренняя ошибка сервера"})
+		}
 		return
 	}
 	write(w, http.StatusCreated, map[string]any{"data": squad})
