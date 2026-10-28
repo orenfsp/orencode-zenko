@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { initApiClient, resetApiClient } from "@/shared/api/client";
+import { getApiPermissions, initApiClient, resetApiClient } from "@/shared/api/client";
 import { AUTH_FAILURE_EVENT, getAccessIdentity, refreshSession, tokenStorage } from "@/entities/session";
 
 const ApiContext = createContext<boolean | null>(null);
@@ -11,7 +11,12 @@ export function ApiProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     initApiClient({
       getAccessToken: () => tokenStorage.get()?.access_token ?? null,
-      getPermissions: () => { const token = tokenStorage.get()?.access_token; return token ? getAccessIdentity(token)?.permissions ?? null : null; },
+      getPermissions: () => {
+        const permissions = getApiPermissions();
+        if (permissions !== undefined) return permissions;
+        const token = tokenStorage.get()?.access_token;
+        return token ? getAccessIdentity(token)?.permissions ?? null : null;
+      },
       refresh: async () => (await refreshSession())?.access_token ?? null,
       onAuthFailure: () => { tokenStorage.clear(); window.dispatchEvent(new Event(AUTH_FAILURE_EVENT)); },
     });
