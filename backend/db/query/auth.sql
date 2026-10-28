@@ -53,6 +53,32 @@ LEFT JOIN LATERAL (
 ) selected_role ON true
 WHERE u.id = $1;
 
+-- name: GetUserProfile :one
+SELECT
+    u.id,
+    u.first_name,
+    u.last_name,
+    u.middle_name,
+    u.birth,
+    u.email,
+    u.tg_username,
+    u.access_status,
+    m.id AS municipality_id,
+    m.name AS municipality_name,
+    o.id AS organization_id,
+    o.name AS organization_name
+FROM "user" AS u
+LEFT JOIN municipality AS m ON m.id = u.municipality_id
+LEFT JOIN organization AS o ON o.id = u.organization_id
+WHERE u.id = sqlc.arg(user_id);
+
+-- name: ListUserProfileRoles :many
+SELECT r.id, r.code, r.name
+FROM role_user AS ru
+JOIN role AS r ON r.id = ru.role_id
+WHERE ru.user_id = sqlc.arg(user_id)
+ORDER BY ru.granted_at DESC, ru.id DESC;
+
 -- name: IsRoleSelfAssignable :one
 SELECT EXISTS (
     SELECT 1

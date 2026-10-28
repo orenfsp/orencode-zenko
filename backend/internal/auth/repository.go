@@ -9,6 +9,7 @@ type UserProvider interface {
 	CreateUser(ctx context.Context, data CreateUser) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
+	GetProfile(ctx context.Context, id int64) (Profile, error)
 	SetRole(ctx context.Context, userID, roleID int64) error
 	SetRoles(ctx context.Context, userID int64, roleIDs []int64) error
 	UpdateTelegramUsername(ctx context.Context, userID int64, username *string) error

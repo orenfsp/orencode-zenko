@@ -244,6 +244,37 @@ POST /api/v1/auth/logout
 
 Успешный ответ: `204 No Content` без тела. После ответа фронт удаляет оба токена и локальные данные текущего пользователя.
 
+## Получение профиля
+
+```http
+GET /api/v1/profile
+Authorization: Bearer <access_token>
+```
+
+Ответ содержит рабочие данные текущего пользователя. `password_hash`, `created_at` и `updated_at` в запрос не выбираются и в ответ не попадают.
+
+```json
+{
+  "data": {
+    "id": 42,
+    "first_name": "Иван",
+    "last_name": "Иванов",
+    "middle_name": "Иванович",
+    "birth_date": "2000-05-10",
+    "email": "user@example.com",
+    "tg_username": "ivanov",
+    "access_status": true,
+    "municipality": { "id": 3, "name": "Оренбург" },
+    "organization": { "id": 8, "name": "Спортивная школа" },
+    "roles": [
+      { "id": 2, "code": "participant", "name": "Участник" }
+    ]
+  }
+}
+```
+
+Если муниципалитет или организация не выбраны, соответствующее поле будет `null` или отсутствует. При отсутствии ролей возвращается пустой массив `roles`.
+
 ## Изменение профиля и выбор роли
 
 ```http

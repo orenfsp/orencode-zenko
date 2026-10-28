@@ -38,6 +38,20 @@ type PatchProfileResponse struct {
 	RefreshToken     string  `json:"refresh_token,omitempty"`
 }
 
+type ProfileResponse struct {
+	ID               int64             `json:"id"`
+	FirstName        string            `json:"first_name"`
+	LastName         string            `json:"last_name"`
+	MiddleName       *string           `json:"middle_name,omitempty"`
+	BirthDate        string            `json:"birth_date"`
+	Email            string            `json:"email"`
+	TelegramUsername *string           `json:"tg_username,omitempty"`
+	AccessStatus     bool              `json:"access_status"`
+	Municipality     *ProfileReference `json:"municipality,omitempty"`
+	Organization     *ProfileReference `json:"organization,omitempty"`
+	Roles            []ProfileRole     `json:"roles"`
+}
+
 type ErrorResponse struct {
 	Message string `json:"message"`
 }

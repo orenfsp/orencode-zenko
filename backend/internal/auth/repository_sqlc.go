@@ -135,6 +135,39 @@ func (r *sqlRepository) GetUserByID(ctx context.Context, id int64) (User, error)
 	}, nil
 }
 
+func (r *sqlRepository) GetProfile(ctx context.Context, id int64) (Profile, error) {
+	row, err := r.queries.GetUserProfile(ctx, id)
+	if err != nil {
+		return Profile{}, err
+	}
+	roleRows, err := r.queries.ListUserProfileRoles(ctx, id)
+	if err != nil {
+		return Profile{}, err
+	}
+	roles := make([]ProfileRole, 0, len(roleRows))
+	for _, role := range roleRows {
+		roles = append(roles, ProfileRole{ID: role.ID, Code: role.Code, Name: role.Name})
+	}
+	profile := Profile{
+		ID:               row.ID,
+		FirstName:        row.FirstName,
+		LastName:         row.LastName,
+		MiddleName:       optionalString(row.MiddleName),
+		BirthDate:        row.Birth.Time,
+		Email:            row.Email,
+		TelegramUsername: optionalString(row.TgUsername),
+		AccessStatus:     row.AccessStatus,
+		Roles:            roles,
+	}
+	if row.MunicipalityID.Valid && row.MunicipalityName.Valid {
+		profile.Municipality = &ProfileReference{ID: row.MunicipalityID.Int64, Name: row.MunicipalityName.String}
+	}
+	if row.OrganizationID.Valid && row.OrganizationName.Valid {
+		profile.Organization = &ProfileReference{ID: row.OrganizationID.Int64, Name: row.OrganizationName.String}
+	}
+	return profile, nil
+}
+
 func (r *sqlRepository) SetRole(ctx context.Context, userID, roleID int64) error {
 	return r.SetRoles(ctx, userID, []int64{roleID})
 }

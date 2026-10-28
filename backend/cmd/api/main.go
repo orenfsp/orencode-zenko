@@ -261,6 +261,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
 	mux.HandleFunc("POST /api/v1/auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /api/v1/auth/logout", authHandler.Logout)
+	mux.Handle("GET /api/v1/profile", authenticated(authHandler.GetProfile))
 	mux.HandleFunc("PATCH /api/v1/profile", authHandler.PatchProfile)
 
 	// Files.

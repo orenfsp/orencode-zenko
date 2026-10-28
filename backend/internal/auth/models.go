@@ -11,6 +11,31 @@ type User struct {
 	AccessStatus     bool
 }
 
+type Profile struct {
+	ID               int64
+	FirstName        string
+	LastName         string
+	MiddleName       *string
+	BirthDate        time.Time
+	Email            string
+	TelegramUsername *string
+	AccessStatus     bool
+	Municipality     *ProfileReference
+	Organization     *ProfileReference
+	Roles            []ProfileRole
+}
+
+type ProfileReference struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+type ProfileRole struct {
+	ID   int64  `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
 type CreateUser struct {
 	FirstName                 string
 	LastName                  string

@@ -12,6 +12,7 @@ import (
 
 	autherrs "github.com/orenfsp/orencode-zenko.git/internal/auth/errs"
 	filedomain "github.com/orenfsp/orencode-zenko.git/internal/file"
+	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"go.uber.org/zap"
 )
@@ -175,6 +176,20 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok || identity.UserID <= 0 {
+		writeError(w, http.StatusUnauthorized, "требуется access-токен")
+		return
+	}
+	response, err := h.service.GetProfile(r.Context(), identity.UserID)
+	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, response)
 }
 
 func (h *Handler) PatchProfile(w http.ResponseWriter, r *http.Request) {

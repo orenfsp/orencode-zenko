@@ -174,6 +174,33 @@ func (s *Service) Logout(ctx context.Context, refreshToken string) error {
 	return s.sessions.DeleteSession(ctx, session.ID)
 }
 
+func (s *Service) GetProfile(ctx context.Context, userID int64) (ProfileResponse, error) {
+	if userID <= 0 {
+		return ProfileResponse{}, autherrs.ErrAccessDenied
+	}
+	profile, err := s.users.GetProfile(ctx, userID)
+	if err != nil {
+		return ProfileResponse{}, err
+	}
+	roles := profile.Roles
+	if roles == nil {
+		roles = make([]ProfileRole, 0)
+	}
+	return ProfileResponse{
+		ID:               profile.ID,
+		FirstName:        profile.FirstName,
+		LastName:         profile.LastName,
+		MiddleName:       profile.MiddleName,
+		BirthDate:        profile.BirthDate.Format("2006-01-02"),
+		Email:            profile.Email,
+		TelegramUsername: profile.TelegramUsername,
+		AccessStatus:     profile.AccessStatus,
+		Municipality:     profile.Municipality,
+		Organization:     profile.Organization,
+		Roles:            roles,
+	}, nil
+}
+
 func (s *Service) PatchProfile(ctx context.Context, accessToken string, req PatchProfileRequest) (PatchProfileResponse, error) {
 	claims, err := s.tokens.Parse(accessToken)
 	if err != nil || claims.Type != "access" || claims.PrincipalType != "user" || claims.UserID == 0 {

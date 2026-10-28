@@ -12,6 +12,7 @@ import (
 
 type userProviderStub struct {
 	user       User
+	profile    Profile
 	createData CreateUser
 	createErr  error
 }
@@ -27,6 +28,10 @@ func (s *userProviderStub) GetUserByEmail(context.Context, string) (User, error)
 
 func (s *userProviderStub) GetUserByID(context.Context, int64) (User, error) {
 	return s.user, nil
+}
+
+func (s *userProviderStub) GetProfile(context.Context, int64) (Profile, error) {
+	return s.profile, nil
 }
 
 func (s *userProviderStub) SetRole(_ context.Context, _ int64, roleID int64) error {
@@ -92,6 +97,30 @@ func validRegisterRequest() RegisterRequest {
 		BirthDate: "2000-05-10",
 		Email:     "USER@example.com",
 		Password:  "password123",
+	}
+}
+
+func TestGetProfileReturnsPublicUserData(t *testing.T) {
+	municipality := &ProfileReference{ID: 3, Name: "Оренбург"}
+	organization := &ProfileReference{ID: 8, Name: "Спортивная школа"}
+	users := &userProviderStub{profile: Profile{
+		ID: 42, FirstName: "Иван", LastName: "Иванов",
+		BirthDate: time.Date(2000, 5, 10, 0, 0, 0, 0, time.UTC),
+		Email:     "user@example.com", AccessStatus: true,
+		Municipality: municipality, Organization: organization,
+		Roles: []ProfileRole{{ID: 2, Code: "participant", Name: "Участник"}},
+	}}
+	service := newTestService(users, &sessionProviderStub{})
+
+	response, err := service.GetProfile(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("GetProfile() error = %v", err)
+	}
+	if response.BirthDate != "2000-05-10" || response.Municipality == nil || response.Municipality.Name != "Оренбург" {
+		t.Fatalf("unexpected profile response: %+v", response)
+	}
+	if response.Organization == nil || len(response.Roles) != 1 || response.Roles[0].Code != "participant" {
+		t.Fatalf("profile references or roles were not returned: %+v", response)
 	}
 }
 

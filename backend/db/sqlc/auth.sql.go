@@ -228,6 +228,61 @@ func (q *Queries) GetAuthUserByID(ctx context.Context, id int64) (GetAuthUserByI
 	return i, err
 }
 
+const getUserProfile = `-- name: GetUserProfile :one
+SELECT
+    u.id,
+    u.first_name,
+    u.last_name,
+    u.middle_name,
+    u.birth,
+    u.email,
+    u.tg_username,
+    u.access_status,
+    m.id AS municipality_id,
+    m.name AS municipality_name,
+    o.id AS organization_id,
+    o.name AS organization_name
+FROM "user" AS u
+LEFT JOIN municipality AS m ON m.id = u.municipality_id
+LEFT JOIN organization AS o ON o.id = u.organization_id
+WHERE u.id = $1
+`
+
+type GetUserProfileRow struct {
+	ID               int64
+	FirstName        string
+	LastName         string
+	MiddleName       pgtype.Text
+	Birth            pgtype.Date
+	Email            string
+	TgUsername       pgtype.Text
+	AccessStatus     bool
+	MunicipalityID   pgtype.Int8
+	MunicipalityName pgtype.Text
+	OrganizationID   pgtype.Int8
+	OrganizationName pgtype.Text
+}
+
+func (q *Queries) GetUserProfile(ctx context.Context, userID int64) (GetUserProfileRow, error) {
+	row := q.db.QueryRow(ctx, getUserProfile, userID)
+	var i GetUserProfileRow
+	err := row.Scan(
+		&i.ID,
+		&i.FirstName,
+		&i.LastName,
+		&i.MiddleName,
+		&i.Birth,
+		&i.Email,
+		&i.TgUsername,
+		&i.AccessStatus,
+		&i.MunicipalityID,
+		&i.MunicipalityName,
+		&i.OrganizationID,
+		&i.OrganizationName,
+	)
+	return i, err
+}
+
 const getUserSessionByRefreshHash = `-- name: GetUserSessionByRefreshHash :one
 SELECT id, user_id, refresh_token_hash, expires_at
 FROM user_session
@@ -266,6 +321,40 @@ func (q *Queries) IsRoleSelfAssignable(ctx context.Context, id int64) (bool, err
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const listUserProfileRoles = `-- name: ListUserProfileRoles :many
+SELECT r.id, r.code, r.name
+FROM role_user AS ru
+JOIN role AS r ON r.id = ru.role_id
+WHERE ru.user_id = $1
+ORDER BY ru.granted_at DESC, ru.id DESC
+`
+
+type ListUserProfileRolesRow struct {
+	ID   int64
+	Code string
+	Name string
+}
+
+func (q *Queries) ListUserProfileRoles(ctx context.Context, userID int64) ([]ListUserProfileRolesRow, error) {
+	rows, err := q.db.Query(ctx, listUserProfileRoles, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUserProfileRolesRow
+	for rows.Next() {
+		var i ListUserProfileRolesRow
+		if err := rows.Scan(&i.ID, &i.Code, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const rotateUserSession = `-- name: RotateUserSession :execrows
