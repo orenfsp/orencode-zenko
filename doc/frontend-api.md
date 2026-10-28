@@ -1033,3 +1033,10 @@ Authorization: Bearer <access_token>
 ```
 
 The response uses the same certificate structure and is ordered from newest to oldest. Review is performed with `PATCH /api/v1/admin/anti-doping/{certificateID}`.
+## Judge positions
+
+```http
+GET /api/v1/judge-positions
+```
+
+The public endpoint returns a list of `{ "id", "name" }` objects. Use the selected `id` as `position_id` when assigning a judge.

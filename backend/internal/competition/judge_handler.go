@@ -33,6 +33,15 @@ func (h *JudgeHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, items)
 }
 
+func (h *JudgeHandler) ListPositions(w http.ResponseWriter, r *http.Request) {
+	items, err := h.service.ListPositions(r.Context())
+	if err != nil {
+		handleJudgeError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, items)
+}
+
 func (h *JudgeHandler) ListAdmin(w http.ResponseWriter, r *http.Request) {
 	competitionID, err := parseJudgeID(r.PathValue("id"))
 	if err != nil {

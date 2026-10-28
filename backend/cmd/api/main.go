@@ -407,6 +407,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/disciplines", referenceHandler.ListDisciplines)
 	mux.HandleFunc("GET /api/v1/competition-types", referenceHandler.ListCompetitionTypes)
 	mux.HandleFunc("GET /api/v1/competition-levels", referenceHandler.ListCompetitionLevels)
+	mux.HandleFunc("GET /api/v1/judge-positions", judgeHandler.ListPositions)
 	mux.HandleFunc("GET /api/v1/age-groups", referenceHandler.ListAgeGroups)
 	mux.Handle("GET /api/v1/admin/dashboard", protected(dashboard.PermissionRead, dashboardHandler.Get))
 	mux.Handle("GET /api/v1/admin/registry/users", protected(registry.PermissionRead, registryHandler.ListUsers))
