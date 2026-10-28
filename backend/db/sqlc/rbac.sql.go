@@ -43,6 +43,16 @@ func (q *Queries) AssignRolePermission(ctx context.Context, arg AssignRolePermis
 	return err
 }
 
+const clearRolePermissions = `-- name: ClearRolePermissions :exec
+DELETE FROM role_permission
+WHERE role_id = $1
+`
+
+func (q *Queries) ClearRolePermissions(ctx context.Context, roleID int64) error {
+	_, err := q.db.Exec(ctx, clearRolePermissions, roleID)
+	return err
+}
+
 const createRole = `-- name: CreateRole :one
 INSERT INTO role (code, name, self_assignable)
 VALUES ($1, $2, $3)

@@ -140,7 +140,8 @@ func seed(ctx context.Context, pool *pgxpool.Pool, config adminSeedConfig) error
 		selfRoleID, err := queries.UpsertSelfAssignableRole(ctx, db.UpsertSelfAssignableRoleParams{
 			Code: role.Code,
 			Name: role.Name,
-		}); err != nil {
+		})
+		if err != nil {
 			return err
 		}
 		roleIDs[role.Code] = selfRoleID
