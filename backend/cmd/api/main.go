@@ -339,7 +339,7 @@ func main() {
 	mux.Handle("PATCH /api/v1/admin/report-deadlines/{id}", protected(deadline.PermissionManage, deadlineHandler.UpdateReport))
 
 	// Rankings.
-	mux.HandleFunc("POST /api/v1/admin/rank", rankHandler.CreateRank)
+	mux.Handle("POST /api/v1/admin/rank", protected(rbac.PermissionRankApplicationsReview, rankHandler.CreateRank))
 	mux.HandleFunc("GET /api/v1/rank/{id}", rankHandler.GetRank)
 	mux.HandleFunc("GET /api/v1/rank", rankHandler.ListRank)
 	mux.Handle("POST /api/v1/rank-applications", authenticated(rankApplicationHandler.Create))
