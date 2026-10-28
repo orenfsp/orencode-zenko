@@ -128,7 +128,7 @@ func (r *sqlRepository) ListReports(ctx context.Context) ([]Report, error) {
 	}
 	items := make([]Report, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, fromReport(row))
+		items = append(items, makeReport(row.ID, row.Name, row.DueAt, row.Status, row.DeadlineType, row.CreatedByUserID, row.CreatedAt, row.UpdatedAt))
 	}
 	return items, nil
 }
@@ -141,34 +141,34 @@ func (r *sqlRepository) GetReport(ctx context.Context, id int64) (Report, error)
 	if err != nil {
 		return Report{}, err
 	}
-	return fromReport(row), nil
+	return makeReport(row.ID, row.Name, row.DueAt, row.Status, row.DeadlineType, row.CreatedByUserID, row.CreatedAt, row.UpdatedAt), nil
 }
 
-func (r *sqlRepository) CreateReport(ctx context.Context, actorID int64, name string, dueAt time.Time, status string) (Report, error) {
-	row, err := r.queries.CreateReportDeadline(ctx, db.CreateReportDeadlineParams{Name: name, DueAt: pgtype.Timestamptz{Time: dueAt, Valid: true}, Status: status, CreatedByUserID: actorID})
+func (r *sqlRepository) CreateReport(ctx context.Context, actorID int64, name string, dueAt time.Time, status, reportType string) (Report, error) {
+	row, err := r.queries.CreateReportDeadline(ctx, db.CreateReportDeadlineParams{Name: name, DueAt: pgtype.Timestamptz{Time: dueAt, Valid: true}, Status: status, DeadlineType: reportType, CreatedByUserID: actorID})
 	if err != nil {
 		return Report{}, err
 	}
-	return fromReport(row), nil
+	return makeReport(row.ID, row.Name, row.DueAt, row.Status, row.DeadlineType, row.CreatedByUserID, row.CreatedAt, row.UpdatedAt), nil
 }
 
 func (r *sqlRepository) UpdateReport(ctx context.Context, report Report) (Report, error) {
-	row, err := r.queries.UpdateReportDeadline(ctx, db.UpdateReportDeadlineParams{Name: report.Name, DueAt: pgtype.Timestamptz{Time: report.DueAt, Valid: true}, Status: report.Status, ID: report.ID})
+	row, err := r.queries.UpdateReportDeadline(ctx, db.UpdateReportDeadlineParams{Name: report.Name, DueAt: pgtype.Timestamptz{Time: report.DueAt, Valid: true}, Status: report.Status, DeadlineType: report.Type, ID: report.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Report{}, ErrNotFound
 	}
 	if err != nil {
 		return Report{}, err
 	}
-	return fromReport(row), nil
+	return makeReport(row.ID, row.Name, row.DueAt, row.Status, row.DeadlineType, row.CreatedByUserID, row.CreatedAt, row.UpdatedAt), nil
 }
 
 func (r *sqlRepository) CreateReportDeadlineReminders(ctx context.Context, daysBefore int32) error {
 	return r.queries.CreateReportDeadlineReminders(ctx, daysBefore)
 }
 
-func fromReport(row db.ReportDeadline) Report {
-	return Report{ID: row.ID, Name: row.Name, DueAt: row.DueAt.Time, Status: row.Status, CreatedByUserID: row.CreatedByUserID, CreatedAt: row.CreatedAt.Time, UpdatedAt: row.UpdatedAt.Time}
+func makeReport(id int64, name string, dueAt pgtype.Timestamptz, status, reportType string, creator int64, created, updated pgtype.Timestamptz) Report {
+	return Report{ID: id, Name: name, DueAt: dueAt.Time, Status: status, Type: reportType, CreatedByUserID: creator, CreatedAt: created.Time, UpdatedAt: updated.Time}
 }
 
 func credentialItem(kind string, id, userID int64, lastName, firstName, middleName, subject string, dueAt time.Time) Item {

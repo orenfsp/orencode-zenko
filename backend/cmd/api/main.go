@@ -17,6 +17,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/internal/competitionevent"
 	"github.com/orenfsp/orencode-zenko.git/internal/dashboard"
 	"github.com/orenfsp/orencode-zenko.git/internal/deadline"
+	"github.com/orenfsp/orencode-zenko.git/internal/evsk"
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/httpx"
 	"github.com/orenfsp/orencode-zenko.git/internal/judgecategory"
@@ -283,6 +284,8 @@ func main() {
 	rankRepository := rank.NewRepository(queries)
 	rankService := rank.NewService(rankRepository)
 	rankHandler := rank.NewHandler(rankService)
+	evskService := evsk.NewService(evsk.NewRepository(queries))
+	evskHandler := evsk.NewHandler(evskService)
 	cleanupExpiredRanks := func(ctx context.Context) {
 		deleted, err := rankService.CleanupExpired(ctx)
 		if err != nil {
@@ -411,6 +414,8 @@ func main() {
 	mux.Handle("GET /api/v1/ranks/history", authenticated(rankApplicationHandler.ListHistory))
 	mux.Handle("GET /api/v1/admin/rank-applications", protected(rbac.PermissionRankApplicationsReview, rankApplicationHandler.ListPending))
 	mux.Handle("PATCH /api/v1/admin/rank-applications/{applicationID}", protected(rbac.PermissionRankApplicationsReview, rankApplicationHandler.Review))
+	mux.Handle("GET /api/v1/admin/rank-standards", protected(rbac.PermissionRankApplicationsReview, evskHandler.List))
+	mux.Handle("POST /api/v1/admin/rank-standards", protected(rbac.PermissionRankApplicationsReview, evskHandler.Upsert))
 
 	mux.HandleFunc("GET /api/v1/municipalities", municipalityHandler.List)
 	mux.HandleFunc("GET /api/v1/municipalities/{id}", municipalityHandler.Get)

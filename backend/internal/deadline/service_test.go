@@ -41,8 +41,8 @@ func (r *repositoryStub) AllJudgeAssignments(context.Context) ([]Item, error) {
 }
 func (r *repositoryStub) ListReports(context.Context) ([]Report, error)    { return r.reports, nil }
 func (r *repositoryStub) GetReport(context.Context, int64) (Report, error) { return r.report, nil }
-func (r *repositoryStub) CreateReport(_ context.Context, actorID int64, name string, dueAt time.Time, status string) (Report, error) {
-	return Report{ID: 1, Name: name, DueAt: dueAt, Status: status, CreatedByUserID: actorID}, nil
+func (r *repositoryStub) CreateReport(_ context.Context, actorID int64, name string, dueAt time.Time, status, reportType string) (Report, error) {
+	return Report{ID: 1, Name: name, DueAt: dueAt, Status: status, Type: reportType, CreatedByUserID: actorID}, nil
 }
 func (r *repositoryStub) UpdateReport(_ context.Context, report Report) (Report, error) {
 	return report, nil

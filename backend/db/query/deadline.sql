@@ -83,25 +83,25 @@ WHERE c.start_at >= now()
 ORDER BY c.start_at, c.id, cj.id;
 
 -- name: ListReportDeadlines :many
-SELECT id, name, due_at, status, created_by_user_id, created_at, updated_at
+SELECT id, name, due_at, status, deadline_type, created_by_user_id, created_at, updated_at
 FROM report_deadline
 ORDER BY due_at, id;
 
 -- name: CreateReportDeadline :one
-INSERT INTO report_deadline (name, due_at, status, created_by_user_id)
-VALUES (sqlc.arg(name), sqlc.arg(due_at), sqlc.arg(status), sqlc.arg(created_by_user_id))
-RETURNING id, name, due_at, status, created_by_user_id, created_at, updated_at;
+INSERT INTO report_deadline (name, due_at, status, deadline_type, created_by_user_id)
+VALUES (sqlc.arg(name), sqlc.arg(due_at), sqlc.arg(status), sqlc.arg(deadline_type), sqlc.arg(created_by_user_id))
+RETURNING id, name, due_at, status, deadline_type, created_by_user_id, created_at, updated_at;
 
 -- name: GetReportDeadline :one
-SELECT id, name, due_at, status, created_by_user_id, created_at, updated_at
+SELECT id, name, due_at, status, deadline_type, created_by_user_id, created_at, updated_at
 FROM report_deadline
 WHERE id = sqlc.arg(id);
 
 -- name: UpdateReportDeadline :one
 UPDATE report_deadline
-SET name = sqlc.arg(name), due_at = sqlc.arg(due_at), status = sqlc.arg(status), updated_at = now()
+SET name = sqlc.arg(name), due_at = sqlc.arg(due_at), status = sqlc.arg(status), deadline_type = sqlc.arg(deadline_type), updated_at = now()
 WHERE id = sqlc.arg(id)
-RETURNING id, name, due_at, status, created_by_user_id, created_at, updated_at;
+RETURNING id, name, due_at, status, deadline_type, created_by_user_id, created_at, updated_at;
 
 -- name: CreateReportDeadlineReminders :exec
 WITH candidates AS (

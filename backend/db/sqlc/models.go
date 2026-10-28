@@ -307,6 +307,7 @@ type ReportDeadline struct {
 	CreatedByUserID int64
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+	DeadlineType    string
 }
 
 type ReportDeadlineReminder struct {

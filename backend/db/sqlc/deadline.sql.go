@@ -12,31 +12,45 @@ import (
 )
 
 const createReportDeadline = `-- name: CreateReportDeadline :one
-INSERT INTO report_deadline (name, due_at, status, created_by_user_id)
-VALUES ($1, $2, $3, $4)
-RETURNING id, name, due_at, status, created_by_user_id, created_at, updated_at
+INSERT INTO report_deadline (name, due_at, status, deadline_type, created_by_user_id)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, name, due_at, status, deadline_type, created_by_user_id, created_at, updated_at
 `
 
 type CreateReportDeadlineParams struct {
 	Name            string
 	DueAt           pgtype.Timestamptz
 	Status          string
+	DeadlineType    string
 	CreatedByUserID int64
 }
 
-func (q *Queries) CreateReportDeadline(ctx context.Context, arg CreateReportDeadlineParams) (ReportDeadline, error) {
+type CreateReportDeadlineRow struct {
+	ID              int64
+	Name            string
+	DueAt           pgtype.Timestamptz
+	Status          string
+	DeadlineType    string
+	CreatedByUserID int64
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) CreateReportDeadline(ctx context.Context, arg CreateReportDeadlineParams) (CreateReportDeadlineRow, error) {
 	row := q.db.QueryRow(ctx, createReportDeadline,
 		arg.Name,
 		arg.DueAt,
 		arg.Status,
+		arg.DeadlineType,
 		arg.CreatedByUserID,
 	)
-	var i ReportDeadline
+	var i CreateReportDeadlineRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.DueAt,
 		&i.Status,
+		&i.DeadlineType,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -82,19 +96,31 @@ func (q *Queries) CreateReportDeadlineReminders(ctx context.Context, daysBefore 
 }
 
 const getReportDeadline = `-- name: GetReportDeadline :one
-SELECT id, name, due_at, status, created_by_user_id, created_at, updated_at
+SELECT id, name, due_at, status, deadline_type, created_by_user_id, created_at, updated_at
 FROM report_deadline
 WHERE id = $1
 `
 
-func (q *Queries) GetReportDeadline(ctx context.Context, id int64) (ReportDeadline, error) {
+type GetReportDeadlineRow struct {
+	ID              int64
+	Name            string
+	DueAt           pgtype.Timestamptz
+	Status          string
+	DeadlineType    string
+	CreatedByUserID int64
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) GetReportDeadline(ctx context.Context, id int64) (GetReportDeadlineRow, error) {
 	row := q.db.QueryRow(ctx, getReportDeadline, id)
-	var i ReportDeadline
+	var i GetReportDeadlineRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.DueAt,
 		&i.Status,
+		&i.DeadlineType,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -506,25 +532,37 @@ func (q *Queries) ListRegistrationDeadlines(ctx context.Context) ([]ListRegistra
 }
 
 const listReportDeadlines = `-- name: ListReportDeadlines :many
-SELECT id, name, due_at, status, created_by_user_id, created_at, updated_at
+SELECT id, name, due_at, status, deadline_type, created_by_user_id, created_at, updated_at
 FROM report_deadline
 ORDER BY due_at, id
 `
 
-func (q *Queries) ListReportDeadlines(ctx context.Context) ([]ReportDeadline, error) {
+type ListReportDeadlinesRow struct {
+	ID              int64
+	Name            string
+	DueAt           pgtype.Timestamptz
+	Status          string
+	DeadlineType    string
+	CreatedByUserID int64
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) ListReportDeadlines(ctx context.Context) ([]ListReportDeadlinesRow, error) {
 	rows, err := q.db.Query(ctx, listReportDeadlines)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ReportDeadline
+	var items []ListReportDeadlinesRow
 	for rows.Next() {
-		var i ReportDeadline
+		var i ListReportDeadlinesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
 			&i.DueAt,
 			&i.Status,
+			&i.DeadlineType,
 			&i.CreatedByUserID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -541,31 +579,45 @@ func (q *Queries) ListReportDeadlines(ctx context.Context) ([]ReportDeadline, er
 
 const updateReportDeadline = `-- name: UpdateReportDeadline :one
 UPDATE report_deadline
-SET name = $1, due_at = $2, status = $3, updated_at = now()
-WHERE id = $4
-RETURNING id, name, due_at, status, created_by_user_id, created_at, updated_at
+SET name = $1, due_at = $2, status = $3, deadline_type = $4, updated_at = now()
+WHERE id = $5
+RETURNING id, name, due_at, status, deadline_type, created_by_user_id, created_at, updated_at
 `
 
 type UpdateReportDeadlineParams struct {
-	Name   string
-	DueAt  pgtype.Timestamptz
-	Status string
-	ID     int64
+	Name         string
+	DueAt        pgtype.Timestamptz
+	Status       string
+	DeadlineType string
+	ID           int64
 }
 
-func (q *Queries) UpdateReportDeadline(ctx context.Context, arg UpdateReportDeadlineParams) (ReportDeadline, error) {
+type UpdateReportDeadlineRow struct {
+	ID              int64
+	Name            string
+	DueAt           pgtype.Timestamptz
+	Status          string
+	DeadlineType    string
+	CreatedByUserID int64
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateReportDeadline(ctx context.Context, arg UpdateReportDeadlineParams) (UpdateReportDeadlineRow, error) {
 	row := q.db.QueryRow(ctx, updateReportDeadline,
 		arg.Name,
 		arg.DueAt,
 		arg.Status,
+		arg.DeadlineType,
 		arg.ID,
 	)
-	var i ReportDeadline
+	var i UpdateReportDeadlineRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.DueAt,
 		&i.Status,
+		&i.DeadlineType,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,

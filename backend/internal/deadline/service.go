@@ -118,15 +118,19 @@ func (s *Service) CreateReport(ctx context.Context, actorID int64, request Creat
 	if status == "" {
 		status = "planned"
 	}
+	deadlineType := strings.TrimSpace(request.Type)
+	if deadlineType == "" {
+		deadlineType = "report"
+	}
 	dueAt, err := parseTime(request.DueAt)
-	if actorID <= 0 || err != nil || name == "" || utf8.RuneCountInString(name) > 250 || !validStatus(status) {
+	if actorID <= 0 || err != nil || name == "" || utf8.RuneCountInString(name) > 250 || !validStatus(status) || !validType(deadlineType) || !validGovernorDate(deadlineType, dueAt) {
 		return Report{}, ErrInvalidInput
 	}
-	return s.repository.CreateReport(ctx, actorID, name, dueAt, status)
+	return s.repository.CreateReport(ctx, actorID, name, dueAt, status, deadlineType)
 }
 
 func (s *Service) UpdateReport(ctx context.Context, id int64, request UpdateReportRequest) (Report, error) {
-	if id <= 0 || (request.Name == nil && request.DueAt == nil && request.Status == nil) {
+	if id <= 0 || (request.Name == nil && request.DueAt == nil && request.Status == nil && request.Type == nil) {
 		return Report{}, ErrInvalidInput
 	}
 	report, err := s.repository.GetReport(ctx, id)
@@ -139,13 +143,16 @@ func (s *Service) UpdateReport(ctx context.Context, id int64, request UpdateRepo
 	if request.Status != nil {
 		report.Status = strings.TrimSpace(*request.Status)
 	}
+	if request.Type != nil {
+		report.Type = strings.TrimSpace(*request.Type)
+	}
 	if request.DueAt != nil {
 		report.DueAt, err = parseTime(*request.DueAt)
 		if err != nil {
 			return Report{}, ErrInvalidInput
 		}
 	}
-	if report.Name == "" || utf8.RuneCountInString(report.Name) > 250 || !validStatus(report.Status) {
+	if report.Name == "" || utf8.RuneCountInString(report.Name) > 250 || !validStatus(report.Status) || !validType(report.Type) || !validGovernorDate(report.Type, report.DueAt) {
 		return Report{}, ErrInvalidInput
 	}
 	return s.repository.UpdateReport(ctx, report)
@@ -160,6 +167,11 @@ func parseTime(value string) (time.Time, error) {
 
 func validStatus(value string) bool {
 	return value == "planned" || value == "completed" || value == "cancelled"
+}
+
+func validType(value string) bool { return value == "report" || value == "governor_award" }
+func validGovernorDate(kind string, dueAt time.Time) bool {
+	return kind != "governor_award" || (dueAt.Month() == time.February && dueAt.Day() <= 1)
 }
 
 func unique(items []Item) []Item {
