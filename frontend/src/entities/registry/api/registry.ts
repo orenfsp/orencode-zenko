@@ -8,6 +8,17 @@ import type {
 } from "../model/types";
 
 export const registryApi = {
+  report: async () => {
+    const response = await api.get<Response>("/api/v1/admin/reports/users.xlsx", {
+      permission: "registry.read",
+      responseType: "response",
+    });
+    return {
+      blob: await response.blob(),
+      filename: response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] ?? "federation-users.xlsx",
+      fileId: response.headers.get("X-File-ID"),
+    };
+  },
   users: async (query: RegistryUserQuery = {}) =>
     (
       await api.get<ApiEnvelope<RegistryPage<RegistryUser>>>(

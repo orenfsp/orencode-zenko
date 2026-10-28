@@ -27,6 +27,7 @@ import {
   LogOut,
   Menu,
   Medal,
+  Star,
   ShieldCheck,
   Trophy,
   UsersRound,
@@ -296,6 +297,9 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
       { label: "Результаты", icon: Award, href: "/workspace/results" },
     );
   }
+  if (permissions.has("teams.manage") && !isFederationRole) {
+    items.push({ label: "Сборные команды", icon: UsersRound, href: "/workspace/teams" });
+  }
   if (role === "judge") {
     items.push({
       label: "Мои соревнования",
@@ -323,6 +327,15 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
   }
   if (isFederationRole || permissions.has("files.read")) {
     administration.push({ label: "Файлы", icon: FileText, href: "/workspace/files" });
+  }
+  if (permissions.has("rating.read")) {
+    administration.push({ label: "Рейтинг спортсменов", icon: Star, href: "/workspace/rating" });
+  }
+  if (permissions.has("teams.manage") && isFederationRole) {
+    administration.push({ label: "Сборные команды", icon: UsersRound, href: "/workspace/teams" });
+  }
+  if (permissions.has("rank_applications.review")) {
+    administration.push({ label: "Нормативы разрядов", icon: Medal, href: "/workspace/administration/rank-standards" });
   }
   const canAdminister =
     isFederationRole ||

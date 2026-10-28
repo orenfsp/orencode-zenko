@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useState } from "react";
-import { Building2, Search, UserRound } from "lucide-react";
+import { Building2, Download, Search, UserRound } from "lucide-react";
 
 import {
   registryApi,
@@ -16,6 +16,7 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
 import { Input } from "@/shared/ui/input";
+import { useNotifications } from "@/shared/lib/notifications";
 
 type RegistryMode = "users" | "organizations";
 type RegistryData =
@@ -23,6 +24,8 @@ type RegistryData =
   | { mode: "organizations"; page: RegistryPage<RegistryOrganization> };
 
 export function RegistryView() {
+  const notify = useNotifications();
+  const [downloading, setDownloading] = useState(false);
   const [mode, setMode] = useState<RegistryMode>("users");
   const [draftSearch, setDraftSearch] = useState("");
   const [search, setSearch] = useState("");
@@ -40,9 +43,26 @@ export function RegistryView() {
     setSearch(draftSearch.trim());
   }
 
+  async function downloadReport() {
+    setDownloading(true);
+    try {
+      const report = await registryApi.report();
+      const url = URL.createObjectURL(report.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = report.filename;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (cause) {
+      notify.error(cause instanceof Error ? cause.message : "Не удалось скачать отчёт");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <SectionHeading title="Единый реестр" description="Пользователи и организации федерации." />
+      <SectionHeading title="Единый реестр" description="Пользователи и организации федерации." action={<Button variant="outline" disabled={downloading} onClick={() => void downloadReport()}><Download />Скачать XLSX</Button>} />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-2">
           <Button variant={mode === "users" ? "default" : "outline"} onClick={() => setMode("users")}><UserRound />Пользователи</Button>
@@ -68,6 +88,10 @@ export function RegistryView() {
                       <p className="mt-1 text-sm text-muted-foreground">{item.organization?.name ?? "Без организации"} · {formatDate(item.birth)}</p>
                     </div>
                     <div className="flex flex-wrap gap-1.5">{item.roles.map((role) => <Badge key={role.id} variant="secondary">{role.name}</Badge>)}</div>
+                  </div>
+                  <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
+                    {item.coach_relations?.length ? <p>Связи с тренерами и спортсменами: {item.coach_relations.map((relation) => `${relation.related_user_name} (${relation.status})`).join(", ")}</p> : null}
+                    {item.judge_assignments?.length ? <p>Судейские назначения: {item.judge_assignments.map((assignment) => `${assignment.competition_name} — ${assignment.position_name}`).join(", ")}</p> : null}
                   </div>
                 </Card>
               ))

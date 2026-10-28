@@ -41,6 +41,32 @@ export interface RegistryUser {
   disciplines: RegistryReference[];
   ranks: RegistryRank[];
   judge_category: RegistryJudgeCategory | null;
+  coach_relations: RegistryCoachRelation[];
+  judge_assignments: RegistryJudgeAssignment[];
+}
+
+export interface RegistryCoachRelation {
+  id: number;
+  relation_type: "coach" | "participant";
+  related_user_id: number;
+  related_user_name: string;
+  discipline?: RegistryReference | null;
+  status: string;
+  requested_at: string;
+  confirmed_at?: string | null;
+  ended_at?: string | null;
+}
+
+export interface RegistryJudgeAssignment {
+  id: number;
+  competition_id: number;
+  competition_name: string;
+  competition_status: string;
+  position_id: number;
+  position_name: string;
+  start_at: string;
+  end_at: string;
+  appointed_at: string;
 }
 
 export interface RegistryOrganization {

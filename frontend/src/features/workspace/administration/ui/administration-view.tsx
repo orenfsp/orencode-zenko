@@ -144,6 +144,7 @@ export function AdministrationView({ section = "overview" }: { section?: Adminis
       { href: "/workspace/administration/directories", title: "Справочники", description: "Муниципалитеты и спортивные разряды.", visible: permissions.has("municipalities.create") || permissions.has("rank_applications.review") },
       { href: "/workspace/administration/reviews", title: "Проверки", description: "Проверка антидопинговых сертификатов и заявок.", visible: permissions.has("anti_doping.review") },
       { href: "/workspace/administration/audit", title: "Журнал аудита", description: "История административных действий.", visible: permissions.has("roles.read") },
+      { href: "/workspace/administration/rank-standards", title: "Нормативы разрядов", description: "Условия ЕВСК для проверки заявок на разряд.", visible: permissions.has("rank_applications.review") },
     ].filter((item) => item.visible);
 
     return (

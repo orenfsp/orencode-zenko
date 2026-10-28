@@ -8,6 +8,6 @@ export interface PublicProfile {
   roles: ProfileRole[]; disciplines: ProfileReference[]; ranks: ProfileRank[];
   judge_category: ProfileJudgeCategory | null;
 }
-export interface OwnProfile extends PublicProfile { birth_date: string; email: string; tg_username: string | null }
+export interface OwnProfile extends PublicProfile { birth_date: string; email: string; tg_username: string | null; access_status: boolean }
 export interface UpdateProfilePayload { tg_username?: string; role_id?: number; role_ids?: number[]; refresh_token?: string }
 export interface UpdateProfileResult { tg_username?: string; role_id?: number; role_ids?: number[]; access_token?: string; refresh_token?: string }

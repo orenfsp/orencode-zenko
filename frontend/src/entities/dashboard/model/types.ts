@@ -44,6 +44,7 @@ export interface DashboardDeadline {
 }
 
 export interface DashboardData {
+  period_year: number;
   metrics: DashboardMetrics;
   upcoming_competitions: DashboardUpcomingCompetition[];
   pending_competition_applications: DashboardPendingApplication[];

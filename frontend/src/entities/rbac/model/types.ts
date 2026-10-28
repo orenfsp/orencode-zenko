@@ -22,6 +22,8 @@ export type PermissionCode =
   | "anti_doping.review"
   | "dashboard.read"
   | "registry.read"
+  | "rating.read"
+  | "teams.manage"
   | "judge_categories.review"
   | "rank_applications.review"
   | "deadlines.manage";

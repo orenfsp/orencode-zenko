@@ -14,6 +14,7 @@ export interface ReportDeadline {
   name: string;
   due_at: string;
   status: string;
+  type: "report" | "governor_award";
   created_by_user_id: number;
   created_at: string;
   updated_at: string;
@@ -23,6 +24,7 @@ export interface CreateReportDeadlinePayload {
   name: string;
   due_at: string;
   status?: string;
+  type?: "report" | "governor_award";
 }
 
 export type UpdateReportDeadlinePayload = Partial<CreateReportDeadlinePayload>;
