@@ -781,7 +781,7 @@ export function WorkspaceShell({
   return (
     <main className="relative h-svh min-w-0 overflow-hidden bg-workspace">
       <div className="absolute inset-0">
-        {theme === "dark" ? <RibbonGlowDark /> : <RibbonGlow />}
+        {theme === "dark" ? <div className="opacity-20"> <RibbonGlowDark /></div> : <RibbonGlow />}
       </div>
       <div className="relative z-10 h-full">
         <SidebarProvider
