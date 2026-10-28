@@ -33,6 +33,13 @@ WHERE c.status = ANY(sqlc.arg(p_public_statuses)::text[])
 ORDER BY c.start_at, c.id
 LIMIT $1 OFFSET $2;
 
+-- name: CountPublicCompetitions :one
+SELECT count(*) FROM competition AS c
+JOIN discipline AS d ON d.id = c.discipline_id
+JOIN competition_type AS ct ON ct.id = c.competition_type_id
+JOIN competition_level AS cl ON cl.id = c.competition_level_id
+WHERE c.status = ANY(sqlc.arg(p_public_statuses)::text[]);
+
 -- name: ListCalendarCompetitions :many
 SELECT
     c.id,

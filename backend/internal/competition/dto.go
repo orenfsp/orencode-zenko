@@ -6,6 +6,14 @@ import (
 	"time"
 )
 
+type ListPageDTO struct {
+	Items   []ResponseDTO `json:"items"`
+	Total   int64         `json:"total"`
+	Limit   int32         `json:"limit"`
+	Offset  int32         `json:"offset"`
+	HasNext bool          `json:"has_next"`
+}
+
 type CreateRequest struct {
 	Name                 string    `json:"name"`
 	Description          *string   `json:"description"`

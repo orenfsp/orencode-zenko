@@ -32,6 +32,22 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "limit и offset должны быть целыми числами")
 		return
 	}
+	values, present := r.URL.Query()["with_meta"]
+	if present {
+		if len(values) != 1 || (values[0] != "true" && values[0] != "false") {
+			writeError(w, http.StatusBadRequest, "with_meta должен быть true или false")
+			return
+		}
+		if values[0] == "true" {
+			page, err := h.service.ListWithMeta(r.Context(), limit, offset)
+			if err != nil {
+				handleServiceError(w, err)
+				return
+			}
+			writeSuccess(w, http.StatusOK, page)
+			return
+		}
+	}
 
 	items, err := h.service.List(r.Context(), limit, offset)
 	if err != nil {
