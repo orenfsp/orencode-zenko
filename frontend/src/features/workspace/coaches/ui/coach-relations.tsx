@@ -13,6 +13,8 @@ import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
+import { Input } from "@/shared/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
 interface RelationData {
   role: "coach" | "participant";
@@ -77,11 +79,8 @@ export function CoachRelations() {
       {state.data?.role === "coach" ? (
         <Card className="mb-4 bg-white/75 p-4 shadow-none">
           <form className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={create}>
-            <input name="participant_user_id" type="number" min="1" required placeholder="ID спортсмена" className="h-9 rounded-[10px] border border-border bg-background px-2.5 text-sm outline-none" />
-            <select name="discipline_id" required defaultValue="" className="h-9 rounded-[10px] border border-border bg-background px-2.5 text-sm outline-none">
-              <option value="" disabled>Выберите дисциплину</option>
-              {state.data.disciplines.map((discipline) => <option key={discipline.id} value={discipline.id}>{discipline.name}</option>)}
-            </select>
+            <Input name="participant_user_id" type="number" min="1" required placeholder="ID спортсмена" />
+            <Select name="discipline_id"><SelectTrigger><SelectValue placeholder="Выберите дисциплину" /></SelectTrigger><SelectContent>{state.data.disciplines.map((discipline) => <SelectItem key={discipline.id} value={String(discipline.id)}>{discipline.name}</SelectItem>)}</SelectContent></Select>
             <Button disabled={pendingId !== null}>{pendingId === 0 ? <LoaderCircle className="animate-spin" /> : <Plus />}Добавить спортсмена</Button>
           </form>
         </Card>

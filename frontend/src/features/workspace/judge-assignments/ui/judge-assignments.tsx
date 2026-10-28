@@ -4,7 +4,6 @@ import { useCallback } from "react";
 import { Gavel } from "lucide-react";
 
 import { competitionJudgeApi } from "@/entities/competition-judge";
-import { judgeCategoryApi } from "@/entities/judge-category";
 import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Card } from "@/shared/ui/card";
@@ -12,14 +11,7 @@ import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
 
 export function JudgeAssignments() {
   const load = useCallback(
-    async () => {
-      const [assignments, competitions, categoryAssignments] = await Promise.all([
-        competitionJudgeApi.profileAssignments({ limit: 100 }),
-        competitionJudgeApi.profileCompetitions({ limit: 100 }),
-        judgeCategoryApi.assignments(),
-      ]);
-      return { assignments, competitions, categoryAssignments };
-    },
+    () => competitionJudgeApi.profileAssignments({ limit: 100 }),
     [],
   );
   const state = useAsyncData(load);
@@ -29,11 +21,11 @@ export function JudgeAssignments() {
       <SectionHeading title="Мои соревнования" description="Назначения в судейскую коллегию." />
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
-      {!state.loading && !state.error && !state.data?.assignments.length ? (
+      {!state.loading && !state.error && !state.data?.length ? (
         <DataEmpty title="Назначений пока нет" description="После назначения федерацией соревнование появится здесь." />
       ) : null}
       <div className="grid gap-3">
-        {state.data?.assignments.map((assignment) => (
+        {state.data?.map((assignment) => (
           <Card key={assignment.id} className="bg-white/75 p-5 shadow-none">
             <div className="flex items-start justify-between gap-4">
               <div className="flex gap-3">
@@ -49,7 +41,6 @@ export function JudgeAssignments() {
           </Card>
         ))}
       </div>
-      {state.data?.competitions.length ? <p className="mt-5 text-xs text-muted-foreground">Всего соревнований в профиле: {state.data.competitions.length}. Назначений по судейской категории: {state.data.categoryAssignments.length}.</p> : null}
     </div>
   );
 }

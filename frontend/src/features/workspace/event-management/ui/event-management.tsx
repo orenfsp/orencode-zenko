@@ -7,6 +7,7 @@ import {
   competitionEventApi,
   type CompetitionEvent,
 } from "@/entities/competition-event";
+import { competitionApi } from "@/entities/competition";
 import { referenceDataApi } from "@/entities/reference-data";
 import { SectionHeading } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
@@ -22,8 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
-import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
 interface EventEditor {
   mode: "create" | "edit";
@@ -33,7 +34,6 @@ interface EventEditor {
 
 export function EventManagement() {
   const notify = useNotifications();
-  const [competitionIdDraft, setCompetitionIdDraft] = useState("");
   const [competitionId, setCompetitionId] = useState<number | null>(null);
   const [editor, setEditor] = useState<EventEditor | null>(null);
   const [deleting, setDeleting] = useState<CompetitionEvent | null>(null);
@@ -47,18 +47,10 @@ export function EventManagement() {
     [competitionId],
   );
   const loadAgeGroups = useCallback(() => referenceDataApi.ageGroups(), []);
+  const loadCompetitions = useCallback(() => competitionApi.list({ limit: 100 }), []);
   const events = useAsyncData(loadEvents);
   const ageGroups = useAsyncData(loadAgeGroups);
-
-  function selectCompetition(event: FormEvent) {
-    event.preventDefault();
-    const value = Number(competitionIdDraft);
-    if (!Number.isInteger(value) || value <= 0) {
-      notify.warning("Введите корректный ID соревнования");
-      return;
-    }
-    setCompetitionId(value);
-  }
+  const competitions = useAsyncData(loadCompetitions);
 
   async function saveEvent(event: FormEvent) {
     event.preventDefault();
@@ -104,7 +96,7 @@ export function EventManagement() {
     <div className="mx-auto w-full max-w-5xl">
       <SectionHeading
         title="Зачёты соревнований"
-        description="Управление зачётами черновика по ID соревнования."
+        description="Управление зачётами соревнований из списка."
         action={
           competitionId ? (
             <Button onClick={() => setEditor({ mode: "create", ageGroupId: null })}>
@@ -115,27 +107,22 @@ export function EventManagement() {
       />
 
       <Card className="mb-5 bg-white/75 p-5 shadow-none">
-        <form onSubmit={selectCompetition} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1 space-y-2">
-            <Label htmlFor="competition-id">ID соревнования</Label>
-            <Input
-              id="competition-id"
-              type="number"
-              min={1}
-              value={competitionIdDraft}
-              onChange={(event) => setCompetitionIdDraft(event.target.value)}
-              placeholder="Например, 7"
-              className="bg-white shadow-none"
-            />
+            <Label htmlFor="competition-id">Соревнование</Label>
+            <Select value={competitionId ? String(competitionId) : ""} onValueChange={(value) => setCompetitionId(Number(value))}>
+              <SelectTrigger id="competition-id" className="bg-white shadow-none"><SelectValue placeholder={competitions.loading ? "Загрузка соревнований…" : "Выберите соревнование"} /></SelectTrigger>
+              <SelectContent>{competitions.data?.map((competition) => <SelectItem key={competition.id} value={String(competition.id)}>{competition.name} · #{competition.id}</SelectItem>)}</SelectContent>
+            </Select>
           </div>
-          <Button type="submit" variant="outline"><Search />Открыть</Button>
-        </form>
+          <Button type="button" variant="outline" disabled={!competitionId} onClick={() => events.reload()}><Search />Открыть</Button>
+        </div>
       </Card>
 
       {events.loading && competitionId ? <DataLoading rows={3} /> : null}
       {events.error ? <DataError message={events.error} retry={events.reload} /> : null}
       {!competitionId ? (
-        <DataEmpty title="Выберите соревнование" description="Введите ID черновика, чтобы загрузить его зачёты." />
+        <DataEmpty title="Выберите соревнование" description="Выберите соревнование из списка, чтобы загрузить его зачёты." />
       ) : null}
       {competitionId && !events.loading && !events.error && !events.data?.length ? (
         <DataEmpty title="Зачётов пока нет" description="Создайте первый зачёт для выбранного соревнования." />

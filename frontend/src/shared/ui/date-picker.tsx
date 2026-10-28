@@ -19,6 +19,7 @@ interface DatePickerProps {
   name: string;
   defaultValue?: string;
   disabled?: boolean;
+  required?: boolean;
   className?: string;
 }
 
@@ -33,6 +34,7 @@ export function DatePicker({
   name,
   defaultValue,
   disabled,
+  required,
   className,
 }: DatePickerProps) {
   const [date, setDate] = useState<Date | undefined>(() =>
@@ -75,6 +77,7 @@ export function DatePicker({
         type="hidden"
         name={name}
         value={date ? format(date, "yyyy-MM-dd") : ""}
+        required={required}
       />
     </>
   );

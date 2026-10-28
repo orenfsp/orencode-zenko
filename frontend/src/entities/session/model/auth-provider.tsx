@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { logout as requestLogout } from "../api/auth";
+import { logout as requestLogout, refreshSession } from "../api/auth";
 import { getAccessIdentity } from "./jwt";
 import { AUTH_CHANGE_EVENT, AUTH_FAILURE_EVENT, tokenStorage } from "./storage";
 import type { AuthIdentity } from "./types";
@@ -18,8 +18,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let syncVersion = 0;
     const sync = async () => {
       const version = ++syncVersion;
-      const token = tokenStorage.get()?.access_token;
-      const next = token ? getAccessIdentity(token) : null;
+      const storedTokens = tokenStorage.get();
+      let token = storedTokens?.access_token ?? null;
+      let next = token ? getAccessIdentity(token) : null;
+
+      // Access-токен может истечь между переходами по страницам. Сначала
+      // пробуем бесшумно обновить сессию по refresh-токену и только затем
+      // считаем пользователя разлогиненным.
+      if (storedTokens && (!next || next.expiresAt <= Date.now())) {
+        const refreshed = await refreshSession().catch(() => null);
+        if (refreshed) {
+          token = refreshed.access_token;
+          next = getAccessIdentity(token);
+        }
+      }
 
       if (!next || next.expiresAt <= Date.now()) {
         if (token) tokenStorage.clear();

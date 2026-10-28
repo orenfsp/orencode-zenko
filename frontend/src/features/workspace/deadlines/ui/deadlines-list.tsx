@@ -12,6 +12,7 @@ import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
+import { DatePicker } from "@/shared/ui/date-picker";
 
 export function DeadlinesList() {
   const { identity } = useAuth();
@@ -56,7 +57,7 @@ export function DeadlinesList() {
         <Card className="mb-4 bg-white/75 p-4 shadow-none">
           <form className="grid gap-2 sm:grid-cols-[1fr_180px_auto]" onSubmit={createReport}>
             <Input name="name" placeholder="Название отчётного срока" required />
-            <Input name="due_at" type="date" required />
+            <DatePicker id="report-due-at" name="due_at" required />
             <Button disabled={pendingId !== null}>{pendingId === 0 ? <LoaderCircle className="animate-spin" /> : <Plus />}Добавить</Button>
           </form>
         </Card>

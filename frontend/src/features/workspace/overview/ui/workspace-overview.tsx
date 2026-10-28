@@ -122,8 +122,8 @@ if (loading || !data) {
     return (
       <div className="mx-auto w-full max-w-5xl">
         <SectionHeading
-          title="Ближайшие события"
-          description="Сроки и действия, сформированные для вашей активной роли."
+          title="Ближайшие сроки"
+          description="Сроки и обязательные действия для вашей активной роли."
           action={
             <Button asChild variant="outline" size="sm">
               <Link href="/workspace/competitions">

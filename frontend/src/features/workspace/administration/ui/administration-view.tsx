@@ -1,11 +1,13 @@
 "use client";
 
 import { FormEvent, useCallback, useState } from "react";
-import { Activity, Building2, LoaderCircle, Medal, ShieldCheck } from "lucide-react";
+import { Activity, ArrowRight, Building2, LoaderCircle, Medal, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
 import { antiDopingApi } from "@/entities/anti-doping";
 import { auditLogApi } from "@/entities/audit-log";
 import { municipalityApi, type Municipality } from "@/entities/municipality";
+import { registryApi, type RegistryUser } from "@/entities/registry";
 import { rankApi, type Rank } from "@/entities/rank";
 import { rbacApi, type Permission, type Role } from "@/entities/rbac";
 import { useAuth } from "@/entities/session";
@@ -16,9 +18,9 @@ import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { DataError, DataLoading } from "@/shared/ui/data-state";
 import { Input } from "@/shared/ui/input";
-
-const selectClassName =
-  "h-9 w-full rounded-[10px] border border-border bg-background px-2.5 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/25";
+import { DatePicker } from "@/shared/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { Checkbox } from "@/shared/ui/checkbox";
 
 interface AdministrationData {
   roles: Role[];
@@ -26,9 +28,12 @@ interface AdministrationData {
   municipalities: Municipality[];
   ranks: Rank[];
   audit: Awaited<ReturnType<typeof auditLogApi.list>>;
+  users: RegistryUser[];
 }
 
-export function AdministrationView() {
+export type AdministrationSection = "overview" | "roles" | "directories" | "reviews" | "audit";
+
+export function AdministrationView({ section = "overview" }: { section?: AdministrationSection }) {
   const { identity } = useAuth();
   const notify = useNotifications();
   const permissions = new Set(identity?.permissions ?? []);
@@ -38,14 +43,17 @@ export function AdministrationView() {
   const [selectedRank, setSelectedRank] = useState<Rank | null>(null);
 
   const load = useCallback(async (): Promise<AdministrationData> => {
-    const [roles, permissionItems, municipalities, ranks, audit] = await Promise.all([
+    const [roles, permissionItems, municipalities, ranks, audit, users] = await Promise.all([
       identity?.permissions?.includes("roles.read") ? rbacApi.roles() : Promise.resolve([]),
       identity?.permissions?.includes("permissions.read") ? rbacApi.permissions() : Promise.resolve([]),
       municipalityApi.list({ limit: 100 }),
       rankApi.list(),
       identity?.permissions?.includes("roles.read") ? auditLogApi.list({ limit: 100 }) : Promise.resolve([]),
+      identity?.permissions?.includes("roles.assign") && identity?.permissions?.includes("registry.read")
+        ? registryApi.users({ limit: 100 }).then((page) => page.items)
+        : Promise.resolve([]),
     ]);
-    return { roles, permissions: permissionItems, municipalities, ranks, audit };
+    return { roles, permissions: permissionItems, municipalities, ranks, audit, users };
   }, [identity?.permissions]);
   const state = useAsyncData(load);
 
@@ -130,11 +138,36 @@ export function AdministrationView() {
   const data = state.data;
   if (!data) return null;
 
+  if (section === "overview") {
+    const cards = [
+      { href: "/workspace/administration/roles", title: "Роли и права", description: "Роли, permissions и назначение ролей пользователям.", visible: permissions.has("roles.read") || permissions.has("roles.create") || permissions.has("roles.assign") },
+      { href: "/workspace/administration/directories", title: "Справочники", description: "Муниципалитеты и спортивные разряды.", visible: permissions.has("municipalities.create") || permissions.has("rank_applications.review") },
+      { href: "/workspace/administration/reviews", title: "Проверки", description: "Проверка антидопинговых сертификатов и заявок.", visible: permissions.has("anti_doping.review") },
+      { href: "/workspace/administration/audit", title: "Журнал аудита", description: "История административных действий.", visible: permissions.has("roles.read") },
+    ].filter((item) => item.visible);
+
+    return (
+      <div className="mx-auto grid w-full max-w-5xl gap-6">
+        <SectionHeading title="Администрирование" description="Выберите раздел для управления данными и доступами." />
+        <div className="grid gap-4 md:grid-cols-2">
+          {cards.map((card) => (
+            <Link key={card.href} href={card.href} className="group rounded-2xl border bg-white/75 p-5 shadow-none transition hover:border-primary/40 hover:shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div><h2 className="font-medium">{card.title}</h2><p className="mt-2 text-sm text-muted-foreground">{card.description}</p></div>
+                <ArrowRight className="size-5 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-primary" />
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-6">
       <SectionHeading title="Администрирование" description="Роли, справочники, проверки и журнал действий." />
 
-      {(permissions.has("roles.read") || permissions.has("roles.create") || permissions.has("roles.assign")) ? (
+      {section === "roles" && (permissions.has("roles.read") || permissions.has("roles.create") || permissions.has("roles.assign")) ? (
         <Card className="bg-white/75 p-5 shadow-none">
           <SectionHeading title="Роли и права" description="Создание ролей и назначение пользователям." />
           <div className="grid gap-5 xl:grid-cols-2">
@@ -152,7 +185,7 @@ export function AdministrationView() {
                   <p className="font-medium">Новая роль</p>
                   <Input name="code" placeholder="Код роли" required />
                   <Input name="name" placeholder="Название" required />
-                  <label className="flex items-center gap-2 text-sm"><input name="self_assignable" type="checkbox" /> Доступна для самостоятельного выбора</label>
+                  <label className="flex items-center gap-2 text-sm"><Checkbox name="self_assignable" /> Доступна для самостоятельного выбора</label>
                   <div className="grid max-h-40 gap-2 overflow-auto rounded-xl bg-muted/50 p-3">
                     {data.permissions.map((permission) => (
                       <label key={permission.id} className="flex items-start gap-2 text-sm">
@@ -171,9 +204,9 @@ export function AdministrationView() {
               {permissions.has("roles.assign") ? (
                 <form className="grid gap-3 rounded-xl border p-4" onSubmit={assignRole}>
                   <p className="font-medium">Назначить роль</p>
-                  <Input name="user_id" type="number" min="1" placeholder="ID пользователя" required />
-                  <select name="role_id" className={selectClassName} required defaultValue=""><option value="" disabled>Выберите роль</option>{data.roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
-                  <Button disabled={pending !== null}>{pending === "assign" ? <LoaderCircle className="animate-spin" /> : null}Назначить</Button>
+                  {data.users.length ? <Select name="user_id"><SelectTrigger><SelectValue placeholder="Выберите пользователя" /></SelectTrigger><SelectContent>{data.users.map((user) => <SelectItem key={user.id} value={String(user.id)}>{user.last_name} {user.first_name}{user.middle_name ? ` ${user.middle_name}` : ""} · #{user.id}</SelectItem>)}</SelectContent></Select> : <p className="text-sm text-muted-foreground">Список пользователей недоступен. Нужен permission `registry.read`.</p>}
+                  <Select name="role_id"><SelectTrigger><SelectValue placeholder="Выберите роль" /></SelectTrigger><SelectContent>{data.roles.map((role) => <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>)}</SelectContent></Select>
+                  <Button disabled={pending !== null || !data.users.length}>{pending === "assign" ? <LoaderCircle className="animate-spin" /> : null}Назначить</Button>
                 </form>
               ) : null}
             </div>
@@ -181,7 +214,7 @@ export function AdministrationView() {
         </Card>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      {section === "directories" ? <div className="grid gap-6 xl:grid-cols-2">
         <Card className="bg-white/75 p-5 shadow-none">
           <SectionHeading title="Муниципалитеты" description="Публичный справочник территорий." />
           {permissions.has("municipalities.create") ? (
@@ -211,22 +244,22 @@ export function AdministrationView() {
           </div>
           {selectedRank ? <p className="mt-3 text-sm">{selectedRank.name}: создан {formatDate(selectedRank.created_at)}</p> : null}
         </Card>
-      </div>
+      </div> : null}
 
-      {permissions.has("anti_doping.review") ? (
+      {section === "reviews" && permissions.has("anti_doping.review") ? (
         <Card className="bg-white/75 p-5 shadow-none">
           <SectionHeading title="Проверка антидопингового сертификата" description="Backend пока не предоставляет очередь сертификатов, поэтому укажите ID из реестра файлов." />
           <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-5" onSubmit={reviewCertificate}>
             <Input name="certificate_id" type="number" min="1" placeholder="ID сертификата" required />
-            <select name="status" className={selectClassName} defaultValue="valid"><option value="valid">Действителен</option><option value="expired">Истёк</option><option value="rejected">Отклонён</option></select>
-            <Input name="completed_at" type="date" aria-label="Дата прохождения" />
+            <Select name="status" defaultValue="valid"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="valid">Действителен</SelectItem><SelectItem value="expired">Истёк</SelectItem><SelectItem value="rejected">Отклонён</SelectItem></SelectContent></Select>
+            <DatePicker id="certificate-completed-at" name="completed_at" />
             <Input name="rejection_reason" placeholder="Причина отклонения" />
             <Button disabled={pending !== null}>{pending === "certificate" ? <LoaderCircle className="animate-spin" /> : null}Сохранить</Button>
           </form>
         </Card>
       ) : null}
 
-      {permissions.has("roles.read") ? (
+      {section === "audit" && permissions.has("roles.read") ? (
         <Card className="bg-white/75 p-5 shadow-none">
           <SectionHeading title="Журнал аудита" description="Последние действия административных пользователей." />
           <div className="grid max-h-[32rem] gap-2 overflow-auto">

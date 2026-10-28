@@ -13,11 +13,11 @@ import { Card } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
 import { Input } from "@/shared/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { DateTimePicker } from "@/shared/ui/date-time-picker";
 import { Label } from "@/shared/ui/label";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
-
-const selectClassName = "h-9 w-full rounded-[10px] border border-border bg-background px-2.5 text-sm outline-none";
 
 export function CompetitionsList() {
   const { identity } = useAuth();
@@ -139,12 +139,12 @@ export function CompetitionsList() {
             <Label htmlFor="competition-name">Название</Label><Input id="competition-name" name="name" required />
             <Label htmlFor="competition-description">Описание</Label><Input id="competition-description" name="description" />
             <div className="grid gap-3 sm:grid-cols-3">
-              <select name="discipline_id" className={selectClassName} required defaultValue=""><option value="" disabled>Дисциплина</option>{state.data?.disciplines.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-              <select name="competition_type_id" className={selectClassName} required defaultValue=""><option value="" disabled>Тип</option>{state.data?.types.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-              <select name="competition_level_id" className={selectClassName} required defaultValue=""><option value="" disabled>Уровень</option>{state.data?.levels.map((item) => <option key={item.id} value={item.id}>{item.name ?? item.code ?? `#${item.id}`}</option>)}</select>
+              <Select name="discipline_id"><SelectTrigger><SelectValue placeholder="Дисциплина" /></SelectTrigger><SelectContent>{state.data?.disciplines.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
+              <Select name="competition_type_id"><SelectTrigger><SelectValue placeholder="Тип" /></SelectTrigger><SelectContent>{state.data?.types.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
+              <Select name="competition_level_id"><SelectTrigger><SelectValue placeholder="Уровень" /></SelectTrigger><SelectContent>{state.data?.levels.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name ?? item.code ?? `#${item.id}`}</SelectItem>)}</SelectContent></Select>
             </div>
-            <Label htmlFor="competition-format">Формат</Label><select id="competition-format" name="format" className={selectClassName} defaultValue="offline"><option value="offline">Очно</option><option value="online">Онлайн</option><option value="hybrid">Гибрид</option></select>
-            <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="start-at">Начало</Label><Input id="start-at" name="start_at" type="datetime-local" required /></div><div><Label htmlFor="end-at">Окончание</Label><Input id="end-at" name="end_at" type="datetime-local" required /></div><div><Label htmlFor="registration-starts-at">Начало регистрации</Label><Input id="registration-starts-at" name="registration_starts_at" type="datetime-local" required /></div><div><Label htmlFor="registration-ends-at">Конец регистрации</Label><Input id="registration-ends-at" name="registration_ends_at" type="datetime-local" required /></div></div>
+            <Label htmlFor="competition-format">Формат</Label><Select name="format" defaultValue="offline"><SelectTrigger id="competition-format"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="offline">Очно</SelectItem><SelectItem value="online">Онлайн</SelectItem><SelectItem value="hybrid">Гибрид</SelectItem></SelectContent></Select>
+            <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="start-at">Начало</Label><DateTimePicker id="start-at" name="start_at" required /></div><div><Label htmlFor="end-at">Окончание</Label><DateTimePicker id="end-at" name="end_at" required /></div><div><Label htmlFor="registration-starts-at">Начало регистрации</Label><DateTimePicker id="registration-starts-at" name="registration_starts_at" required /></div><div><Label htmlFor="registration-ends-at">Конец регистрации</Label><DateTimePicker id="registration-ends-at" name="registration_ends_at" required /></div></div>
             <Input name="venue_address" placeholder="Адрес площадки" /><Input name="online_url" type="url" placeholder="Ссылка на онлайн-площадку" />
             <DialogFooter><Button type="submit" disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Создать</Button></DialogFooter>
           </form>

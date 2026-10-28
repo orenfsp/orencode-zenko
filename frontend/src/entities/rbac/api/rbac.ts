@@ -7,12 +7,17 @@ export const rbacApi = {
     ).data,
   selfAssignableRoles: async () =>
     (await api.get<ApiEnvelope<Role[]>>("/api/v1/roles/self-assignable")).data,
-  roles: async () =>
-    (
-      await api.get<ApiEnvelope<Role[]>>("/api/v1/admin/roles", {
+  roles: async () => {
+    const roles = (
+      await api.get<ApiEnvelope<Array<Partial<Role>>>>("/api/v1/admin/roles", {
         permission: "roles.read",
       })
-    ).data,
+    ).data;
+    return roles.map((role) => ({
+      ...role,
+      permissions: Array.isArray(role.permissions) ? role.permissions : [],
+    })) as Role[];
+  },
   permissions: async () =>
     (
       await api.get<ApiEnvelope<Permission[]>>("/api/v1/admin/permissions", {

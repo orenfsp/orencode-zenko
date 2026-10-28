@@ -84,6 +84,11 @@ interface NavigationItem {
   href: string;
 }
 
+interface NavigationGroup {
+  label: string;
+  items: NavigationItem[];
+}
+
 const roleIcons: Record<string, LucideIcon> = {
   participant: UserRound,
   coach: Dumbbell,
@@ -257,7 +262,7 @@ function useWorkspaceUser() {
 
 type WorkspaceUser = ReturnType<typeof useWorkspaceUser>;
 
-function workspaceNavigation(user: WorkspaceUser): NavigationItem[] {
+function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
   const permissions = new Set(user.identity?.permissions ?? []);
   const role = user.activeRole?.code;
   const isFederationRole = role === "federation" || role === "super_admin";
@@ -298,27 +303,28 @@ function workspaceNavigation(user: WorkspaceUser): NavigationItem[] {
       href: "/workspace/judge-competitions",
     });
   }
+  const administration: NavigationItem[] = [];
   if (isFederationRole || permissions.has("registry.read")) {
-    items.push({
+    administration.push({
       label: "Реестр",
       icon: Building2,
       href: "/workspace/registry",
     });
   }
   if (isFederationRole || permissions.has("calendar_plans.read")) {
-    items.push({
+    administration.push({
       label: "Календарные планы",
       icon: CalendarRange,
       href: "/workspace/calendar-plans",
     });
   }
   if (isFederationRole || permissions.has("competition_events.read")) {
-    items.push({ label: "Зачёты", icon: ListTree, href: "/workspace/events" });
+    administration.push({ label: "Зачёты", icon: ListTree, href: "/workspace/events" });
   }
   if (isFederationRole || permissions.has("files.read")) {
-    items.push({ label: "Файлы", icon: FileText, href: "/workspace/files" });
+    administration.push({ label: "Файлы", icon: FileText, href: "/workspace/files" });
   }
-  if (
+  const canAdminister =
     isFederationRole ||
     [
       "roles.read",
@@ -328,15 +334,30 @@ function workspaceNavigation(user: WorkspaceUser): NavigationItem[] {
       "municipalities.create",
       "anti_doping.review",
       "rank_applications.review",
-    ].some((permission) => permissions.has(permission))
-  ) {
-    items.push({
+    ].some((permission) => permissions.has(permission));
+  if (canAdminister) {
+    administration.push({
       label: "Администрирование",
       icon: ShieldCheck,
       href: "/workspace/administration",
     });
+    if (isFederationRole || permissions.has("roles.read") || permissions.has("roles.create") || permissions.has("roles.assign")) {
+      administration.push({ label: "Роли и права", icon: ShieldCheck, href: "/workspace/administration/roles" });
+    }
+    if (isFederationRole || permissions.has("municipalities.create") || permissions.has("rank_applications.review")) {
+      administration.push({ label: "Справочники", icon: ListTree, href: "/workspace/administration/directories" });
+    }
+    if (isFederationRole || permissions.has("anti_doping.review")) {
+      administration.push({ label: "Проверки", icon: FileCheck2, href: "/workspace/administration/reviews" });
+    }
+    if (isFederationRole || permissions.has("roles.read")) {
+      administration.push({ label: "Журнал аудита", icon: ClipboardList, href: "/workspace/administration/audit" });
+    }
   }
-  return items;
+  return [
+    { label: "Рабочее пространство", items },
+    ...(administration.length ? [{ label: "Администрирование", items: administration }] : []),
+  ];
 }
 
 function NavigationSkeleton() {
@@ -372,8 +393,12 @@ function WorkspaceNavigation({ user }: { user: WorkspaceUser }) {
   }
 
   return (
-    <SidebarMenu className="gap-1">
-      {navigation.map(({ label, icon: Icon, href }) => {
+    <div className="grid gap-4">
+      {navigation.map((group) => (
+        <div key={group.label} className="grid gap-1">
+          <p className="px-2 text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden">{group.label}</p>
+          <SidebarMenu className="gap-1">
+            {group.items.map(({ label, icon: Icon, href }) => {
         const isActive = pathname === href;
 
         const content = (
@@ -390,7 +415,7 @@ function WorkspaceNavigation({ user }: { user: WorkspaceUser }) {
           </>
         );
 
-        return (
+              return (
           <SidebarMenuItem key={href}>
             <SidebarMenuButton
               asChild
@@ -406,9 +431,12 @@ function WorkspaceNavigation({ user }: { user: WorkspaceUser }) {
               <Link href={href}>{content}</Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-        );
-      })}
-    </SidebarMenu>
+              );
+            })}
+          </SidebarMenu>
+        </div>
+      ))}
+    </div>
   );
 }
 

@@ -3,11 +3,13 @@
 import { FormEvent, useCallback, useState } from "react";
 import { Gavel, LoaderCircle, Medal, Plus } from "lucide-react";
 
+import { competitionApi } from "@/entities/competition";
 import { judgeCategoryApi, type CurrentJudgeCategory, type JudgeCategoryApplication } from "@/entities/judge-category";
 import { profileApi } from "@/entities/profile";
 import { rankApi, type Rank } from "@/entities/rank";
 import { rankApplicationApi, type RankApplication } from "@/entities/rank-application";
 import { referenceDataApi, type Discipline } from "@/entities/reference-data";
+import { userCoachApi, type UserCoachRelation } from "@/entities/user-coach";
 import { useAuth } from "@/entities/session";
 import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
@@ -18,8 +20,8 @@ import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-
-const selectClassName = "h-9 w-full rounded-[10px] border border-border bg-background px-2.5 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/25";
+import { DatePicker } from "@/shared/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
 interface ApplicationData {
   mode: "personal" | "review";
@@ -29,6 +31,8 @@ interface ApplicationData {
   ranks: Rank[];
   disciplines: Discipline[];
   currentCategory: CurrentJudgeCategory | null;
+  competitions: Awaited<ReturnType<typeof competitionApi.list>>;
+  athletes: UserCoachRelation[];
 }
 
 type ReviewTarget = { kind: "rank" | "judge"; id: number; status: "approved" | "rejected" };
@@ -52,14 +56,19 @@ export function ApplicationsView() {
         canReviewRank || isFederationRole ? rankApplicationApi.pending({ limit: 100 }) : Promise.resolve([]),
         canReviewJudge || isFederationRole ? judgeCategoryApi.pending({ limit: 100 }) : Promise.resolve([]),
       ]);
-      return { mode: "review", activeRole, rank, judge, ranks: [], disciplines: [], currentCategory: null };
+      return { mode: "review", activeRole, rank, judge, ranks: [], disciplines: [], currentCategory: null, competitions: [], athletes: [] };
     }
-    const [ranks, disciplines] = await Promise.all([rankApi.list(), referenceDataApi.disciplines()]);
+    const [ranks, disciplines, competitions, athletes] = await Promise.all([
+      rankApi.list(),
+      referenceDataApi.disciplines(),
+      competitionApi.list({ limit: 100 }),
+      activeRole === "coach" ? userCoachApi.byCoach({ limit: 100 }) : Promise.resolve([]),
+    ]);
     if (activeRole === "judge") {
       const [judge, currentCategory] = await Promise.all([judgeCategoryApi.mine(), judgeCategoryApi.current()]);
-      return { mode: "personal", activeRole, rank: [], judge, ranks, disciplines, currentCategory };
+      return { mode: "personal", activeRole, rank: [], judge, ranks, disciplines, currentCategory, competitions, athletes };
     }
-    return { mode: "personal", activeRole, rank: await rankApplicationApi.mine(), judge: [], ranks, disciplines, currentCategory: null };
+    return { mode: "personal", activeRole, rank: await rankApplicationApi.mine(), judge: [], ranks, disciplines, currentCategory: null, competitions, athletes };
   }, [canReviewJudge, canReviewRank, identity?.roleId]);
 
   const state = useAsyncData(load);
@@ -162,12 +171,12 @@ export function ApplicationsView() {
         <DialogContent><DialogHeader><DialogTitle>Новая заявка</DialogTitle><DialogDescription>{state.data?.activeRole === "judge" ? "Укажите категорию и основание." : "Укажите разряд, дисциплину и результат-основание."}</DialogDescription></DialogHeader>
           <form className="grid gap-3" onSubmit={submitApplication}>
             {state.data?.activeRole === "judge" ? <><Label htmlFor="category-id">ID судейской категории</Label><Input id="category-id" name="category_id" type="number" min="1" required /></> : <>
-              <Label htmlFor="rank-id">Разряд</Label><select id="rank-id" name="rank_id" className={selectClassName} required defaultValue=""><option value="" disabled>Выберите разряд</option>{state.data?.ranks.map((rank) => <option key={rank.id} value={rank.id}>{rank.name}</option>)}</select>
-              <Label htmlFor="discipline-id">Дисциплина</Label><select id="discipline-id" name="discipline_id" className={selectClassName} required defaultValue=""><option value="" disabled>Выберите дисциплину</option>{state.data?.disciplines.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-              {state.data?.activeRole === "coach" ? <><Label htmlFor="athlete-id">ID спортсмена</Label><Input id="athlete-id" name="athlete_user_id" type="number" min="1" required /></> : null}
-              <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="competition-id">ID соревнования</Label><Input id="competition-id" name="competition_id" type="number" min="1" required /></div><div><Label htmlFor="result-id">ID результата</Label><Input id="result-id" name="result_id" type="number" min="1" required /></div></div>
+              <Label htmlFor="rank-id">Разряд</Label><Select name="rank_id" required><SelectTrigger id="rank-id"><SelectValue placeholder="Выберите разряд" /></SelectTrigger><SelectContent>{state.data?.ranks.map((rank) => <SelectItem key={rank.id} value={String(rank.id)}>{rank.name}</SelectItem>)}</SelectContent></Select>
+              <Label htmlFor="discipline-id">Дисциплина</Label><Select name="discipline_id" required><SelectTrigger id="discipline-id"><SelectValue placeholder="Выберите дисциплину" /></SelectTrigger><SelectContent>{state.data?.disciplines.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
+              {state.data?.activeRole === "coach" ? <div><Label htmlFor="athlete-id">Спортсмен</Label><Select name="athlete_user_id" required><SelectTrigger id="athlete-id"><SelectValue placeholder="Выберите спортсмена" /></SelectTrigger><SelectContent>{state.data.athletes.map((relation) => <SelectItem key={relation.participant_user_id} value={String(relation.participant_user_id)}>Спортсмен #{relation.participant_user_id}</SelectItem>)}</SelectContent></Select></div> : null}
+              <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="competition-id">Соревнование</Label><Select name="competition_id" required><SelectTrigger id="competition-id"><SelectValue placeholder="Выберите соревнование" /></SelectTrigger><SelectContent>{state.data?.competitions.map((competition) => <SelectItem key={competition.id} value={String(competition.id)}>{competition.name}</SelectItem>)}</SelectContent></Select></div><div><Label htmlFor="result-id">ID результата</Label><Input id="result-id" name="result_id" type="number" min="1" required placeholder="Укажите результат-основание" /></div></div>
             </>}
-            <Label htmlFor="application-type">Тип заявки</Label><select id="application-type" name="application_type" className={selectClassName} defaultValue="assignment"><option value="assignment">Присвоение</option><option value="confirmation">Подтверждение</option></select>
+            <Label htmlFor="application-type">Тип заявки</Label><Select name="application_type" defaultValue="assignment"><SelectTrigger id="application-type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="assignment">Присвоение</SelectItem><SelectItem value="confirmation">Подтверждение</SelectItem></SelectContent></Select>
             <DialogFooter><Button type="submit" disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Подать</Button></DialogFooter>
           </form>
         </DialogContent>
@@ -176,7 +185,7 @@ export function ApplicationsView() {
       <Dialog open={Boolean(reviewTarget)} onOpenChange={(open) => !open && setReviewTarget(null)}>
         <DialogContent><DialogHeader><DialogTitle>{reviewTarget?.status === "approved" ? "Одобрить заявку" : "Отклонить заявку"}</DialogTitle><DialogDescription>Решение будет сохранено и отправлено заявителю.</DialogDescription></DialogHeader>
           <form className="grid gap-3" onSubmit={submitReview}>
-            {reviewTarget?.status === "approved" ? <><Label htmlFor="assigned-at">Дата присвоения</Label><Input id="assigned-at" name="assigned_at" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /><Label htmlFor="expires-at">Действует до</Label><Input id="expires-at" name="expires_at" type="date" /><Label htmlFor="order-number">Номер приказа</Label><Input id="order-number" name="order_number" /></> : <><Label htmlFor="rejection-reason">Причина отклонения</Label><Input id="rejection-reason" name="rejection_reason" required /></>}
+            {reviewTarget?.status === "approved" ? <><Label htmlFor="assigned-at">Дата присвоения</Label><DatePicker id="assigned-at" name="assigned_at" defaultValue={new Date().toISOString().slice(0, 10)} /><Label htmlFor="expires-at">Действует до</Label><DatePicker id="expires-at" name="expires_at" /><Label htmlFor="order-number">Номер приказа</Label><Input id="order-number" name="order_number" /></> : <><Label htmlFor="rejection-reason">Причина отклонения</Label><Input id="rejection-reason" name="rejection_reason" required /></>}
             <DialogFooter><Button type="submit" variant={reviewTarget?.status === "rejected" ? "destructive" : "default"} disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Сохранить решение</Button></DialogFooter>
           </form>
         </DialogContent>
