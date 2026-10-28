@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   Award,
+  Bell,
   Building2,
   CalendarClock,
   CalendarRange,
@@ -137,8 +138,11 @@ function useWorkspaceUser() {
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-    setProfile(null);
-    setProfileLoading(true);
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setProfile(null);
+      setProfileLoading(true);
+    });
 
     if (!identity) {
       return () => {
@@ -314,6 +318,24 @@ function workspaceNavigation(user: WorkspaceUser): NavigationItem[] {
   if (isFederationRole || permissions.has("files.read")) {
     items.push({ label: "Файлы", icon: FileText, href: "/workspace/files" });
   }
+  if (
+    isFederationRole ||
+    [
+      "roles.read",
+      "roles.create",
+      "roles.assign",
+      "permissions.read",
+      "municipalities.create",
+      "anti_doping.review",
+      "rank_applications.review",
+    ].some((permission) => permissions.has(permission))
+  ) {
+    items.push({
+      label: "Администрирование",
+      icon: ShieldCheck,
+      href: "/workspace/administration",
+    });
+  }
   return items;
 }
 
@@ -435,8 +457,28 @@ function RoleDropdownItems({ user }: { user: WorkspaceUser }) {
 }
 
 function DesktopUserMenu({ user }: { user: WorkspaceUser }) {
+  const pathname = usePathname();
+
   return (
     <SidebarMenu>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          asChild
+          isActive={pathname === "/workspace/notifications"}
+          tooltip="Уведомления"
+          className="h-10 data-[active=true]:bg-[#402fff] data-[active=true]:text-white data-[active=true]:hover:bg-[#402fff]/90"
+        >
+          <Link href="/workspace/notifications">
+            <Bell />
+            <span className="transition-opacity duration-150 group-data-[collapsible=icon]:opacity-0">
+              Уведомления
+            </span>
+            {pathname === "/workspace/notifications" ? (
+              <ChevronRight className="ml-auto transition-opacity duration-150 group-data-[collapsible=icon]:opacity-0" />
+            ) : null}
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -501,9 +543,25 @@ function DesktopUserMenu({ user }: { user: WorkspaceUser }) {
 
 function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
   const { setOpenMobile } = useSidebar();
+  const pathname = usePathname();
 
   return (
     <div className="flex flex-col gap-3">
+      <SidebarMenu className="gap-1">
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            asChild
+            isActive={pathname === "/workspace/notifications"}
+            className="h-10 data-[active=true]:bg-[#f0eeff] data-[active=true]:text-[#402fff]"
+          >
+            <Link href="/workspace/notifications" onClick={() => setOpenMobile(false)}>
+              <Bell />
+              <span>Уведомления</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+
       <div>
         <p className="mb-1 px-2 text-xs text-muted-foreground">Выбор роли</p>
         <SidebarMenu className="gap-1">

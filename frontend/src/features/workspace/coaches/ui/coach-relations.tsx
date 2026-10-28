@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Dumbbell, LoaderCircle, UserRoundCheck } from "lucide-react";
+import { FormEvent, useCallback, useState } from "react";
+import { Dumbbell, LoaderCircle, Plus, UserRoundCheck } from "lucide-react";
 
 import { profileApi } from "@/entities/profile";
+import { referenceDataApi, type Discipline } from "@/entities/reference-data";
 import { useAuth } from "@/entities/session";
 import { userCoachApi, type UserCoachRelation } from "@/entities/user-coach";
 import { formatDate, SectionHeading, StatusBadge } from "@/features/workspace/common";
@@ -16,6 +17,7 @@ import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
 interface RelationData {
   role: "coach" | "participant";
   items: UserCoachRelation[];
+  disciplines: Discipline[];
 }
 
 export function CoachRelations() {
@@ -25,9 +27,32 @@ export function CoachRelations() {
   const load = useCallback(async (): Promise<RelationData> => {
     const profile = await profileApi.me();
     const role = profile.roles.find((item) => item.id === identity?.roleId)?.code === "coach" ? "coach" : "participant";
-    return { role, items: role === "coach" ? await userCoachApi.byCoach({ limit: 100 }) : await userCoachApi.byParticipant({ limit: 100 }) };
+    const [items, disciplines] = await Promise.all([
+      role === "coach" ? userCoachApi.byCoach({ limit: 100 }) : userCoachApi.byParticipant({ limit: 100 }),
+      referenceDataApi.disciplines(),
+    ]);
+    return { role, items, disciplines };
   }, [identity?.roleId]);
   const state = useAsyncData(load);
+
+  async function create(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setPendingId(0);
+    try {
+      await userCoachApi.create({
+        participant_user_id: Number(form.get("participant_user_id")),
+        discipline_id: Number(form.get("discipline_id")),
+      });
+      notify.success("Запрос спортсмену отправлен");
+      event.currentTarget.reset();
+      state.reload();
+    } catch (cause) {
+      notify.error(cause instanceof Error ? cause.message : "Не удалось создать связь");
+    } finally {
+      setPendingId(null);
+    }
+  }
 
   async function update(relation: UserCoachRelation, action: "confirm" | "end") {
     setPendingId(relation.id);
@@ -49,6 +74,18 @@ export function CoachRelations() {
         title={state.data?.role === "coach" ? "Мои спортсмены" : "Мои тренеры"}
         description="Подтверждённые и ожидающие связи по спортивным дисциплинам."
       />
+      {state.data?.role === "coach" ? (
+        <Card className="mb-4 bg-white/75 p-4 shadow-none">
+          <form className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]" onSubmit={create}>
+            <input name="participant_user_id" type="number" min="1" required placeholder="ID спортсмена" className="h-9 rounded-[10px] border border-border bg-background px-2.5 text-sm outline-none" />
+            <select name="discipline_id" required defaultValue="" className="h-9 rounded-[10px] border border-border bg-background px-2.5 text-sm outline-none">
+              <option value="" disabled>Выберите дисциплину</option>
+              {state.data.disciplines.map((discipline) => <option key={discipline.id} value={discipline.id}>{discipline.name}</option>)}
+            </select>
+            <Button disabled={pendingId !== null}>{pendingId === 0 ? <LoaderCircle className="animate-spin" /> : <Plus />}Добавить спортсмена</Button>
+          </form>
+        </Card>
+      ) : null}
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !state.data?.items.length ? <DataEmpty title="Связей пока нет" description="Новые запросы появятся на этой странице." /> : null}
