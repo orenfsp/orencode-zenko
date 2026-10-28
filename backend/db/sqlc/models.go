@@ -164,6 +164,15 @@ type CompetitionResult struct {
 	AwardedRankID pgtype.Int8
 }
 
+type CompetitionStatusHistory struct {
+	ID            int64
+	CompetitionID int64
+	FromStatus    pgtype.Text
+	ToStatus      string
+	ChangedBy     int64
+	ChangedAt     pgtype.Timestamptz
+}
+
 type CompetitionType struct {
 	ID        int64
 	Name      string

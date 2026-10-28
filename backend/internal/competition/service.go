@@ -144,6 +144,117 @@ func (s *Service) Update(ctx context.Context, id int64, req UpdateRequest) (Resp
 	return toResponse(updated), nil
 }
 
+func (s *Service) UpdateOwned(ctx context.Context, actorID, id int64, req UpdateRequest) (ResponseDTO, error) {
+	if actorID <= 0 {
+		return ResponseDTO{}, competitionerrs.ErrForbidden
+	}
+	current, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return ResponseDTO{}, err
+	}
+	if current.CreatedBy != 0 && current.CreatedBy != actorID {
+		return ResponseDTO{}, competitionerrs.ErrNotOwner
+	}
+	return s.Update(ctx, id, req)
+}
+
+func (s *Service) ListAdmin(ctx context.Context, actorID int64, status *string) ([]ResponseDTO, error) {
+	if actorID <= 0 {
+		return nil, competitionerrs.ErrForbidden
+	}
+	repo, ok := s.repo.(interface {
+		ListAdmin(context.Context, int64, *string) ([]Competition, error)
+	})
+	if !ok {
+		return nil, competitionerrs.ErrForbidden
+	}
+	if status != nil {
+		allowed := map[string]bool{"draft": true, "under_review": true, "published": true, "cancelled": true}
+		if !allowed[*status] {
+			return nil, competitionerrs.ErrInvalidTransition
+		}
+	}
+	items, err := repo.ListAdmin(ctx, actorID, status)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]ResponseDTO, 0, len(items))
+	for _, item := range items {
+		result = append(result, toResponse(item))
+	}
+	return result, nil
+}
+
+func (s *Service) GetAdmin(ctx context.Context, actorID, id int64) (ResponseDTO, error) {
+	if actorID <= 0 {
+		return ResponseDTO{}, competitionerrs.ErrForbidden
+	}
+	item, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return ResponseDTO{}, err
+	}
+	if item.CreatedBy != 0 && item.CreatedBy != actorID {
+		return ResponseDTO{}, competitionerrs.ErrNotOwner
+	}
+	return toResponse(item), nil
+}
+
+func (s *Service) Transition(ctx context.Context, actorID, id int64, target string) (ResponseDTO, error) {
+	if actorID <= 0 || id <= 0 {
+		return ResponseDTO{}, competitionerrs.ErrInvalidID
+	}
+	repo, ok := s.repo.(interface {
+		Transition(context.Context, int64, int64, string, string) error
+	})
+	if !ok {
+		return ResponseDTO{}, competitionerrs.ErrForbidden
+	}
+	item, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return ResponseDTO{}, err
+	}
+	if item.CreatedBy != 0 && item.CreatedBy != actorID {
+		return ResponseDTO{}, competitionerrs.ErrNotOwner
+	}
+	allowed := map[string]map[string]bool{
+		"under_review": {"draft": true},
+		"published":    {"under_review": true},
+		"cancelled":    {"published": true, "under_review": true},
+		"draft":        {"under_review": true},
+	}
+	if !allowed[target][item.Status] {
+		return ResponseDTO{}, competitionerrs.ErrInvalidTransition
+	}
+	if err := repo.Transition(ctx, id, actorID, item.Status, target); err != nil {
+		return ResponseDTO{}, err
+	}
+	item, err = s.repo.GetByID(ctx, id)
+	if err != nil {
+		return ResponseDTO{}, err
+	}
+	return toResponse(item), nil
+}
+
+func (s *Service) History(ctx context.Context, actorID, id int64) ([]StatusHistory, error) {
+	if actorID <= 0 || id <= 0 {
+		return nil, competitionerrs.ErrInvalidID
+	}
+	repo, ok := s.repo.(interface {
+		ListHistory(context.Context, int64) ([]StatusHistory, error)
+	})
+	if !ok {
+		return nil, competitionerrs.ErrForbidden
+	}
+	item, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if item.CreatedBy != 0 && item.CreatedBy != actorID {
+		return nil, competitionerrs.ErrNotOwner
+	}
+	return repo.ListHistory(ctx, id)
+}
+
 func mergeUpdate(current Competition, req UpdateRequest) (UpdateCompetition, error) {
 	input := UpdateCompetition{
 		ID: current.ID, Name: current.Name, Description: current.Description,

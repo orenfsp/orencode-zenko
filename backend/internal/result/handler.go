@@ -27,7 +27,16 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusUnauthorized, "требуется авторизация")
 		return
 	}
-	items, err := h.service.repository.ListHistory(r.Context(), identity.UserID)
+	var disciplineID *int64
+	if raw := r.URL.Query().Get("discipline_id"); raw != "" {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || id <= 0 {
+			writeMessage(w, http.StatusBadRequest, "некорректный ID дисциплины")
+			return
+		}
+		disciplineID = &id
+	}
+	items, err := h.service.repository.ListHistory(r.Context(), identity.UserID, disciplineID)
 	if err != nil {
 		handleError(w, err)
 		return

@@ -25,6 +25,18 @@ func (r *sqlJudgeRepository) GetCompetitionStatus(ctx context.Context, competiti
 	return status, err
 }
 
+func (r *sqlJudgeRepository) ListJudgePositions(ctx context.Context) ([]JudgePositionDTO, error) {
+	rows, err := r.queries.ListJudgePositions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]JudgePositionDTO, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, JudgePositionDTO{ID: row.ID, Name: row.Name})
+	}
+	return result, nil
+}
+
 func (r *sqlJudgeRepository) ListCompetitionJudges(
 	ctx context.Context, competitionID int64,
 ) ([]CompetitionJudge, error) {

@@ -292,8 +292,14 @@ JOIN competition_event ce ON ce.id = ca.event_id
 JOIN competition c ON c.id = ce.competition_id
 JOIN discipline d ON d.id = ce.discipline_id
 WHERE ca.athlete_user_id = $1
+  AND ($2::bigint IS NULL OR ce.discipline_id = $2)
 ORDER BY c.start_at DESC, ce.id DESC, cr.id DESC
 `
+
+type ListAthleteResultHistoryParams struct {
+	PUserID       int64
+	PDisciplineID pgtype.Int8
+}
 
 type ListAthleteResultHistoryRow struct {
 	ResultID        int64
@@ -309,8 +315,8 @@ type ListAthleteResultHistoryRow struct {
 	ProtocolUrl     pgtype.Text
 }
 
-func (q *Queries) ListAthleteResultHistory(ctx context.Context, pUserID int64) ([]ListAthleteResultHistoryRow, error) {
-	rows, err := q.db.Query(ctx, listAthleteResultHistory, pUserID)
+func (q *Queries) ListAthleteResultHistory(ctx context.Context, arg ListAthleteResultHistoryParams) ([]ListAthleteResultHistoryRow, error) {
+	rows, err := q.db.Query(ctx, listAthleteResultHistory, arg.PUserID, arg.PDisciplineID)
 	if err != nil {
 		return nil, err
 	}

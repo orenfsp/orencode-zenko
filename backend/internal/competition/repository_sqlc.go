@@ -117,6 +117,38 @@ func (r *sqlRepository) GetByID(ctx context.Context, id int64) (Competition, err
 	return fromGetCompetitionRow(row), nil
 }
 
+func (r *sqlRepository) ListAdmin(ctx context.Context, createdBy int64, status *string) ([]Competition, error) {
+	rows, err := r.queries.ListAdminCompetitions(ctx, db.ListAdminCompetitionsParams{CreatedBy: createdBy, Status: nullableText(status)})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Competition, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, fromAdminRow(row))
+	}
+	return result, nil
+}
+
+func (r *sqlRepository) Transition(ctx context.Context, id, actorID int64, fromStatus, toStatus string) error {
+	_, err := r.queries.TransitionCompetition(ctx, db.TransitionCompetitionParams{ID: id, ChangedBy: actorID, FromStatus: fromStatus, ToStatus: toStatus})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return competitionerrs.ErrInvalidTransition
+	}
+	return err
+}
+
+func (r *sqlRepository) ListHistory(ctx context.Context, id int64) ([]StatusHistory, error) {
+	rows, err := r.queries.ListCompetitionStatusHistory(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]StatusHistory, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, StatusHistory{ID: row.ID, CompetitionID: row.CompetitionID, FromStatus: textPointer(row.FromStatus), ToStatus: row.ToStatus, ChangedBy: row.ChangedBy, ChangedAt: row.ChangedAt.Time})
+	}
+	return result, nil
+}
+
 func (r *sqlRepository) UpdateDraft(ctx context.Context, input UpdateCompetition) (Competition, error) {
 	row, err := r.queries.UpdateDraftCompetition(ctx, db.UpdateDraftCompetitionParams{
 		PName: input.Name, PDescription: nullableText(input.Description),
@@ -211,6 +243,22 @@ func fromGetRow(row db.GetPublicCompetitionRow) Competition {
 func fromGetCompetitionRow(row db.GetCompetitionRow) Competition {
 	return Competition{
 		ID: row.ID, Name: row.Name, Description: textPointer(row.Description),
+		DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,
+		CompetitionTypeID: row.CompetitionTypeID, CompetitionTypeName: row.CompetitionTypeName,
+		CompetitionLevelID: row.CompetitionLevelID, CompetitionLevelCode: textPointer(row.CompetitionLevelCode),
+		CompetitionLevelName: textPointer(row.CompetitionLevelName), Format: row.Format,
+		StartAt: row.StartAt.Time, EndAt: row.EndAt.Time,
+		RegistrationStartsAt: row.RegistrationStartsAt.Time, RegistrationEndsAt: row.RegistrationEndsAt.Time,
+		VenueAddress: textPointer(row.VenueAddress), OnlineURL: textPointer(row.OnlineUrl), Status: row.Status, CreatedBy: row.CreatedBy,
+		CalendarPlanID: int64Pointer(row.CalendarPlanID), CalendarPlanName: textPointer(row.CalendarPlanName),
+		CalendarPlanYear: int16Pointer(row.CalendarPlanYear), CalendarPlanNumber: textPointer(row.CalendarPlanNumber),
+		RegulationURL: textPointer(row.RegulationUrl),
+	}
+}
+
+func fromAdminRow(row db.ListAdminCompetitionsRow) Competition {
+	return Competition{
+		ID: row.ID, Name: row.Name, Description: textPointer(row.Description), CreatedBy: row.CreatedBy,
 		DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,
 		CompetitionTypeID: row.CompetitionTypeID, CompetitionTypeName: row.CompetitionTypeName,
 		CompetitionLevelID: row.CompetitionLevelID, CompetitionLevelCode: textPointer(row.CompetitionLevelCode),

@@ -998,6 +998,22 @@ This endpoint is public and does not require an access token. It returns only sa
 ```
 
 For an invalid or unknown `userId`, the API returns `404 Not Found`.
+
+## Competition workflow (administrator)
+
+Use `GET /api/v1/admin/competitions?status=draft` to restore the current administrator's own competitions. A single draft is available through `GET /api/v1/admin/competitions/{id}`.
+
+Status actions:
+
+```http
+POST /api/v1/admin/competitions/{id}/submit
+POST /api/v1/admin/competitions/{id}/publish
+POST /api/v1/admin/competitions/{id}/cancel
+POST /api/v1/admin/competitions/{id}/return
+GET  /api/v1/admin/competitions/{id}/history
+```
+
+Allowed transitions are `draft -> under_review`, `under_review -> published`, `under_review|published -> cancelled` and `under_review -> draft`. All workflow endpoints require `competitions.update`; only the competition creator can operate on it.
 ## Anti-doping certificates
 
 The current user's certificates are loaded with:
@@ -1017,3 +1033,21 @@ Authorization: Bearer <access_token>
 ```
 
 The response uses the same certificate structure and is ordered from newest to oldest. Review is performed with `PATCH /api/v1/admin/anti-doping/{certificateID}`.
+## Judge positions
+
+```http
+GET /api/v1/judge-positions
+```
+
+The public endpoint returns a list of `{ "id", "name" }` objects. Use the selected `id` as `position_id` when assigning a judge.
+
+## Search users by role
+
+Administrators can search users for assignment forms through:
+
+```http
+GET /api/v1/admin/users?role=judge&search=иван&limit=50&offset=0
+Authorization: Bearer <access_token>
+```
+
+The `role` filter is optional and supports role codes such as `judge`, `coach` and `participant`. Results use the registry pagination format and require `registry.read`.
