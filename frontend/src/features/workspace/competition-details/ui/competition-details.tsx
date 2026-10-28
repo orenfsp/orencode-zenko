@@ -246,7 +246,7 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
         <Link href="/workspace/competitions"><ArrowLeft />К соревнованиям</Link>
       </Button>
 
-      <Card className="bg-white/75 p-6 shadow-none">
+      <Card variant="glass" className="p-6">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
           <div className="max-w-3xl">
             <div className="mb-3 flex flex-wrap gap-2">
@@ -265,10 +265,10 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
         </div>
       </Card>
       {canManageCompetition ? <div className="mt-4 flex flex-wrap gap-2">{competition.status === "draft" ? <Button disabled={pending} onClick={() => transitionCompetition("submit")}>Отправить на проверку</Button> : null}{competition.status === "under_review" ? <><Button disabled={pending} onClick={() => transitionCompetition("publish")}>Опубликовать</Button><Button variant="outline" disabled={pending} onClick={() => transitionCompetition("return")}>Вернуть на доработку</Button></> : null}{competition.status === "under_review" || competition.status === "published" ? <ConfirmAction trigger={<Button variant="outline" disabled={pending}>Отменить соревнование</Button>} title="Отменить соревнование?" description="Соревнование станет недоступно участникам. Вернуть его в публикацию через текущий API нельзя." confirmLabel="Отменить соревнование" destructive onConfirm={() => transitionCompetition("cancel")} /> : null}</div> : null}
-      {canUpdate && competition.status === "draft" ? <Card className="mt-4 bg-white/75 p-4 shadow-none"><form className="grid gap-2 md:grid-cols-[1fr_1fr_auto]" onSubmit={updateCompetition}><Input name="name" defaultValue={competition.name} required /><Input name="description" defaultValue={competition.description ?? ""} placeholder="Описание" /><Button disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Сохранить карточку</Button></form></Card> : null}
+      {canUpdate && competition.status === "draft" ? <Card variant="glass" className="mt-4 p-4"><form className="grid gap-2 md:grid-cols-[1fr_1fr_auto]" onSubmit={updateCompetition}><Input name="name" defaultValue={competition.name} required /><Input name="description" defaultValue={competition.description ?? ""} placeholder="Описание" /><Button disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Сохранить карточку</Button></form></Card> : null}
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-        <Card className="border-0 bg-white/75 p-5 shadow-none">
+        <Card variant="glass" className="p-5">
           <CardHeader className="flex-row items-start justify-between gap-3 p-0">
             <div>
             <CardTitle>Зачёты соревнования</CardTitle>
@@ -292,7 +292,7 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
           </div>
         </Card>
 
-        <Card className="bg-white/75 p-5 shadow-none">
+        <Card variant="glass" className="p-5">
           <CardHeader>
             <CardTitle>Судейская коллегия</CardTitle>
             <CardDescription>Назначенные судьи соревнования.</CardDescription>

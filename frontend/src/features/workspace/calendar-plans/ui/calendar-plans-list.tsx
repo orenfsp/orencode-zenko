@@ -105,6 +105,8 @@ export function CalendarPlansList() {
         search={search}
         onSearchChange={setSearch}
         searchPlaceholder="Найти план по названию или году"
+        filterActive={Boolean(yearFilter)}
+        onResetFilters={() => setYearFilter("")}
         filterContent={
           <div className="grid gap-2">
             <label htmlFor="calendar-plan-year-filter" className="text-sm font-medium">Год плана</label>
@@ -151,10 +153,10 @@ export function CalendarPlansList() {
 
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
-      {!state.loading && !state.error && !plans.length ? <DataEmpty title={search || yearFilter ? "Планы не найдены" : "Календарных планов пока нет"} description={search || yearFilter ? "Измените запрос или сбросьте фильтр по году." : canCreate ? "Создайте первый план кнопкой «Создать план», чтобы связать с ним соревнования." : "Планы появятся после того, как администратор добавит их."} /> : null}
+      {!state.loading && !state.error && !plans.length ? <DataEmpty title={search || yearFilter ? "Планы не найдены" : "Календарных планов пока нет"} description={search || yearFilter ? "Измените запрос или сбросьте фильтр по году." : canCreate ? "Создайте первый план кнопкой «Создать план», чтобы связать с ним соревнования." : "Планы появятся после того, как администратор добавит их."} action={search || yearFilter ? <Button variant="outline" size="sm" onClick={() => { setSearch(""); setYearFilter(""); }}>Сбросить фильтры</Button> : undefined} /> : null}
 
       <div className="grid gap-3">
-        {plans.map((plan) => <Card key={plan.id} className="bg-white/75 p-4 shadow-none sm:p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><CalendarDays className="size-4 shrink-0 text-muted-foreground" /><h2 className="truncate font-medium">{plan.name}</h2></div><p className="mt-1 pl-6 text-sm text-muted-foreground">{plan.year} год</p></div><div className="flex flex-wrap gap-2 sm:shrink-0"><Button type="button" variant="outline" onClick={() => void openPlan(plan)} disabled={pending}><Search />Открыть соревнования</Button>{canUpdate ? <Button type="button" variant="ghost" size="icon" aria-label={`Изменить план «${plan.name}»`} onClick={() => setEditing(plan)} disabled={pending}><Pencil /></Button> : null}</div></div></Card>)}
+        {plans.map((plan) => <Card key={plan.id} variant="glass" className="p-4 sm:p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex items-center gap-2"><CalendarDays className="size-4 shrink-0 text-muted-foreground" /><h2 className="truncate font-medium">{plan.name}</h2></div><p className="mt-1 pl-6 text-sm text-muted-foreground">{plan.year} год</p></div><div className="flex flex-wrap gap-2 sm:shrink-0"><Button type="button" variant="outline" onClick={() => void openPlan(plan)} disabled={pending}><Search />Открыть соревнования</Button>{canUpdate ? <Button type="button" variant="ghost" size="icon" aria-label={`Изменить план «${plan.name}»`} onClick={() => setEditing(plan)} disabled={pending}><Pencil /></Button> : null}</div></div></Card>)}
       </div>
     </div>
   );

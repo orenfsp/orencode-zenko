@@ -50,7 +50,7 @@ export function DeadlinesList() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти срок" filterContent={<Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все статусы</SelectItem><SelectItem value="planned">Запланированные</SelectItem><SelectItem value="completed">Выполненные</SelectItem></SelectContent></Select>} createLabel="Добавить срок" onCreate={canManage ? () => setCreateOpen(true) : undefined} />
+      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти срок" filterActive={statusFilter !== "all"} onResetFilters={() => setStatusFilter("all")} filterContent={<Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все статусы</SelectItem><SelectItem value="planned">Запланированные</SelectItem><SelectItem value="completed">Выполненные</SelectItem></SelectContent></Select>} createLabel="Добавить срок" onCreate={canManage ? () => setCreateOpen(true) : undefined} />
       <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>Новый отчётный срок</DialogTitle><DialogDescription>Добавьте срок, который будет отображаться федерации и ответственным пользователям.</DialogDescription></DialogHeader><form className="grid gap-3" onSubmit={createReport}>
             <Input name="name" placeholder="Название отчётного срока" required />
             <Select name="type" defaultValue="report"><SelectTrigger aria-label="Тип срока"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="report">Обычный отчёт</SelectItem><SelectItem value="governor_award">Губернаторская премия</SelectItem></SelectContent></Select>
@@ -60,11 +60,11 @@ export function DeadlinesList() {
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !personal.length ? (
-        <DataEmpty title="Активных сроков нет" description="Новые сроки появятся автоматически." />
+        <DataEmpty title={search || statusFilter !== "all" ? "Сроки не найдены" : "Активных сроков нет"} description={search || statusFilter !== "all" ? "Измените поисковый запрос или сбросьте фильтры." : "Новые сроки появятся автоматически."} action={search || statusFilter !== "all" ? <Button variant="outline" size="sm" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Сбросить фильтры</Button> : undefined} />
       ) : null}
       <div className="grid gap-3">
         {personal.map((deadline) => (
-          <Card key={`${deadline.type}-${deadline.id}`} className="bg-white/75 p-5 shadow-none">
+          <Card key={`${deadline.type}-${deadline.id}`} variant="glass" className="p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="flex gap-3">
                 <div>

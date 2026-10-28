@@ -586,7 +586,7 @@ function DesktopUserMenu({ user }: { user: WorkspaceUser }) {
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg shadow-none"
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 shadow-none"
             side="right"
             align="end"
             sideOffset={4}
@@ -740,7 +740,7 @@ function MobileHeader({ user }: { user: WorkspaceUser }) {
     <header className="grid h-16 shrink-0 grid-cols-[40px_1fr_auto] items-center gap-2 px-4 md:hidden">
       <SidebarTrigger
         aria-label="Открыть меню"
-        className="size-9 rounded-lg text-foreground hover:bg-muted"
+        className="size-9 text-foreground hover:bg-muted"
       >
         <Menu className="size-6" />
       </SidebarTrigger>
@@ -754,12 +754,12 @@ function MobileHeader({ user }: { user: WorkspaceUser }) {
           asChild
           variant="ghost"
           size="icon"
-          className="size-9 rounded-lg p-0 hover:bg-muted"
+          className="size-9 p-0 hover:bg-muted"
         >
           <Link href="/workspace/profile" aria-label="Открыть профиль">
             <ProfileAvatar
               name={user.displayName}
-              className="size-9 rounded-full border border-white/80"
+              className="size-9 rounded-full border border-border/80"
             />
           </Link>
         </Button>
@@ -821,7 +821,7 @@ export function WorkspaceShell({
             </SidebarFooter>
           </Sidebar>
 
-          <SidebarInset className="h-svh min-w-0 bg-white/40 backdrop-blur-[20px] dark:backdrop-blur-[36px]">
+          <SidebarInset className="h-svh min-w-0 bg-background/40 backdrop-blur-[20px] dark:backdrop-blur-[36px]">
             <MobileHeader user={user} />
             <header className="hidden h-14 shrink-0 items-center gap-3 px-3 md:flex">
               <SidebarTrigger aria-label="Свернуть боковое меню" />
@@ -836,7 +836,9 @@ export function WorkspaceShell({
             {children ? (
               <div className="relative min-h-0 flex-1">
                 <ScrollMask className="h-full p-4 pb-7 pt-4 md:px-6 md:pb-9 md:pt-5" fade={32}>
-                  {children}
+                  <div className="mx-auto w-full max-w-6xl">
+                    {children}
+                  </div>
                 </ScrollMask>
               </div>
             ) : null}

@@ -33,14 +33,14 @@ export function ResultsHistory() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти результат" filterContent={<Select value={status} onValueChange={setStatus}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все статусы</SelectItem><SelectItem value="approved">Утверждённые</SelectItem><SelectItem value="finished">Завершённые</SelectItem></SelectContent></Select>} />
+      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти результат" filterActive={status !== "all"} onResetFilters={() => setStatus("all")} filterContent={<Select value={status} onValueChange={setStatus}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все статусы</SelectItem><SelectItem value="approved">Утверждённые</SelectItem><SelectItem value="finished">Завершённые</SelectItem></SelectContent></Select>} />
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !items.length ? (
-        <DataEmpty title="Результатов пока нет" description="После утверждения результатов соревнований они появятся здесь." />
+        <DataEmpty title={search || status !== "all" ? "Результаты не найдены" : "Результатов пока нет"} description={search || status !== "all" ? "Измените запрос или сбросьте фильтры." : "После утверждения результатов соревнований они появятся здесь."} action={search || status !== "all" ? <Button variant="outline" size="sm" onClick={() => { setSearch(""); setStatus("all"); }}>Сбросить фильтры</Button> : undefined} />
       ) : null}
       {!state.loading && !state.error && (scorePoints.length >= 2 || placePoints.length >= 2) ? (
-        <Card className="mb-4 bg-white/75 p-5 shadow-none">
+        <Card variant="glass" className="mb-4 p-5">
           <CardHeader className="p-0">
             <CardTitle>Динамика результатов</CardTitle>
             <CardDescription>
@@ -57,7 +57,7 @@ export function ResultsHistory() {
       ) : null}
       <div className="grid gap-3">
         {items.map((item) => (
-          <Card key={`${item.competition_id}-${item.event_id}`} className="bg-white/75 p-5 shadow-none">
+          <Card key={`${item.competition_id}-${item.event_id}`} variant="glass" className="p-5">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div className="flex min-w-0 gap-3">
                 <div>

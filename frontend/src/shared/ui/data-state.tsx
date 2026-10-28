@@ -1,4 +1,5 @@
 import { AlertCircle, Inbox, RefreshCw } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
@@ -17,7 +18,7 @@ export function DataLoading({ rows = 3 }: { rows?: number }) {
 
 export function DataError({ message, retry }: { message: string; retry: () => void }) {
   return (
-    <Alert variant="destructive" className="bg-white/80 shadow-none">
+    <Alert variant="destructive" className="bg-card/80 shadow-none backdrop-blur-sm">
       <AlertCircle />
       <AlertTitle>Не удалось загрузить данные</AlertTitle>
       <AlertDescription>
@@ -34,17 +35,20 @@ export function DataError({ message, retry }: { message: string; retry: () => vo
 export function DataEmpty({
   title = "Здесь пока ничего нет",
   description = "Данные появятся после первой операции.",
+  action,
 }: {
   title?: string;
   description?: string;
+  action?: ReactNode;
 }) {
   return (
-    <Card className="items-center gap-2 bg-white/70 px-6 py-12 text-center shadow-none">
+    <Card variant="glass" className="items-center gap-2 px-6 py-12 text-center">
       <span className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         <Inbox className="size-5" />
       </span>
       <h2 className="font-medium">{title}</h2>
       <p className="max-w-md text-sm text-muted-foreground">{description}</p>
+      {action}
     </Card>
   );
 }

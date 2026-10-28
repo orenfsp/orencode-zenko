@@ -56,16 +56,17 @@ export function ParticipantPicker({ value, onChange }: { value: CoachParticipant
           {loading ? <p className="px-2 py-3 text-sm text-muted-foreground">Ищем спортсменов…</p> : error ? (
             <div className="px-2 py-3 text-sm text-destructive">Не удалось загрузить список. <Button type="button" variant="link" className="h-auto p-0" onClick={() => { setLoading(true); setError(false); setRevision((current) => current + 1); }}>Повторить</Button></div>
           ) : users.length ? users.map((user, index) => (
-            <button
+            <Button
               key={user.id}
               ref={index === 0 ? firstOption : undefined}
               type="button"
-              className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+              variant="ghost"
+              className="min-h-11 w-full justify-between px-2 font-normal"
               onClick={() => { onChange(user); setOpen(false); }}
             >
               <span className="min-w-0 truncate">{fullName(user)}</span>
               {value?.id === user.id ? <Check aria-hidden="true" className="shrink-0" /> : null}
-            </button>
+            </Button>
           )) : <p className="px-2 py-3 text-sm text-muted-foreground">Спортсмены не найдены. Уточните ФИО.</p>}
         </ScrollMask>
         {!search && users.length === 30 ? <p className="px-2 pt-2 text-xs text-muted-foreground">Показаны первые 30. Чтобы найти другого спортсмена, введите ФИО.</p> : null}

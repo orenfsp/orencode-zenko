@@ -4,8 +4,12 @@ import type {
   CompetitionResultApproval,
   CompetitionResultHistoryItem,
   CompetitionResultTable,
+  CreateResultTemplatePayload,
   ResultSettingsPayload,
+  SaveManualResultsPayload,
   SaveResultsPayload,
+  ResultTemplate,
+  UpdateResultTemplatePayload,
 } from "../model/types";
 
 function resultsPath(competitionId: number, eventId: number) {
@@ -17,6 +21,25 @@ function protocolFilename(disposition: string | null, eventId: number) {
 }
 
 export const competitionResultApi = {
+  templates: async (disciplineId?: number) =>
+    (
+      await api.get<ApiEnvelope<ResultTemplate[]>>("/api/v1/admin/result-templates", {
+        permission: "competition_results.read",
+        params: disciplineId ? { discipline_id: disciplineId } : undefined,
+      })
+    ).data,
+  createTemplate: async (body: CreateResultTemplatePayload) =>
+    (
+      await api.post<ApiEnvelope<ResultTemplate>>("/api/v1/admin/result-templates", body, {
+        permission: "competition_results.manage",
+      })
+    ).data,
+  updateTemplate: async (templateId: number, body: UpdateResultTemplatePayload) =>
+    (
+      await api.patch<ApiEnvelope<ResultTemplate>>(`/api/v1/admin/result-templates/${templateId}`, body, {
+        permission: "competition_results.manage",
+      })
+    ).data,
   get: async (competitionId: number, eventId: number) =>
     (
       await api.get<ApiEnvelope<CompetitionResultTable>>(
@@ -44,6 +67,18 @@ export const competitionResultApi = {
     (
       await api.put<ApiEnvelope<CompetitionResultTable>>(
         resultsPath(competitionId, eventId),
+        body,
+        { permission: "competition_results.manage" },
+      )
+    ).data,
+  saveManual: async (
+    competitionId: number,
+    eventId: number,
+    body: SaveManualResultsPayload,
+  ) =>
+    (
+      await api.put<ApiEnvelope<CompetitionResultTable>>(
+        `${resultsPath(competitionId, eventId)}/manual`,
         body,
         { permission: "competition_results.manage" },
       )

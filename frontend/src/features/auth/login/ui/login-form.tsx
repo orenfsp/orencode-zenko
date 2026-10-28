@@ -80,7 +80,7 @@ export function LoginForm() {
         minLength={8}
         required
         labelAddon={
-          <Link className="text-sm leading-5 hover:underline" href="#">
+          <Link className="text-sm leading-5 hover:underline" href="/reset-password">
             Забыли пароль?
           </Link>
         }

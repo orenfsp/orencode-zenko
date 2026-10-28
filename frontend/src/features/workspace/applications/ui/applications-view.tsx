@@ -168,6 +168,7 @@ export function ApplicationsView() {
   const visibleCompetitionApplications = (state.data?.competitionApplications ?? []).filter((item) => matches(`${item.competition_name} ${item.discipline_name} ${item.athlete_last_name} ${item.athlete_first_name} ${item.status}`));
   const visibleRankApplications = (state.data?.rank ?? []).filter((item) => matches(`${item.athlete_user_id} ${item.rank_id} ${item.discipline_id} ${item.status}`));
   const visibleJudgeApplications = (state.data?.judge ?? []).filter((item) => matches(`${item.judge_name ?? ""} ${item.category_name ?? item.category_id} ${item.status}`));
+  const visibleTotal = visibleCompetitionApplications.length + visibleRankApplications.length + visibleJudgeApplications.length;
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -178,12 +179,13 @@ export function ApplicationsView() {
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !total ? <DataEmpty title={state.data?.mode === "review" ? "Очередь пуста" : "Заявок пока нет"} description={state.data?.mode === "review" ? "Новые заявки появятся здесь после подачи." : missingCoachAthletes ? "Подать заявку за спортсмена можно после подтверждения связи с ним." : "Подайте заявку, чтобы отслеживать её статус здесь."} /> : null}
+      {!state.loading && !state.error && total > 0 && !visibleTotal ? <DataEmpty title="Заявки не найдены" description="Измените поисковый запрос." action={<Button type="button" variant="outline" size="sm" onClick={() => setSearch("")}>Сбросить поиск</Button>} /> : null}
       {missingCoachAthletes ? <Button asChild variant="outline" className="mb-4"><Link href="/workspace/coaches">Добавить спортсмена</Link></Button> : null}
       {!state.loading && !state.error && !total && state.data?.mode === "personal" ? <Button asChild variant="outline" className="mb-4"><Link href="/workspace/competitions">Найти соревнование</Link></Button> : null}
 
       <div className="grid gap-3">
         {visibleCompetitionApplications.map((application) => (
-          <Card key={`competition-${application.id}`} className="bg-white/75 p-5 shadow-none">
+          <Card key={`competition-${application.id}`} variant="glass" className="p-5">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
               <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Заявка на соревнование</p><StatusBadge status={application.status} /></div><p className="mt-1 text-sm">{application.competition_name} · {application.discipline_name}{application.age_group_name ? ` · ${application.age_group_name}` : ""}</p><p className="mt-1 text-sm text-muted-foreground">Спортсмен: {application.athlete_last_name} {application.athlete_first_name} · подана {formatDate(application.submitted_at, true)}</p><Button asChild variant="link" size="sm" className="mt-1 px-0"><Link href={`/workspace/competitions/${application.competition_id}`}>Открыть соревнование</Link></Button></div>
               {state.data?.mode === "review" ? <div className="flex w-full gap-2 sm:w-auto"><Button className="flex-1 sm:flex-none" size="sm" disabled={pending} onClick={() => void changeCompetitionApplication(application, "approve")}>Одобрить</Button><Button className="flex-1 sm:flex-none" size="sm" variant="outline" disabled={pending} onClick={() => void changeCompetitionApplication(application, "reject")}>Отклонить</Button></div> : application.can_withdraw ? <div className="flex w-full sm:w-auto"><ConfirmAction trigger={<Button className="w-full sm:w-auto" size="sm" variant="outline" disabled={pending}>Отозвать</Button>} title="Отозвать заявку?" description="Заявка перестанет участвовать в модерации. Это действие нельзя отменить." confirmLabel="Отозвать заявку" destructive onConfirm={() => changeCompetitionApplication(application, "withdraw")} /></div> : null}
@@ -191,7 +193,7 @@ export function ApplicationsView() {
           </Card>
         ))}
         {visibleRankApplications.map((application) => (
-          <Card key={`rank-${application.id}`} className="bg-white/75 p-5 shadow-none">
+          <Card key={`rank-${application.id}`} variant="glass" className="p-5">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
               <div className="flex min-w-0 gap-3"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Заявка на спортивный разряд</p><StatusBadge status={application.status} /></div><p className="mt-1 text-sm text-muted-foreground">{state.data?.userNames[application.athlete_user_id] ?? "Спортсмен"} · {state.data?.ranks.find((item) => item.id === application.rank_id)?.name ?? "Разряд"} · {state.data?.disciplines.find((item) => item.id === application.discipline_id)?.name ?? "Дисциплина"}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.created_at, true)} · {application.application_type === "confirmation" ? "подтверждение" : "присвоение"}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
               {state.data?.mode === "review" ? <div className="flex w-full shrink-0 gap-2 sm:w-auto"><Button className="flex-1 sm:flex-none" size="sm" onClick={() => setReviewTarget({ kind: "rank", id: application.id, status: "approved" })}>Одобрить</Button><Button className="flex-1 sm:flex-none" size="sm" variant="outline" onClick={() => setReviewTarget({ kind: "rank", id: application.id, status: "rejected" })}>Отклонить</Button></div> : null}
@@ -200,7 +202,7 @@ export function ApplicationsView() {
         ))}
 
         {visibleJudgeApplications.map((application) => (
-          <Card key={`judge-${application.id}`} className="bg-white/75 p-5 shadow-none">
+          <Card key={`judge-${application.id}`} variant="glass" className="p-5">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
               <div className="flex min-w-0 gap-3"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{application.category_name ?? `Судейская категория #${application.category_id}`}</p><StatusBadge status={application.status} /></div><p className="mt-1 text-sm text-muted-foreground">{application.judge_name ? `${application.judge_name} · ` : ""}{application.application_type}</p><p className="mt-1 text-xs text-muted-foreground">Подана {formatDate(application.submitted_at, true)}</p>{application.rejection_reason ? <p className="mt-2 text-sm text-destructive">{application.rejection_reason}</p> : null}</div></div>
               {state.data?.mode === "review" ? <div className="flex w-full shrink-0 gap-2 sm:w-auto"><Button className="flex-1 sm:flex-none" size="sm" onClick={() => setReviewTarget({ kind: "judge", id: application.id, status: "approved" })}>Одобрить</Button><Button className="flex-1 sm:flex-none" size="sm" variant="outline" onClick={() => setReviewTarget({ kind: "judge", id: application.id, status: "rejected" })}>Отклонить</Button></div> : null}

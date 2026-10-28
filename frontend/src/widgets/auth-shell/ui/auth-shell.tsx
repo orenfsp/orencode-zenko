@@ -11,19 +11,19 @@ export function AuthShell({
   contentClassName?: string;
 }) {
   return (
-    <main className="grid h-svh grid-cols-1 min-[1016px]:grid-cols-2 overflow-hidden bg-card">
-  <section className="relative flex h-svh min-h-0 items-center justify-center overflow-hidden px-5 py-16 min-[1016px]:px-10">
+    <main className="grid h-svh min-w-0 grid-cols-1 overflow-hidden bg-card min-[1016px]:grid-cols-2">
+  <section className="relative flex h-svh min-h-0 min-w-0 items-center justify-center overflow-hidden px-5 py-16 min-[1016px]:px-10">
     <BrandLogo className="absolute left-5 top-10 min-[1016px]:left-10" />
 
     <section
-      className={cn("w-full max-w-80 translate-y-5", contentClassName)}
+      className={cn("min-w-0 w-full max-w-80 translate-y-5", contentClassName)}
     >
       {children}
     </section>
   </section>
 
   <aside
-    className="relative hidden h-svh w-full overflow-hidden bg-[#d9d9d9] min-[1016px]:block"
+    className="relative hidden h-svh w-full overflow-hidden bg-auth-panel min-[1016px]:block"
     aria-hidden="true"
   >
     <RibbonGlowDark />

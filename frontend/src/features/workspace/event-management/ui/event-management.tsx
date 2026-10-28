@@ -104,6 +104,8 @@ export function EventManagement() {
         search={search}
         onSearchChange={setSearch}
         searchPlaceholder="Найти зачёт"
+        filterActive={competitionId !== null}
+        onResetFilters={() => setCompetitionId(null)}
         filterContent={
           <div className="grid gap-2">
             <Label htmlFor="competition-id">Соревнование</Label>
@@ -125,12 +127,12 @@ export function EventManagement() {
         <DataEmpty title="Выберите соревнование" description="Выберите соревнование из списка, чтобы загрузить его зачёты." />
       ) : null}
       {competitionId && !events.loading && !events.error && !visibleEvents.length ? (
-        <DataEmpty title={search ? "Зачёты не найдены" : "Зачётов пока нет"} description={search ? "Измените поисковый запрос." : "Создайте первый зачёт для выбранного соревнования."} />
+        <DataEmpty title={search ? "Зачёты не найдены" : "Зачётов пока нет"} description={search ? "Измените поисковый запрос." : "Создайте первый зачёт для выбранного соревнования."} action={search ? <Button variant="outline" size="sm" onClick={() => setSearch("")}>Сбросить поиск</Button> : undefined} />
       ) : null}
 
       <div className="grid gap-3">
         {visibleEvents.map((item) => (
-          <Card key={item.id} className="border-0 bg-white/75 p-4 shadow-none sm:p-5">
+          <Card key={item.id} variant="glass" className="p-4 sm:p-5">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div className="min-w-0">
                 <p className="font-medium">Зачёт #{item.id}</p>

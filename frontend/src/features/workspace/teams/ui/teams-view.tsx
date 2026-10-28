@@ -217,13 +217,14 @@ export function TeamsView() {
       ) : null}
       {!state.loading && !state.error && !filteredTeams.length ? (
         <DataEmpty
-          title="Сборных пока нет"
-          description="Выберите спортсменов и тренеров выше, чтобы создать первую сборную."
+          title={search ? "Сборные не найдены" : "Сборных пока нет"}
+          description={search ? "Измените поисковый запрос." : "Выберите спортсменов и тренеров, чтобы создать первую сборную."}
+          action={search ? <Button type="button" variant="outline" size="sm" onClick={() => setSearch("")}>Сбросить поиск</Button> : undefined}
         />
       ) : null}
       <div className="grid gap-3">
         {filteredTeams.map((team) => (
-          <Card key={team.id} className="bg-white/75 p-5 shadow-none">
+          <Card key={team.id} variant="glass" className="p-5">
             <p className="font-medium">{team.name}</p>
             <p className="mt-1 text-xs text-muted-foreground">
               Создана {formatDate(team.created_at)}

@@ -17,7 +17,7 @@ export function FormField({
         <Label htmlFor={id}>{label}</Label>
         {labelAddon}
       </span>
-      <Input id={id} {...props} className="rounded-xl" />
+      <Input id={id} {...props} />
     </fieldset>
   );
 }

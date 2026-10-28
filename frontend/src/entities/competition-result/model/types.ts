@@ -5,10 +5,37 @@ export interface ResultTeamSetup {
 
 export interface ResultSettingsPayload {
   mode: string;
+  scoring_mode?: "algorithmic" | "manual";
   task_count: number;
   teams?: ResultTeamSetup[];
+  template_id?: number;
   confirm_reset?: boolean;
 }
+
+export interface ResultTemplateField {
+  key: string;
+  label: string;
+  type: "number" | "text";
+  required: boolean;
+}
+
+export interface ResultTemplate {
+  id: number;
+  discipline_id: number;
+  name: string;
+  fields: ResultTemplateField[];
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateResultTemplatePayload {
+  discipline_id: number;
+  name: string;
+  fields: ResultTemplateField[];
+}
+
+export type UpdateResultTemplatePayload = Partial<Omit<CreateResultTemplatePayload, "discipline_id">> & { is_active?: boolean };
 
 export interface ResultTaskPayload {
   task_number: number;
@@ -25,6 +52,18 @@ export interface ResultEntryPayload {
 
 export interface SaveResultsPayload {
   entries: ResultEntryPayload[];
+}
+
+export interface ManualResultEntryPayload {
+  entry_id: number;
+  result_status: string;
+  place: number | null;
+  custom_values: Record<string, string | number | null>;
+}
+
+export interface SaveManualResultsPayload {
+  revision: number;
+  entries: ManualResultEntryPayload[];
 }
 
 export interface ResultCompetition {
@@ -70,6 +109,13 @@ export interface ResultEntry {
   last_solve_time_deciseconds: number;
   negative_attempts: number;
   place: number | null;
+  custom_values?: Record<string, string | number | null>;
+}
+
+export interface ResultTemplateSnapshot {
+  id: number;
+  name: string;
+  fields: ResultTemplateField[];
 }
 
 export interface CompetitionResultTable {
@@ -77,7 +123,11 @@ export interface CompetitionResultTable {
   event: ResultEvent;
   mode: string;
   task_count: number;
+  revision: number;
   status: string;
+  scoring_mode: "algorithmic" | "manual";
+  template_id: number | null;
+  template_snapshot: ResultTemplateSnapshot | null;
   calculated_at: string | null;
   approved_at: string | null;
   protocol_url: string | null;

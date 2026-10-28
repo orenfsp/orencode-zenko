@@ -37,17 +37,17 @@ export function NotificationsView() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти уведомление" filterContent={<Select value={readFilter} onValueChange={setReadFilter}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все уведомления</SelectItem><SelectItem value="unread">Непрочитанные</SelectItem><SelectItem value="read">Прочитанные</SelectItem></SelectContent></Select>} />
+      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти уведомление" filterActive={readFilter !== "all"} onResetFilters={() => setReadFilter("all")} filterContent={<Select value={readFilter} onValueChange={setReadFilter}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все уведомления</SelectItem><SelectItem value="unread">Непрочитанные</SelectItem><SelectItem value="read">Прочитанные</SelectItem></SelectContent></Select>} />
       {state.loading ? <DataLoading rows={5} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
-      {!state.loading && !state.error && !items.length ? <DataEmpty title="Уведомлений пока нет" /> : null}
+      {!state.loading && !state.error && !items.length ? <DataEmpty title={search || readFilter !== "all" ? "Уведомления не найдены" : "Уведомлений пока нет"} action={search || readFilter !== "all" ? <Button variant="outline" size="sm" onClick={() => { setSearch(""); setReadFilter("all"); }}>Сбросить фильтры</Button> : undefined} /> : null}
       <div className="grid gap-3">
         {items.map((item) => {
           const isGenericTitle = item.title.trim().toLocaleLowerCase("ru") === "уведомление";
           const headingClass = item.is_read ? "font-medium text-foreground/55" : "font-medium text-foreground";
 
           return (
-          <Card key={item.id} className="border-0 bg-white/75 p-4 shadow-none sm:p-5">
+          <Card key={item.id} variant="glass" className="p-4 sm:p-5">
             <div className="relative">
               <div className="min-w-0 pr-8">
                 {!isGenericTitle ? <p className={headingClass}>{item.title}</p> : null}

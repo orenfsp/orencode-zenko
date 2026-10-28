@@ -61,7 +61,7 @@ export function DatePicker({
             aria-invalid={invalid}
             aria-describedby={invalid ? `${id}-error` : undefined}
             className={cn(
-              "h-8 w-full justify-between px-2.5 text-left font-normal data-[empty=true]:text-muted-foreground",
+              "h-9 w-full justify-between px-3 text-left font-normal data-[empty=true]:text-muted-foreground",
               className,
             )}
           >

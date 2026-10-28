@@ -236,7 +236,6 @@ export function RegisterForm() {
         label="Почта"
         placeholder="m@example.ru"
         autoComplete="email"
-        className="h-8"
         defaultValue={values.email}
         required
       />
@@ -255,7 +254,6 @@ export function RegisterForm() {
         label="Пароль"
         autoComplete="new-password"
         minLength={8}
-        className="h-8"
         defaultValue={values.password}
         required
       />
@@ -266,7 +264,6 @@ export function RegisterForm() {
         label="Подтвердить пароль"
         autoComplete="new-password"
         minLength={8}
-        className="h-8"
         defaultValue={values.password}
         required
       />

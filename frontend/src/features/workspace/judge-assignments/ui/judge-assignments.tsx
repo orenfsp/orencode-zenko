@@ -24,7 +24,7 @@ export function JudgeAssignments() {
       ) : null}
       <div className="grid gap-3">
         {state.data?.map((assignment) => (
-          <Card key={assignment.id} className="bg-white/75 p-5 shadow-none">
+          <Card key={assignment.id} variant="glass" className="p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="flex gap-3">
                 <div>

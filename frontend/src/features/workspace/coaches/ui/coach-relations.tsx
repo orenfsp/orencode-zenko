@@ -82,7 +82,7 @@ export function CoachRelations() {
   return (
     <div className="mx-auto w-full max-w-6xl">
       {state.data?.role === "coach" ? (
-        <Card className="mb-4 bg-white/75 p-4 shadow-none">
+        <Card variant="glass" className="mb-4 p-4">
           <form key={formVersion} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={create}>
             <ParticipantPicker value={selectedParticipant} onChange={setSelectedParticipant} />
             <Select name="discipline_id" required><SelectTrigger className="min-h-11"><SelectValue placeholder="Выберите дисциплину" /></SelectTrigger><SelectContent>{state.data.disciplines.map((discipline) => <SelectItem key={discipline.id} value={String(discipline.id)}>{discipline.name}</SelectItem>)}</SelectContent></Select>
@@ -95,7 +95,7 @@ export function CoachRelations() {
       {!state.loading && !state.error && !state.data?.items.length ? <DataEmpty title="Связей пока нет" description="Новые запросы появятся на этой странице." /> : null}
       <div className="grid gap-3">
         {state.data?.items.map((relation) => (
-          <Card key={relation.id} className="bg-white/75 p-5 shadow-none">
+          <Card key={relation.id} variant="glass" className="p-5">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div className="flex gap-3">
                 <div>

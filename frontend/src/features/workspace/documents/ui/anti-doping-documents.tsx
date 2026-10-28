@@ -61,7 +61,7 @@ export function AntiDopingDocuments() {
       {!state.loading && !state.error && !state.data?.length ? <DataEmpty title="Сертификатов пока нет" description="Загрузите первый сертификат для проверки." /> : null}
       <div className="grid gap-3">
         {state.data?.map((certificate) => (
-          <Card key={certificate.id} className="bg-white/75 p-5 shadow-none">
+          <Card key={certificate.id} variant="glass" className="p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="flex gap-3">
                 <div>

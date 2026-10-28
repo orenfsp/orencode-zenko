@@ -6,6 +6,7 @@ import { rankApplicationApi } from "@/entities/rank-application";
 import { formatDate } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Button } from "@/shared/ui/button";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
 import { ChartLine } from "@/shared/ui/chart";
 import { WorkspaceToolbar } from "@/shared/ui/workspace-toolbar";
@@ -22,14 +23,18 @@ export function RankHistory() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти разряд" filterContent={<p className="text-sm text-muted-foreground">История отображается по дате присвоения.</p>} />
+      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти разряд" />
       {state.loading ? <DataLoading rows={3} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !items.length ? (
-        <DataEmpty title="Разрядов пока нет" description="Подтверждённые присвоения появятся на этой странице." />
+        <DataEmpty
+          title={search ? "Разряды не найдены" : "Разрядов пока нет"}
+          description={search ? "Измените поисковый запрос." : "Подтверждённые присвоения появятся на этой странице."}
+          action={search ? <Button type="button" variant="outline" size="sm" onClick={() => setSearch("")}>Сбросить поиск</Button> : undefined}
+        />
       ) : null}
       {!state.loading && !state.error && awardedPoints.length >= 2 ? (
-        <Card className="mb-4 bg-white/75 p-5 shadow-none">
+        <Card variant="glass" className="mb-4 p-5">
           <CardHeader className="p-0">
             <CardTitle>Динамика присвоений</CardTitle>
             <CardDescription>Накопительное количество подтверждённых разрядов по датам.</CardDescription>
@@ -39,7 +44,7 @@ export function RankHistory() {
       ) : null}
       <div className="grid gap-3">
         {items.map((rank) => (
-          <Card key={rank.id} className="bg-white/75 p-5 shadow-none">
+          <Card key={rank.id} variant="glass" className="p-5">
             <div className="flex gap-3">
               <div>
                 <p className="font-medium">{rank.rank_name}</p>

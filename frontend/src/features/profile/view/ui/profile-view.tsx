@@ -293,7 +293,7 @@ export function ProfileView(props: ProfileViewProps) {
   return (
     <Dialog open={editOpen} onOpenChange={changeEditOpen}>
       <div className="mx-auto w-full max-w-6xl pb-24 md:pb-0">
-        <Card className="border-white/70 bg-white/90 backdrop-blur-xl">
+        <Card className="border-border/70 bg-card/90 backdrop-blur-xl">
           <header className="relative p-5 sm:p-6">
             <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-center sm:text-left">
               <Avatar className="size-28 shrink-0 rounded-2xl sm:size-24">
@@ -486,7 +486,7 @@ export function ProfileView(props: ProfileViewProps) {
 
         {ownProfile && portalReady
           ? createPortal(
-              <div className="fixed inset-x-0 bottom-0 z-40 bg-linear-to-t from-white via-white/95 to-transparent px-4 pt-7 pb-[max(1rem,env(safe-area-inset-bottom))] dark:from-background dark:via-background/95 md:hidden">
+              <div className="fixed inset-x-0 bottom-0 z-40 bg-linear-to-t from-background via-background/95 to-transparent px-4 pt-7 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden">
                 <DialogTrigger asChild>
                   <Button size="lg" className="h-12 w-full rounded-xl">
                     Редактировать

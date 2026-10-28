@@ -141,7 +141,7 @@ export function CompetitionsList() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти соревнование" filterContent={<><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все статусы</SelectItem><SelectItem value="published">Опубликовано</SelectItem><SelectItem value="registration_open">Регистрация открыта</SelectItem><SelectItem value="completed">Завершено</SelectItem></SelectContent></Select><Select value={formatFilter} onValueChange={setFormatFilter}><SelectTrigger><SelectValue placeholder="Формат" /></SelectTrigger><SelectContent><SelectItem value="all">Все форматы</SelectItem><SelectItem value="offline">Очно</SelectItem><SelectItem value="online">Онлайн</SelectItem><SelectItem value="mixed">Смешанный</SelectItem></SelectContent></Select></>} createLabel="Создать соревнование" onCreate={canCreate ? () => setCreateOpen(true) : undefined} />
+      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти соревнование" filterActive={statusFilter !== "all" || formatFilter !== "all"} onResetFilters={() => { setStatusFilter("all"); setFormatFilter("all"); }} filterContent={<><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все статусы</SelectItem><SelectItem value="published">Опубликовано</SelectItem><SelectItem value="registration_open">Регистрация открыта</SelectItem><SelectItem value="completed">Завершено</SelectItem></SelectContent></Select><Select value={formatFilter} onValueChange={setFormatFilter}><SelectTrigger><SelectValue placeholder="Формат" /></SelectTrigger><SelectContent><SelectItem value="all">Все форматы</SelectItem><SelectItem value="offline">Очно</SelectItem><SelectItem value="online">Онлайн</SelectItem><SelectItem value="mixed">Смешанный</SelectItem></SelectContent></Select></>} createLabel="Создать соревнование" onCreate={canCreate ? () => setCreateOpen(true) : undefined} />
       {visibleManaged.length ? (
         <section className="mb-6" aria-label="Мои соревнования">
           <h2 className="mb-2 text-sm font-medium">Мои соревнования</h2>
@@ -167,13 +167,14 @@ export function CompetitionsList() {
       {!state.loading && !state.error && !competitions.length && !visibleManaged.length ? (
         <DataEmpty
           title={search ? "Ничего не найдено" : "Соревнований пока нет"}
-          description={search ? "Попробуйте изменить запрос." : "Создайте соревнование или дождитесь публикации новых событий федерации."}
+          description={search || statusFilter !== "all" || formatFilter !== "all" ? "Попробуйте изменить запрос или сбросить фильтры." : "Создайте соревнование или дождитесь публикации новых событий федерации."}
+          action={search || statusFilter !== "all" || formatFilter !== "all" ? <Button variant="outline" size="sm" onClick={() => { setSearch(""); setStatusFilter("all"); setFormatFilter("all"); }}>Сбросить фильтры</Button> : undefined}
         />
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {competitions.map((competition) => (
-          <Card key={competition.id} className="min-h-[250px] justify-between gap-8 rounded-2xl bg-white p-5 shadow-none sm:p-6">
+          <Card key={competition.id} className="min-h-[250px] justify-between gap-8 border-0 p-5 shadow-none sm:p-6">
             <div className="flex flex-col gap-5">
               <div className="flex flex-wrap items-start justify-between gap-3 text-xs text-muted-foreground sm:text-sm"><span className="max-w-[260px]">{competition.discipline.name}</span><span>{formatDate(competition.start_at)} — {formatDate(competition.end_at)}</span></div>
               <div><div className="mb-3 flex flex-wrap gap-2"><StatusBadge status={competition.status} /><span className="text-xs text-muted-foreground">{competition.competition_type.name}</span></div><h3 className="max-w-[540px] text-2xl font-medium leading-tight tracking-tight">{competition.name}</h3>{competition.description ? <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{competition.description}</p> : null}</div>

@@ -22,7 +22,7 @@ function DrawerHandle({ className, ...props }: React.ComponentProps<typeof Drawe
 }
 
 function DrawerContent({ className, children, ...props }: React.ComponentProps<typeof DrawerPrimitive.Content>) {
-  return <DrawerPortal><DrawerOverlay /><DrawerPrimitive.Content data-slot="drawer-content" className={cn("fixed inset-x-0 bottom-0 z-50 mt-24 flex max-h-[90vh] flex-col overflow-hidden rounded-t-2xl border bg-background", className)} {...props}>{children}</DrawerPrimitive.Content></DrawerPortal>
+  return <DrawerPortal><DrawerOverlay /><DrawerPrimitive.Content data-slot="drawer-content" className={cn("fixed inset-x-0 bottom-0 z-50 mt-24 flex max-h-[90vh] flex-col overflow-hidden rounded-t-[var(--radius-overlay)] border bg-background shadow-lg outline-none", className)} {...props}>{children}</DrawerPrimitive.Content></DrawerPortal>
 }
 
 function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {

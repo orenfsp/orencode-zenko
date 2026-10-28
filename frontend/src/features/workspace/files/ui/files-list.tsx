@@ -82,6 +82,8 @@ export function FilesList() {
         search={search}
         onSearchChange={setSearch}
         searchPlaceholder="Найти файл"
+        filterActive={statusFilter !== "all"}
+        onResetFilters={() => setStatusFilter("all")}
         filterContent={<Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все файлы</SelectItem><SelectItem value="uploaded">Загруженные</SelectItem><SelectItem value="attached">Прикреплённые</SelectItem><SelectItem value="delete_pending">Ожидают удаления</SelectItem></SelectContent></Select>}
       />
 
@@ -101,7 +103,7 @@ export function FilesList() {
 
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
-      {!state.loading && !state.error && !files.length ? <DataEmpty title={search || statusFilter !== "all" ? "Файлы не найдены" : "Файлов пока нет"} description={search || statusFilter !== "all" ? "Измените поисковый запрос или фильтр." : "Загруженные документы появятся здесь."} /> : null}
+      {!state.loading && !state.error && !files.length ? <DataEmpty title={search || statusFilter !== "all" ? "Файлы не найдены" : "Файлов пока нет"} description={search || statusFilter !== "all" ? "Измените поисковый запрос или фильтр." : "Загруженные документы появятся здесь."} action={search || statusFilter !== "all" ? <Button variant="outline" size="sm" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Сбросить фильтры</Button> : undefined} /> : null}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-2">
         {files.map((file) => {
@@ -111,7 +113,7 @@ export function FilesList() {
             key={file.id}
             role="button"
             tabIndex={0}
-            className="group cursor-pointer border-0 bg-transparent p-3 shadow-none transition-colors hover:bg-white/40 focus-visible:ring-2 focus-visible:ring-ring sm:p-4 lg:p-3"
+            className="group cursor-pointer border-0 bg-transparent p-3 shadow-none transition-colors hover:bg-card/40 focus-visible:ring-2 focus-visible:ring-ring sm:p-4 lg:p-3"
             onClick={() => { setSelected(file); setDetailsOpen(true); }}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(file); setDetailsOpen(true); } }}
           >

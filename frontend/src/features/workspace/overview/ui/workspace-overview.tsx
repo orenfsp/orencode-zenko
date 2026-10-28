@@ -44,7 +44,7 @@ const metricCards = [
 
 function Metric({ label, value }: { label: string; value: number | string }) {
   return (
-    <Card className="bg-white/75 p-4 shadow-none sm:p-5">
+    <Card variant="glass" className="p-4 sm:p-5">
       <p className="text-2xl font-medium tabular-nums">{value}</p>
       <p className="mt-1 text-sm text-muted-foreground">{label}</p>
     </Card>
@@ -53,7 +53,7 @@ function Metric({ label, value }: { label: string; value: number | string }) {
 
 function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
-    <Card className="bg-white/75 p-5 shadow-none">
+    <Card variant="glass" className="p-5">
       <CardHeader className="p-0">
         <CardTitle>{title}</CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
