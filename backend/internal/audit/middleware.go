@@ -199,6 +199,10 @@ func auditedRoute(method, path string) (routeRule, bool) {
 			eventType = EventProtocolDeleted
 		}
 		return ruleWithPathID(eventType, "competition_event", segments[6], "/api/v1/admin/competitions/{competitionID}/events/{eventID}/protocol")
+	case method == http.MethodPut && path == "/api/v1/admin/rating/selections":
+		return routeRule{eventType: EventRatingSelectionSaved, entityType: "rating_selection", entityIDFromResponse: true, route: path}, true
+	case method == http.MethodPost && len(segments) == 7 && segments[0] == "api" && segments[1] == "v1" && segments[2] == "admin" && segments[3] == "rating" && segments[4] == "selections" && segments[6] == "lock":
+		return ruleWithPathID(EventRatingSelectionLocked, "rating_selection", segments[5], "/api/v1/admin/rating/selections/{selectionID}/lock")
 	default:
 		return routeRule{}, false
 	}

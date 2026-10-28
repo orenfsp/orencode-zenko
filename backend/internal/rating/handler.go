@@ -2,9 +2,12 @@ package rating
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
 )
 
 type Handler struct{ service *Service }
@@ -24,6 +27,90 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"data": page})
+}
+
+func (h *Handler) GetSelection(w http.ResponseWriter, r *http.Request) {
+	scope, err := parseSelectionScope(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "некорректные параметры состава")
+		return
+	}
+	selection, err := h.service.GetSelection(r.Context(), scope)
+	if err != nil {
+		handleSelectionError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, selection)
+}
+
+func (h *Handler) SaveSelection(w http.ResponseWriter, r *http.Request) {
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok || identity.UserID <= 0 {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
+		return
+	}
+	var request SaveSelectionRequest
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&request); err != nil {
+		writeError(w, http.StatusBadRequest, "некорректный JSON")
+		return
+	}
+	selection, err := h.service.SaveSelection(r.Context(), identity.UserID, request)
+	if err != nil {
+		handleSelectionError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, selection)
+}
+
+func (h *Handler) LockSelection(w http.ResponseWriter, r *http.Request) {
+	selectionID, err := strconv.ParseInt(r.PathValue("selectionID"), 10, 64)
+	if err != nil || selectionID <= 0 {
+		writeError(w, http.StatusBadRequest, "некорректный id состава")
+		return
+	}
+	selection, err := h.service.LockSelection(r.Context(), selectionID)
+	if err != nil {
+		handleSelectionError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, selection)
+}
+
+func parseSelectionScope(r *http.Request) (SelectionScope, error) {
+	year, err := strconv.ParseInt(r.URL.Query().Get("year"), 10, 32)
+	if err != nil {
+		return SelectionScope{}, ErrInvalidInput
+	}
+	disciplineID, err := strconv.ParseInt(r.URL.Query().Get("discipline_id"), 10, 64)
+	if err != nil {
+		return SelectionScope{}, ErrInvalidInput
+	}
+	ageGroupID, err := strconv.ParseInt(r.URL.Query().Get("age_group_id"), 10, 64)
+	if err != nil {
+		return SelectionScope{}, ErrInvalidInput
+	}
+	return SelectionScope{SeasonYear: int32(year), DisciplineID: disciplineID, AgeGroupID: ageGroupID}, nil
+}
+
+func handleSelectionError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, ErrInvalidInput):
+		writeError(w, http.StatusBadRequest, "некорректные данные состава")
+	case errors.Is(err, ErrSelectionNotFound):
+		writeError(w, http.StatusNotFound, "состав не найден")
+	case errors.Is(err, ErrSelectionLocked):
+		writeError(w, http.StatusConflict, "состав уже зафиксирован")
+	default:
+		writeError(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
+	}
+}
+
+func writeSuccess(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
 }
 
 func parseFilter(r *http.Request) (Filter, error) {

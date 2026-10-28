@@ -31,6 +31,8 @@ const (
 	EventResultApproved                = "competition_result.approved"
 	EventProtocolUploaded              = "competition_protocol.uploaded"
 	EventProtocolDeleted               = "competition_protocol.deleted"
+	EventRatingSelectionSaved          = "rating_selection.saved"
+	EventRatingSelectionLocked         = "rating_selection.locked"
 )
 
 type EventCreate struct {

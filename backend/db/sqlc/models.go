@@ -309,6 +309,26 @@ type RankEvskStandard struct {
 	CreatedAt    pgtype.Timestamptz
 }
 
+type RatingSelection struct {
+	ID              int64
+	SeasonYear      int16
+	DisciplineID    int64
+	AgeGroupID      int64
+	Status          string
+	CaptainUserID   pgtype.Int8
+	CoachUserID     pgtype.Int8
+	CreatedByUserID int64
+	LockedAt        pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type RatingSelectionMember struct {
+	SelectionID       int64
+	UserID            int64
+	SelectionPosition int32
+}
+
 type ReportDeadline struct {
 	ID              int64
 	Name            string

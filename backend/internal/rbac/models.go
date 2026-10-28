@@ -29,6 +29,7 @@ const (
 	PermissionRankApplicationsReview        = "rank_applications.review"
 	PermissionDeadlinesManage               = "deadlines.manage"
 	PermissionRatingRead                    = "rating.read"
+	PermissionRatingManage                  = "rating.manage"
 	PermissionTeamsManage                   = "teams.manage"
 
 	SuperAdminRoleCode = "super_admin"
@@ -53,7 +54,7 @@ var DefaultSelfAssignableRoles = []SeedRoleDefinition{
 
 var DefaultRolePermissions = map[string][]string{
 	"participant": {},
-	"coach":       {PermissionTeamsManage},
+	"coach":       {PermissionTeamsManage, PermissionRatingRead},
 	"judge":       {PermissionCompetitionResultsRead, PermissionCompetitionResultsManage},
 }
 
@@ -86,6 +87,7 @@ var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionRankApplicationsReview, Description: "Рассмотрение заявок на спортивные разряды"},
 	{Code: PermissionDeadlinesManage, Description: "Управление сроками федерации"},
 	{Code: PermissionRatingRead, Description: "Просмотр рейтинга спортсменов"},
+	{Code: PermissionRatingManage, Description: "Управление сезонными составами рейтинга"},
 	{Code: PermissionTeamsManage, Description: "Формирование сборных команд"},
 }
 

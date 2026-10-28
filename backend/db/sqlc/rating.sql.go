@@ -11,6 +11,112 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addRatingSelectionMember = `-- name: AddRatingSelectionMember :exec
+INSERT INTO rating_selection_member (selection_id, user_id, selection_position)
+VALUES ($1, $2, $3)
+`
+
+type AddRatingSelectionMemberParams struct {
+	SelectionID       int64
+	UserID            int64
+	SelectionPosition int32
+}
+
+func (q *Queries) AddRatingSelectionMember(ctx context.Context, arg AddRatingSelectionMemberParams) error {
+	_, err := q.db.Exec(ctx, addRatingSelectionMember, arg.SelectionID, arg.UserID, arg.SelectionPosition)
+	return err
+}
+
+const deleteRatingSelectionMembers = `-- name: DeleteRatingSelectionMembers :exec
+DELETE FROM rating_selection_member WHERE selection_id = $1
+`
+
+func (q *Queries) DeleteRatingSelectionMembers(ctx context.Context, selectionID int64) error {
+	_, err := q.db.Exec(ctx, deleteRatingSelectionMembers, selectionID)
+	return err
+}
+
+const getRatingSelection = `-- name: GetRatingSelection :one
+SELECT
+    rs.id, rs.season_year, rs.discipline_id, d.name AS discipline_name,
+    rs.age_group_id, ag.name AS age_group_name, rs.status,
+    rs.captain_user_id, rs.coach_user_id, rs.created_by_user_id,
+    rs.locked_at, rs.created_at, rs.updated_at
+FROM rating_selection AS rs
+JOIN discipline AS d ON d.id = rs.discipline_id
+JOIN age_group AS ag ON ag.id = rs.age_group_id
+WHERE rs.id = $1
+`
+
+type GetRatingSelectionRow struct {
+	ID              int64
+	SeasonYear      int16
+	DisciplineID    int64
+	DisciplineName  string
+	AgeGroupID      int64
+	AgeGroupName    string
+	Status          string
+	CaptainUserID   pgtype.Int8
+	CoachUserID     pgtype.Int8
+	CreatedByUserID int64
+	LockedAt        pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) GetRatingSelection(ctx context.Context, selectionID int64) (GetRatingSelectionRow, error) {
+	row := q.db.QueryRow(ctx, getRatingSelection, selectionID)
+	var i GetRatingSelectionRow
+	err := row.Scan(
+		&i.ID,
+		&i.SeasonYear,
+		&i.DisciplineID,
+		&i.DisciplineName,
+		&i.AgeGroupID,
+		&i.AgeGroupName,
+		&i.Status,
+		&i.CaptainUserID,
+		&i.CoachUserID,
+		&i.CreatedByUserID,
+		&i.LockedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getRatingSelectionIDByScope = `-- name: GetRatingSelectionIDByScope :one
+SELECT id
+FROM rating_selection
+WHERE season_year = $1
+  AND discipline_id = $2
+  AND age_group_id = $3
+`
+
+type GetRatingSelectionIDByScopeParams struct {
+	SeasonYear   int16
+	DisciplineID int64
+	AgeGroupID   int64
+}
+
+func (q *Queries) GetRatingSelectionIDByScope(ctx context.Context, arg GetRatingSelectionIDByScopeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getRatingSelectionIDByScope, arg.SeasonYear, arg.DisciplineID, arg.AgeGroupID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getRatingSelectionStatus = `-- name: GetRatingSelectionStatus :one
+SELECT status FROM rating_selection WHERE id = $1
+`
+
+func (q *Queries) GetRatingSelectionStatus(ctx context.Context, selectionID int64) (string, error) {
+	row := q.db.QueryRow(ctx, getRatingSelectionStatus, selectionID)
+	var status string
+	err := row.Scan(&status)
+	return status, err
+}
+
 const listAthleteRating = `-- name: ListAthleteRating :many
 WITH scored AS (
     SELECT
@@ -126,4 +232,146 @@ func (q *Queries) ListAthleteRating(ctx context.Context, arg ListAthleteRatingPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const listRatingSelectionMembers = `-- name: ListRatingSelectionMembers :many
+SELECT
+    rsm.selection_position, u.id AS user_id,
+    u.last_name, u.first_name, u.middle_name
+FROM rating_selection_member AS rsm
+JOIN "user" AS u ON u.id = rsm.user_id
+WHERE rsm.selection_id = $1
+ORDER BY rsm.selection_position
+`
+
+type ListRatingSelectionMembersRow struct {
+	SelectionPosition int32
+	UserID            int64
+	LastName          string
+	FirstName         string
+	MiddleName        pgtype.Text
+}
+
+func (q *Queries) ListRatingSelectionMembers(ctx context.Context, selectionID int64) ([]ListRatingSelectionMembersRow, error) {
+	rows, err := q.db.Query(ctx, listRatingSelectionMembers, selectionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRatingSelectionMembersRow
+	for rows.Next() {
+		var i ListRatingSelectionMembersRow
+		if err := rows.Scan(
+			&i.SelectionPosition,
+			&i.UserID,
+			&i.LastName,
+			&i.FirstName,
+			&i.MiddleName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockRatingSelection = `-- name: LockRatingSelection :one
+UPDATE rating_selection
+SET status = 'locked', locked_at = now(), updated_at = now()
+WHERE id = $1 AND status = 'draft'
+RETURNING id
+`
+
+func (q *Queries) LockRatingSelection(ctx context.Context, selectionID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, lockRatingSelection, selectionID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const ratingAgeGroupExists = `-- name: RatingAgeGroupExists :one
+SELECT EXISTS (SELECT 1 FROM age_group WHERE id = $1)
+`
+
+func (q *Queries) RatingAgeGroupExists(ctx context.Context, ageGroupID int64) (bool, error) {
+	row := q.db.QueryRow(ctx, ratingAgeGroupExists, ageGroupID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const ratingDisciplineExists = `-- name: RatingDisciplineExists :one
+SELECT EXISTS (SELECT 1 FROM discipline WHERE id = $1)
+`
+
+func (q *Queries) RatingDisciplineExists(ctx context.Context, disciplineID int64) (bool, error) {
+	row := q.db.QueryRow(ctx, ratingDisciplineExists, disciplineID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const ratingUserHasRole = `-- name: RatingUserHasRole :one
+SELECT EXISTS (
+    SELECT 1
+    FROM "user" AS u
+    JOIN role_user AS ru ON ru.user_id = u.id
+    JOIN role AS r ON r.id = ru.role_id
+    WHERE u.id = $1
+      AND u.access_status = true
+      AND r.code = $2
+)
+`
+
+type RatingUserHasRoleParams struct {
+	UserID   int64
+	RoleCode string
+}
+
+func (q *Queries) RatingUserHasRole(ctx context.Context, arg RatingUserHasRoleParams) (bool, error) {
+	row := q.db.QueryRow(ctx, ratingUserHasRole, arg.UserID, arg.RoleCode)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const upsertRatingSelection = `-- name: UpsertRatingSelection :one
+INSERT INTO rating_selection (
+    season_year, discipline_id, age_group_id, captain_user_id, coach_user_id, created_by_user_id
+) VALUES (
+    $1, $2, $3,
+    $4, $5, $6
+)
+ON CONFLICT (season_year, discipline_id, age_group_id) DO UPDATE
+SET captain_user_id = EXCLUDED.captain_user_id,
+    coach_user_id = EXCLUDED.coach_user_id,
+    updated_at = now()
+WHERE rating_selection.status = 'draft'
+RETURNING id
+`
+
+type UpsertRatingSelectionParams struct {
+	SeasonYear      int16
+	DisciplineID    int64
+	AgeGroupID      int64
+	CaptainUserID   pgtype.Int8
+	CoachUserID     pgtype.Int8
+	CreatedByUserID int64
+}
+
+func (q *Queries) UpsertRatingSelection(ctx context.Context, arg UpsertRatingSelectionParams) (int64, error) {
+	row := q.db.QueryRow(ctx, upsertRatingSelection,
+		arg.SeasonYear,
+		arg.DisciplineID,
+		arg.AgeGroupID,
+		arg.CaptainUserID,
+		arg.CoachUserID,
+		arg.CreatedByUserID,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }

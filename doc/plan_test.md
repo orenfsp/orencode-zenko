@@ -21,7 +21,7 @@ Authorization: Bearer <token>
 Ожидаемые права:
 
 - `admin` и `super_admin` — все permissions;
-- `coach` — `teams.manage`;
+- `coach` — `teams.manage`, `rating.read`;
 - `judge` — `competition_results.read`, `competition_results.manage`;
 - `participant` — без административных permissions.
 
@@ -99,6 +99,21 @@ GET /api/v1/admin/rating?year=2026&discipline_id=2&municipality_id=3
 - работают фильтры;
 - сортировка идёт по сумме баллов;
 - `score` имеет приоритет над баллами за место.
+
+Проверить сезонный состав:
+
+```http
+PUT /api/v1/admin/rating/selections
+GET /api/v1/admin/rating/selections?year=2026&discipline_id=2&age_group_id=3
+POST /api/v1/admin/rating/selections/{selectionID}/lock
+```
+
+- порядок `member_ids` возвращается как `selection_position`;
+- капитан вне состава и пользователь без роли `participant` возвращают `400`;
+- пользователь без роли `coach` не может быть назначен тренером;
+- после фиксации статус равен `locked`, заполнен `locked_at`;
+- изменение и повторная фиксация locked-состава возвращают `409`;
+- тренер с `rating.read` получает состав, но на сохранение и фиксацию получает `403` без `rating.manage`.
 
 ## 9. ЕВСК
 

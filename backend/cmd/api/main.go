@@ -204,7 +204,7 @@ func main() {
 	registryService := registry.NewService(registryRepository)
 	registryHandler := registry.NewHandler(registryService)
 	registryReportHandler := registry.NewReportHandler(registryService, fileService)
-	ratingRepository := rating.NewRepository(queries)
+	ratingRepository := rating.NewRepository(queries, pool)
 	ratingService := rating.NewService(ratingRepository)
 	ratingHandler := rating.NewHandler(ratingService)
 	roleChecker := rbac.NewRoleChecker(queries)
@@ -324,7 +324,7 @@ func main() {
 	notificationRepo := notification.NewRepository(queries)
 	notificationHandler := notification.NewHandler(notificationRepo)
 
-		// --- Родительские согласия ---
+	// --- Родительские согласия ---
 	parentalConsentRepo := parentalconsent.NewRepository(queries)
 	parentalConsentHandler := parentalconsent.NewHandler(parentalConsentRepo)
 
@@ -424,6 +424,9 @@ func main() {
 	mux.Handle("GET /api/v1/admin/registry/organizations", protected(registry.PermissionRead, registryHandler.ListOrganizations))
 	mux.Handle("GET /api/v1/admin/reports/users.xlsx", protected(registry.PermissionRead, registryReportHandler.UsersXLSX))
 	mux.Handle("GET /api/v1/admin/rating", protected(rating.PermissionRead, ratingHandler.List))
+	mux.Handle("GET /api/v1/admin/rating/selections", protected(rating.PermissionRead, ratingHandler.GetSelection))
+	mux.Handle("PUT /api/v1/admin/rating/selections", protected(rating.PermissionManage, ratingHandler.SaveSelection))
+	mux.Handle("POST /api/v1/admin/rating/selections/{selectionID}/lock", protected(rating.PermissionManage, ratingHandler.LockSelection))
 	mux.Handle("GET /api/v1/admin/teams", protected(team.PermissionManage, teamHandler.List))
 	mux.Handle("POST /api/v1/admin/teams", protected(team.PermissionManage, teamHandler.Create))
 	mux.Handle("POST /api/v1/judge-category-applications", authenticated(judgeCategoryHandler.Create))

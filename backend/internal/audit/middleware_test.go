@@ -130,6 +130,8 @@ func TestAuditedRoutes(t *testing.T) {
 		{http.MethodPatch, "/api/v1/admin/rank-applications/50", EventRankApplicationReviewed},
 		{http.MethodPost, "/api/v1/admin/competitions/10/events/20/results/approve", EventResultApproved},
 		{http.MethodPut, "/api/v1/admin/competitions/10/events/20/protocol", EventProtocolUploaded},
+		{http.MethodPut, "/api/v1/admin/rating/selections", EventRatingSelectionSaved},
+		{http.MethodPost, "/api/v1/admin/rating/selections/60/lock", EventRatingSelectionLocked},
 	}
 	for _, tt := range tests {
 		rule, ok := auditedRoute(tt.method, tt.path)

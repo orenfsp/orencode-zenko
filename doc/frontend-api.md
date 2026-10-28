@@ -737,6 +737,7 @@ Backend берёт `role_id` из access-токена и возвращает pe
 | `dashboard.read` | просмотр дашборда федерации |
 | `registry.read` | просмотр единого реестра федерации |
 | `rating.read` | просмотр рейтинга спортсменов |
+| `rating.manage` | управление сезонными составами рейтинга |
 | `teams.manage` | формирование сборных команд |
 | `judge_categories.review` | рассмотрение заявок на судейские категории |
 | `rank_applications.review` | рассмотрение заявок на спортивные разряды |
@@ -759,11 +760,82 @@ Authorization: Bearer <access_token>
 ### Рейтинг спортсменов
 
 ```http
-GET /api/v1/admin/rating?year=2026&discipline_id=2&municipality_id=3&limit=50&offset=0
+GET /api/v1/admin/rating?year=2026&discipline_id=2&age_group_id=3&municipality_id=3&limit=50&offset=0
 Authorization: Bearer <access_token>
 ```
 
-Требуется permission `rating.read`. В рейтинг попадают только завершённые результаты соревнований за указанный год. Если в результате есть `score`, используются его баллы; иначе применяются базовые баллы за место: 100, 80, 60, 50, 40, 30, 20, 10. Ответ содержит позицию, спортсмена, сумму баллов, количество результатов и побед.
+Требуется permission `rating.read`. В рейтинг попадают только завершённые результаты соревнований за указанный год. Если в результате есть `score`, используются его баллы; иначе применяются базовые баллы за место: 100, 80, 60, 50, 40, 30, 20, 10. Ответ содержит позицию, спортсмена, сумму баллов, количество результатов и побед. Фильтр `age_group_id` ограничивает результаты выбранной возрастной группой.
+
+### Сезонный состав рейтинга
+
+Состав однозначно определяется сезоном, дисциплиной и возрастной группой. Расчётная `position` рейтинга при этом не меняется: ручной порядок хранится отдельно в `selection_position`. Этот контракт не создаёт запись в `/api/v1/admin/teams`: обычные сборные команды и зафиксированный сезонный состав остаются независимыми сущностями.
+
+Получение состава:
+
+```http
+GET /api/v1/admin/rating/selections?year=2026&discipline_id=2&age_group_id=3
+Authorization: Bearer <access_token>
+```
+
+Создание или полная замена черновика:
+
+```http
+PUT /api/v1/admin/rating/selections
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+```json
+{
+  "season_year": 2026,
+  "discipline_id": 2,
+  "age_group_id": 3,
+  "member_ids": [42, 17, 31],
+  "captain_user_id": 42,
+  "coach_user_id": 8
+}
+```
+
+Порядок `member_ids` сохраняется как позиции `1`, `2`, `3`. Список должен содержать от 1 до 100 уникальных активных пользователей с ролью `participant`. Капитан необязателен, но обязан входить в состав. Тренер необязателен и должен иметь активную роль `coach`. Чтобы снять капитана или тренера с черновика, передайте соответствующее поле со значением `null`.
+
+Ответ `GET` и `PUT`:
+
+```json
+{
+  "data": {
+    "id": 5,
+    "season_year": 2026,
+    "discipline": { "id": 2, "name": "Дисциплина" },
+    "age_group": { "id": 3, "name": "Юниоры" },
+    "status": "draft",
+    "captain_user_id": 42,
+    "coach_user_id": 8,
+    "members": [
+      {
+        "selection_position": 1,
+        "user_id": 42,
+        "last_name": "Иванов",
+        "first_name": "Иван"
+      }
+    ],
+    "created_by_user_id": 1,
+    "locked_at": null,
+    "created_at": "2026-10-28T10:00:00Z",
+    "updated_at": "2026-10-28T10:00:00Z"
+  }
+}
+```
+
+Фиксация состава:
+
+```http
+POST /api/v1/admin/rating/selections/{selectionID}/lock
+Authorization: Bearer <access_token>
+```
+
+После фиксации `status` становится `locked`, заполняется `locked_at`, а повторная замена или фиксация возвращает `409`. Получение состава требует `rating.read`; seed выдаёт это право в том числе тренеру. Сохранение и фиксация требуют `rating.manage`, которое seed выдаёт только ролям `admin` и `super_admin`.
+
+Ошибки: `400` — неверные данные или роли пользователей, `404` — состав не найден, `409` — состав уже зафиксирован.
 
 ### Выгрузка отчёта численности
 
