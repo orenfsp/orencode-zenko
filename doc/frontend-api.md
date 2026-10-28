@@ -697,6 +697,15 @@ Authorization: Bearer <access_token>
 
 ## Admin API
 
+### Выгрузка отчёта численности
+
+```http
+GET /api/v1/admin/reports/users.xlsx
+Authorization: Bearer <access_token>
+```
+
+Требуется permission `registry.read`. Backend формирует XLSX по актуальному реестру пользователей, сохраняет файл через общий file-модуль и возвращает его как скачивание. В ответе также передаётся заголовок `X-File-ID`.
+
 Все admin endpoint’ы требуют access-токен и соответствующий permission.
 
 ### Получение permissions

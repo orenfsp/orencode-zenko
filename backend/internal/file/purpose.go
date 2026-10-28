@@ -6,6 +6,7 @@ const (
 	PurposePersonalDataConsent   Purpose = "personal_data_consent"
 	PurposeParentalConsent       Purpose = "parental_consent"
 	PurposeAntiDopingCertificate Purpose = "anti_doping_certificate"
+	PurposeFederationReport      Purpose = "federation_report"
 )
 
 type Policy struct {
@@ -36,6 +37,12 @@ func DefaultPolicies() map[Purpose]Policy {
 				"application/pdf": ".pdf",
 				"image/jpeg":      ".jpg",
 				"image/png":       ".png",
+			},
+		},
+		PurposeFederationReport: {
+			MaxBytes: 25 << 20,
+			AllowedMIME: map[string]string{
+				"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
 			},
 		},
 	}

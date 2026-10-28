@@ -156,6 +156,26 @@ func (s *Service) Download(ctx context.Context, fileID, requesterUserID int64, c
 	return Download{File: record.UploadedFile, Content: content}, nil
 }
 
+// DownloadStored opens a generated or otherwise non-attached file for a
+// caller that has already passed the endpoint permission check.
+func (s *Service) DownloadStored(ctx context.Context, fileID int64) (Download, error) {
+	if fileID <= 0 {
+		return Download{}, ErrInvalidInput
+	}
+	record, err := s.repo.GetByID(ctx, fileID)
+	if err != nil {
+		return Download{}, err
+	}
+	if record.Status != StatusUploaded && record.Status != StatusAttached {
+		return Download{}, ErrFileNotFound
+	}
+	content, err := s.storage.Open(ctx, record.StorageKey)
+	if err != nil {
+		return Download{}, fmt.Errorf("open stored file: %w", err)
+	}
+	return Download{File: record, Content: content}, nil
+}
+
 func (s *Service) Discard(ctx context.Context, fileID int64) error {
 	if fileID <= 0 {
 		return ErrInvalidInput
@@ -242,6 +262,9 @@ func detectContentType(content []byte) string {
 	if isDOCX(content) {
 		return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 	}
+	if isXLSX(content) {
+		return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	}
 	if isXML(content) {
 		return "application/xml"
 	}
@@ -272,6 +295,23 @@ func isDOCX(content []byte) bool {
 		}
 	}
 	return hasContentTypes && hasDocument
+}
+
+func isXLSX(content []byte) bool {
+	archive, err := zip.NewReader(bytes.NewReader(content), int64(len(content)))
+	if err != nil {
+		return false
+	}
+	var hasTypes, hasWorkbook bool
+	for _, entry := range archive.File {
+		switch strings.TrimPrefix(entry.Name, "/") {
+		case "[Content_Types].xml":
+			hasTypes = true
+		case "xl/workbook.xml":
+			hasWorkbook = true
+		}
+	}
+	return hasTypes && hasWorkbook
 }
 
 func isXML(content []byte) bool {
