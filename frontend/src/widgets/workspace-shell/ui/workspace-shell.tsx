@@ -30,6 +30,8 @@ import {
   Medal,
   Star,
   ShieldCheck,
+  Moon,
+  Sun,
   Trophy,
   UsersRound,
   UserRound,
@@ -77,9 +79,11 @@ import {
   useSidebar,
 } from "@/shared/ui/sidebar";
 import RibbonGlow from "@/widgets/auth-shell/ui/bg-effect";
+import RibbonGlowDark from "@/widgets/auth-shell/ui/bg-effect-dark";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cn } from "@/shared/lib/utils";
 import { ScrollMask } from "@/shared/ui/scroll-mask";
+import { useTheme } from "@/_app/providers/theme-provider";
 
 const workspacePageTitles: Array<[string, string]> = [
   ["/workspace/profile", "Профиль"],
@@ -540,6 +544,8 @@ function RoleDropdownItems({ user }: { user: WorkspaceUser }) {
 
 function DesktopUserMenu({ user }: { user: WorkspaceUser }) {
   const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
+  const themeOrigin = useRef({ x: 0, y: 0 });
 
   return (
     <SidebarMenu>
@@ -609,6 +615,11 @@ function DesktopUserMenu({ user }: { user: WorkspaceUser }) {
               <RoleDropdownItems user={user} />
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onPointerDown={(event) => { themeOrigin.current = { x: event.clientX, y: event.clientY }; }} onSelect={() => toggleTheme(themeOrigin.current)}>
+              {theme === "dark" ? <Sun /> : <Moon />}
+              {theme === "dark" ? "Светлая тема" : "Тёмная тема"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
               onSelect={() => void user.signOut()}
@@ -625,6 +636,8 @@ function DesktopUserMenu({ user }: { user: WorkspaceUser }) {
 
 function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
   const { setOpenMobile } = useSidebar();
+  const { theme, toggleTheme } = useTheme();
+  const themeOrigin = useRef({ x: 0, y: 0 });
   const pathname = usePathname();
   const mobileMenuButtonClass = "h-10 text-sm font-normal data-[active=true]:font-medium";
 
@@ -698,6 +711,15 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
       <SidebarSeparator className="mx-0" />
       <Button
         variant="ghost"
+        className="h-10 w-full justify-start px-2 text-sm font-normal"
+        onClick={() => toggleTheme(themeOrigin.current)}
+        onPointerDown={(event) => { themeOrigin.current = { x: event.clientX, y: event.clientY }; }}
+      >
+        {theme === "dark" ? <Sun /> : <Moon />}
+        <span className="text-sm leading-5 font-normal">{theme === "dark" ? "Светлая тема" : "Тёмная тема"}</span>
+      </Button>
+      <Button
+        variant="ghost"
         className="h-10 w-full justify-start px-2 text-sm font-normal text-destructive hover:bg-destructive/10 hover:text-destructive"
         onClick={() => {
           setOpenMobile(false);
@@ -712,6 +734,8 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
 }
 
 function MobileHeader({ user }: { user: WorkspaceUser }) {
+  const { theme } = useTheme();
+
   return (
     <header className="grid h-16 shrink-0 grid-cols-[40px_1fr_auto] items-center gap-2 px-4 md:hidden">
       <SidebarTrigger
@@ -722,6 +746,7 @@ function MobileHeader({ user }: { user: WorkspaceUser }) {
       </SidebarTrigger>
       <BrandLogo
         href="/workspace"
+        theme={theme === "dark" ? "light" : "dark"}
         className="mx-auto h-7 gap-2.5 [&_img:first-child]:size-7 [&_img:last-child]:h-auto [&_img:last-child]:w-10"
       />
       <div className="flex items-center gap-1">
@@ -751,11 +776,12 @@ export function WorkspaceShell({
   const user = useWorkspaceUser();
   const pathname = usePathname();
   const title = pageTitle(pathname);
+  const { theme } = useTheme();
 
   return (
     <main className="relative h-svh min-w-0 overflow-hidden bg-workspace">
       <div className="absolute inset-0">
-        <RibbonGlow />
+        {theme === "dark" ? <RibbonGlowDark /> : <RibbonGlow />}
       </div>
       <div className="relative z-10 h-full">
         <SidebarProvider
@@ -769,12 +795,13 @@ export function WorkspaceShell({
         >
           <Sidebar
             collapsible="icon"
-            className="border-0 max-md:shadow-none [&_[data-sidebar=sidebar]]:border-r [&_[data-sidebar=sidebar]]:border-border [&_[data-sidebar=sidebar]]:bg-white"
+            className="border-0 max-md:shadow-none [&_[data-sidebar=sidebar]]:border-r [&_[data-sidebar=sidebar]]:border-border [&_[data-sidebar=sidebar]]:bg-sidebar"
           >
             <SidebarHeader className="hidden gap-2 px-5 py-2 md:flex">
               <div className="flex h-10 items-center">
                 <BrandLogo
                   href="/workspace"
+                  theme={theme === "dark" ? "light" : "dark"}
                   className="h-6 w-auto group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:[&_img:last-child]:hidden"
                 />
               </div>
@@ -794,7 +821,7 @@ export function WorkspaceShell({
             </SidebarFooter>
           </Sidebar>
 
-          <SidebarInset className="h-svh min-w-0 bg-white/40 backdrop-blur-[20px]">
+          <SidebarInset className="h-svh min-w-0 bg-white/40 backdrop-blur-[20px] dark:backdrop-blur-[36px]">
             <MobileHeader user={user} />
             <header className="hidden h-14 shrink-0 items-center gap-3 px-3 md:flex">
               <SidebarTrigger aria-label="Свернуть боковое меню" />

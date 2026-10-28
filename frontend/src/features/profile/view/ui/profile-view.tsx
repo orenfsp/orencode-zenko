@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useApiReady } from "@/_app/providers/api-provider";
 import {
   AtSign,
@@ -121,6 +122,12 @@ export function ProfileView(props: ProfileViewProps) {
   const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
   const [rolesLoading, setRolesLoading] = useState(props.mode === "own");
   const [rolesError, setRolesError] = useState<string | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setPortalReady(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     if (!apiReady) return;
@@ -353,15 +360,6 @@ export function ProfileView(props: ProfileViewProps) {
 
           <div className="grid gap-4 px-4 pb-4 sm:px-6 sm:pb-6">
             <Card className="bg-background/75 p-4 sm:p-5">
-              <CardHeader className="p-0 pb-3">
-                <CardTitle>О профиле</CardTitle>
-                <CardDescription>
-                  {ownProfile
-                    ? "Личные и контактные данные"
-                    : "Открытая информация пользователя"}
-                </CardDescription>
-              </CardHeader>
-              <Separator />
               {ownProfile ? (
                 <>
                   <InfoRow icon={Mail} label="Email" value={ownProfile.email} />
@@ -486,15 +484,18 @@ export function ProfileView(props: ProfileViewProps) {
           </div>
         </Card>
 
-        {ownProfile ? (
-          <div className="fixed inset-x-0 bottom-0 z-40 bg-linear-to-t from-white via-white/95 to-transparent px-4 pt-7 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden">
-            <DialogTrigger asChild>
-              <Button size="lg" className="h-12 w-full rounded-xl">
-                Редактировать
-              </Button>
-            </DialogTrigger>
-          </div>
-        ) : null}
+        {ownProfile && portalReady
+          ? createPortal(
+              <div className="fixed inset-x-0 bottom-0 z-40 bg-linear-to-t from-white via-white/95 to-transparent px-4 pt-7 pb-[max(1rem,env(safe-area-inset-bottom))] dark:from-background dark:via-background/95 md:hidden">
+                <DialogTrigger asChild>
+                  <Button size="lg" className="h-12 w-full rounded-xl">
+                    Редактировать
+                  </Button>
+                </DialogTrigger>
+              </div>,
+              document.body,
+            )
+          : null}
       </div>
 
       {ownProfile ? (
