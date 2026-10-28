@@ -27,6 +27,7 @@ const (
 	PermissionJudgeCategoriesReview     = "judge_categories.review"
 	PermissionRankApplicationsReview    = "rank_applications.review"
 	PermissionDeadlinesManage           = "deadlines.manage"
+	PermissionRatingRead                = "rating.read"
 
 	SuperAdminRoleCode = "super_admin"
 	AdminRoleCode      = "admin"
@@ -75,6 +76,7 @@ var DefaultPermissions = []PermissionDefinition{
 	{Code: PermissionJudgeCategoriesReview, Description: "Рассмотрение заявок на судейские категории"},
 	{Code: PermissionRankApplicationsReview, Description: "Рассмотрение заявок на спортивные разряды"},
 	{Code: PermissionDeadlinesManage, Description: "Управление сроками федерации"},
+	{Code: PermissionRatingRead, Description: "Просмотр рейтинга спортсменов"},
 }
 
 type Role struct {

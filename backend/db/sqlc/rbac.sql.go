@@ -164,6 +164,34 @@ func (q *Queries) ListPermissionCodesByRole(ctx context.Context, roleID int64) (
 	return items, nil
 }
 
+const listPermissionCodesByRoleID = `-- name: ListPermissionCodesByRoleID :many
+SELECT p.code
+FROM permission AS p
+JOIN role_permission AS rp ON rp.permission_id = p.id
+WHERE rp.role_id = $1
+ORDER BY p.code
+`
+
+func (q *Queries) ListPermissionCodesByRoleID(ctx context.Context, roleID int64) ([]string, error) {
+	rows, err := q.db.Query(ctx, listPermissionCodesByRoleID, roleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var code string
+		if err := rows.Scan(&code); err != nil {
+			return nil, err
+		}
+		items = append(items, code)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPermissions = `-- name: ListPermissions :many
 SELECT id, code, description
 FROM permission

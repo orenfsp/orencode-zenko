@@ -153,3 +153,7 @@ func (r *sqlRepository) ListSelfAssignableRoles(ctx context.Context) ([]Role, er
 	}
 	return roles, nil
 }
+
+func (r *sqlRepository) ListRolePermissions(ctx context.Context, roleID int64) ([]string, error) {
+	return r.queries.ListPermissionCodesByRoleID(ctx, roleID)
+}

@@ -65,6 +65,13 @@ JOIN role_permission rp ON rp.permission_id = p.id
 WHERE rp.role_id = $1
 ORDER BY p.code;
 
+-- name: ListPermissionCodesByRoleID :many
+SELECT p.code
+FROM permission AS p
+JOIN role_permission AS rp ON rp.permission_id = p.id
+WHERE rp.role_id = sqlc.arg(role_id)
+ORDER BY p.code;
+
 -- name: ListPermissions :many
 SELECT id, code, description
 FROM permission

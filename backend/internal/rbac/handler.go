@@ -66,6 +66,20 @@ func (h *Handler) ListPermissions(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, permissions)
 }
 
+func (h *Handler) MyPermissions(w http.ResponseWriter, r *http.Request) {
+	identity, ok := IdentityFromContext(r.Context())
+	if !ok || identity.RoleID == nil || *identity.RoleID <= 0 {
+		writeError(w, http.StatusNotFound, "у пользователя нет активной роли")
+		return
+	}
+	permissions, err := h.service.ListRolePermissions(r.Context(), *identity.RoleID)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, permissions)
+}
+
 func (h *Handler) ListSelfAssignableRoles(w http.ResponseWriter, r *http.Request) {
 	roles, err := h.service.ListSelfAssignableRoles(r.Context())
 	if err != nil {

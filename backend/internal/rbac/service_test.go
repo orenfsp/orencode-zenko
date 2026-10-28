@@ -29,6 +29,9 @@ func (*repositoryStub) ListPermissions(context.Context) ([]Permission, error) {
 func (*repositoryStub) ListSelfAssignableRoles(context.Context) ([]Role, error) {
 	return nil, nil
 }
+func (*repositoryStub) ListRolePermissions(context.Context, int64) ([]string, error) {
+	return nil, nil
+}
 
 func TestCreateRoleNormalizesAndDeduplicatesPermissions(t *testing.T) {
 	repository := &repositoryStub{}
