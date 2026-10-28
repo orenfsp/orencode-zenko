@@ -18,6 +18,7 @@ interface ApiClientOptions {
 
 let options: ApiClientOptions | null = null;
 let refreshPromise: Promise<string | null> | null = null;
+let runtimePermissions: string[] | null | undefined;
 
 function toUrl(path: string, params?: RequestOptions["params"]) {
   const url = new URL(path, window.location.origin);
@@ -119,6 +120,15 @@ export function initApiClient(nextOptions: ApiClientOptions) {
 export function resetApiClient() {
   options = null;
   refreshPromise = null;
+  runtimePermissions = undefined;
+}
+
+export function setApiPermissions(permissions: string[] | null) {
+  runtimePermissions = permissions;
+}
+
+export function getApiPermissions() {
+  return runtimePermissions;
 }
 
 export { ApiError } from "./types";

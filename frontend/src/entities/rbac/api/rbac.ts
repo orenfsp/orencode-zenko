@@ -1,6 +1,10 @@
 import { api, type ApiEnvelope } from "@/shared/api/client";
 import type { CreateRolePayload, Permission, Role } from "../model/types";
 export const rbacApi = {
+  myPermissions: async () =>
+    (
+      await api.get<ApiEnvelope<string[]>>("/api/v1/my-permission")
+    ).data,
   selfAssignableRoles: async () =>
     (await api.get<ApiEnvelope<Role[]>>("/api/v1/roles/self-assignable")).data,
   roles: async () =>
