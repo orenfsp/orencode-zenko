@@ -286,7 +286,7 @@ func main() {
 		now.AddDate(0, 0, -7), now.AddDate(0, 0, 7),
 	)
 
-	upsertEvent := func(competitionID int64) int64 {
+		upsertEvent := func(competitionID int64) int64 {
 		var id int64
 		scanErr := pool.QueryRow(ctx, `
 			SELECT id FROM competition_event
@@ -295,8 +295,8 @@ func main() {
 		`, competitionID, disciplineID, ageGroupID).Scan(&id)
 		if scanErr == pgx.ErrNoRows {
 			scanErr = pool.QueryRow(ctx, `
-				INSERT INTO competition_event (competition_id, discipline_id, age_group_id)
-				VALUES ($1, $2, $3) RETURNING id
+				INSERT INTO competition_event (competition_id, discipline_id, age_group_id, name)
+				VALUES ($1, $2, $3, 'Основной зачёт') RETURNING id
 			`, competitionID, disciplineID, ageGroupID).Scan(&id)
 		}
 		if scanErr != nil {
