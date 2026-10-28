@@ -8,11 +8,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  X,
   CalendarDays,
   MapPin,
 } from "lucide-react";
 
+import { useApiReady } from "@/_app/providers/api-provider";
+import { competitionApi, type CalendarCompetition } from "@/entities/competition";
 import { BrandLogo } from "@/shared/ui/brand-logo";
 import { Button } from "@/shared/ui/button";
 import RibbonGlowDark from "@/widgets/auth-shell/ui/bg-effect-dark";
@@ -60,72 +61,45 @@ const news = [
   },
 ];
 
-const categories = [
-  { id: "all", label: "Все" },
-  { id: "product", label: "Продуктовое" },
-  { id: "algorithm", label: "Алгоритмы" },
-  { id: "security", label: "Информационная безопасность" },
-  { id: "robotics", label: "Робототехника" },
-  { id: "bas", label: "БАС" },
-] as const;
+function competitionDate(start: string, end: string) {
+  const format = new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${format.format(new Date(start))} — ${format.format(new Date(end))}`;
+}
 
-type Category = (typeof categories)[number]["id"];
+function daysWord(value: number) {
+  const remainder = value % 10;
+  const tens = value % 100;
+  if (remainder === 1 && tens !== 11) return "день";
+  if (remainder >= 2 && remainder <= 4 && (tens < 10 || tens >= 20)) return "дня";
+  return "дней";
+}
 
-const competitions: {
-  id: number;
-  title: string;
-  category: Exclude<Category, "all">;
-  discipline: string;
-  date: string;
-  location: string;
-  format: string;
-}[] = [
-  {
-    id: 1,
-    title: "Открытый чемпионат по алгоритмическому программированию",
-    category: "algorithm",
-    discipline: "Алгоритмическое программирование",
-    date: "10–12 ноября",
-    location: "Оренбург",
-    format: "Очно",
-  },
-  {
-    id: 2,
-    title: "Региональный турнир по продуктовому программированию",
-    category: "product",
-    discipline: "Продуктовое программирование",
-    date: "16–18 ноября",
-    location: "Онлайн",
-    format: "Дистанционно",
-  },
-  {
-    id: 3,
-    title: "Первенство по информационной безопасности",
-    category: "security",
-    discipline: "Информационная безопасность",
-    date: "21–22 ноября",
-    location: "Москва",
-    format: "Очно",
-  },
-  {
-    id: 4,
-    title: "Кубок по программированию робототехники",
-    category: "robotics",
-    discipline: "Программирование робототехники",
-    date: "28–29 ноября",
-    location: "Казань",
-    format: "Очно",
-  },
-  {
-    id: 5,
-    title: "Соревнования по программированию беспилотных систем",
-    category: "bas",
-    discipline: "Программирование БАС",
-    date: "04–05 декабря",
-    location: "Онлайн",
-    format: "Дистанционно",
-  },
-];
+function registrationLabel(startsAt?: string, endsAt?: string) {
+  if (!startsAt || !endsAt) return "Срок регистрации уточняется";
+  const now = Date.now();
+  const start = new Date(startsAt).getTime();
+  const end = new Date(endsAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return "Срок регистрации уточняется";
+  if (now < start) {
+    const days = Math.max(1, Math.ceil((start - now) / 86_400_000));
+    return `Регистрация откроется через ${days} ${daysWord(days)}`;
+  }
+  if (now >= end) return "Регистрация завершена";
+  const days = Math.max(1, Math.ceil((end - now) / 86_400_000));
+  return `Осталось ${days} ${daysWord(days)} регистрации`;
+}
+
+const competitionFormats: Record<string, string> = {
+  offline: "Очно",
+  online: "Онлайн",
+  mixed: "Смешанный формат",
+};
 
 function SectionHeading({
   children,
@@ -292,7 +266,7 @@ function HomeHeader() {
               {/* Ссылки на секции */}
               <nav
                 aria-label="Мобильная навигация"
-                className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-6"
+                className="flex flex-1 flex-col gap-1 overflow-y-auto scroll-mask-y px-3 py-6"
               >
                 {[
                   { label: "Новости", href: "#news" },
@@ -519,7 +493,7 @@ function NewsSection() {
           onScroll={updateActiveIndex}
           className={cn(
             "scrollbar-none flex snap-x snap-mandatory",
-            "gap-3 overflow-x-auto pb-2 sm:gap-5",
+            "gap-3 overflow-x-auto scroll-mask-x pb-2 sm:gap-5",
             "pl-5 pr-5 sm:pl-8 sm:pr-8 lg:pl-10 lg:pr-10",
             "scroll-pl-5 sm:scroll-pl-8 lg:scroll-pl-10",
             "scroll-pr-5 sm:scroll-pr-8 lg:scroll-pr-10",
@@ -626,19 +600,21 @@ function NewsSection() {
 
 function CompetitionCard({
   competition,
+  registration,
 }: {
-  competition: (typeof competitions)[number];
+  competition: CalendarCompetition;
+  registration?: { startsAt: string; endsAt: string };
 }) {
   return (
     <article className="flex min-h-[280px] flex-col justify-between gap-8 rounded-[20px] bg-[#111216] p-5 text-white sm:min-h-[310px] sm:p-7">
       <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-start justify-between gap-3 text-xs text-white/50 sm:text-sm">
-          <span className="max-w-[260px]">{competition.discipline}</span>
-          <span className="whitespace-nowrap">{competition.date}</span>
+          <span className="max-w-[260px]">{competition.discipline.name}</span>
+          <span>{competitionDate(competition.start_at, competition.end_at)}</span>
         </div>
 
         <h3 className="max-w-[540px] font-mono text-[24px] font-light leading-[1.05] tracking-tight sm:text-[28px] xl:text-[32px]">
-          {competition.title}
+          {competition.name}
         </h3>
       </div>
 
@@ -646,11 +622,11 @@ function CompetitionCard({
         <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-white/45 sm:text-sm">
           <span className="flex items-center gap-2">
             <MapPin className="size-4" />
-            {competition.location}
+            {competition.venue_address || (competition.format === "online" ? "Онлайн-площадка" : "Место уточняется")}
           </span>
           <span className="flex items-center gap-2">
             <CalendarDays className="size-4" />
-            {competition.format}
+            {competitionFormats[competition.format] ?? competition.format}
           </span>
         </div>
 
@@ -663,7 +639,7 @@ function CompetitionCard({
           </Button>
 
           <span className="text-xs text-white/40">
-            Личный кабинет участника
+            {registrationLabel(registration?.startsAt, registration?.endsAt)}
           </span>
         </div>
       </div>
@@ -672,16 +648,63 @@ function CompetitionCard({
 }
 
 function CompetitionsSection() {
-  const [category, setCategory] = React.useState<Category>("all");
+  const apiReady = useApiReady();
+  const [competitions, setCompetitions] = React.useState<CalendarCompetition[]>([]);
+  const [registrations, setRegistrations] = React.useState<Record<number, { startsAt: string; endsAt: string }>>({});
+  const [category, setCategory] = React.useState<number | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [revision, setRevision] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!apiReady) return;
+    let active = true;
+    const from = new Date();
+    const to = new Date(from);
+    to.setFullYear(to.getFullYear() + 1);
+
+    competitionApi.calendar({ from: from.toISOString(), to: to.toISOString(), limit: 100 })
+      .then(async (items) => {
+        if (active) {
+          setCompetitions(items);
+          setError(null);
+        }
+        const details = await Promise.allSettled(
+          items.slice(0, 6).map(async (item) => {
+            const detail = await competitionApi.get(item.id);
+            return [item.id, { startsAt: detail.registration_starts_at, endsAt: detail.registration_ends_at }] as const;
+          }),
+        );
+        if (active) {
+          setRegistrations(Object.fromEntries(
+            details.flatMap((result) => result.status === "fulfilled" ? [result.value] : []),
+          ));
+        }
+      })
+      .catch((cause) => {
+        if (active) setError(cause instanceof Error ? cause.message : "Не удалось загрузить соревнования");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [apiReady, revision]);
+
+  const categories = React.useMemo(() => [
+    { id: null, label: "Все" },
+    ...Array.from(
+      new Map(competitions.map((item) => [item.discipline.id, item.discipline.name])).entries(),
+      ([id, label]) => ({ id, label }),
+    ),
+  ], [competitions]);
 
   const filteredCompetitions = React.useMemo(
     () =>
-      category === "all"
+      (category === null
         ? competitions
-        : competitions.filter(
-            (competition) => competition.category === category,
-          ),
-    [category],
+        : competitions.filter((competition) => competition.discipline.id === category)
+      ).slice(0, 6),
+    [category, competitions],
   );
 
   return (
@@ -704,7 +727,7 @@ function CompetitionsSection() {
         <div
           className={cn(
             "scrollbar-none mt-10 flex w-full snap-x gap-2",
-            "overflow-x-auto pb-3",
+            "overflow-x-auto scroll-mask-x pb-3",
             "pl-5 pr-5 sm:pl-8 sm:pr-8 lg:pl-10 lg:pr-10",
             "scroll-pl-5 sm:scroll-pl-8 lg:scroll-pl-10",
             "lg:justify-center",
@@ -729,16 +752,23 @@ function CompetitionsSection() {
         </div>
 
         <div className="mt-5 grid w-full grid-cols-1 gap-3 px-5 sm:mt-8 sm:grid-cols-2 sm:gap-5 sm:px-8 lg:px-10">
-          {filteredCompetitions.length > 0 ? (
-            filteredCompetitions.map((competition) => (
-              <CompetitionCard key={competition.id} competition={competition} />
+          {loading ? (
+            <div className="col-span-full py-16 text-center text-sm text-white/50" role="status">Загружаем соревнования…</div>
+          ) : error ? (
+            <div className="col-span-full flex min-h-[250px] flex-col items-center justify-center gap-4 rounded-[20px] border border-white/10 px-5 text-center">
+              <p className="text-sm text-white/70">{error}</p>
+              <Button variant="secondary" onClick={() => { setLoading(true); setRevision((value) => value + 1); }}>Повторить</Button>
+            </div>
+          ) : filteredCompetitions.length > 0 ? (
+              filteredCompetitions.map((competition) => (
+              <CompetitionCard key={competition.id} competition={competition} registration={registrations[competition.id]} />
             ))
           ) : (
             <div className="col-span-full flex min-h-[250px] flex-col items-center justify-center gap-3 rounded-[20px] border border-white/10 text-center">
               <CalendarDays className="size-9 text-white/30" />
               <p className="text-lg">Пока нет соревнований</p>
               <p className="text-sm text-white/40">
-                Попробуйте выбрать другую дисциплину.
+                {category === null ? "Опубликованные соревнования появятся здесь." : "Попробуйте выбрать другую дисциплину."}
               </p>
             </div>
           )}

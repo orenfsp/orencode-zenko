@@ -9,5 +9,7 @@
 - [Публичный API справочников](./reference-api.md)
 - [API судейской коллегии соревнования](./competition-judges-api.md)
 - [API результатов соревнований и протоколов](./competition-results-api.md)
+- [Backend API MVP и формат ошибок](./mvp-backend-api.md)
+- [Запуск в Docker](./docker.md)
 - `bd.drawio` — диаграмма базы данных.
 - `andrey.drawio` — дополнительная диаграмма проекта.

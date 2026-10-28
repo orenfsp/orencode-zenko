@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useState } from "react";
-import { Dumbbell, LoaderCircle, Plus, UserRoundCheck } from "lucide-react";
+import { LoaderCircle, Plus } from "lucide-react";
 
 import { profileApi } from "@/entities/profile";
 import type { RegistryUser } from "@/entities/registry";
@@ -77,7 +77,7 @@ export function CoachRelations() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-6xl">
       {state.data?.role === "coach" ? (
         <Card className="mb-4 bg-white/75 p-4 shadow-none">
           {canSearchParticipants ? <form key={formVersion} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={create}>
@@ -95,9 +95,6 @@ export function CoachRelations() {
           <Card key={relation.id} className="bg-white/75 p-5 shadow-none">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div className="flex gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary">
-                  {state.data?.role === "coach" ? <Dumbbell className="size-5" /> : <UserRoundCheck className="size-5" />}
-                </span>
                 <div>
                   <p className="font-medium">{state.data?.role === "coach" ? `Спортсмен #${relation.participant_user_id}` : `Тренер #${relation.coach_user_id}`}</p>
                   <p className="mt-1 text-sm text-muted-foreground">Дисциплина #{relation.discipline_id} · запрос {formatDate(relation.requested_at)}</p>

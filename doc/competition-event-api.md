@@ -16,7 +16,7 @@
 | `PATCH /competitions/{competitionID}/events/{eventID}` | `competition_events.update` | Изменить возрастную группу зачёта |
 | `DELETE /competitions/{competitionID}/events/{eventID}` | `competition_events.delete` | Удалить зачёт без заявок |
 
-Защищённым маршрутам нужен `Authorization: Bearer <access_token>`. Они используют общие middleware `Authenticate` и `Require`; permission-коды регистрируются существующим `cmd/seed-rbac` и назначаются системной роли `super_admin`.
+Защищённым маршрутам нужен `Authorization: Bearer <access_token>`. Они используют общие middleware `Authenticate` и `Require`; permission-коды регистрируются существующим `cmd/seed-rbac` и назначаются системным ролям `admin` и `super_admin`.
 
 Публичные GET возвращают Events только для Competition в статусах `published`, `registration_open`, `registration_closed`, `ongoing`, `results_pending`, `completed` — тот же набор использует публичный календарь. `draft` и `under_review` скрыты и дают `404 Not Found`.
 
@@ -43,7 +43,7 @@
 }
 ```
 
-`age_group` может быть `null`. `protocol_url` возвращается в GET, но POST/PATCH его не принимают: загрузка и публикация протоколов относятся к будущему модулю результатов.
+`age_group` может быть `null`. `protocol_url` возвращается в GET, но POST/PATCH зачёта его не принимают. Генерация и управление протоколом описаны в [API результатов](./competition-results-api.md).
 
 ## Создание
 
@@ -57,7 +57,7 @@ Content-Type: application/json
 
 `name` обязателен и должен содержать от 1 до 250 символов. `age_group_id` необязателен; если задан, справочник `age_group` должен содержать запись. `competition_id` берётся только из URL, а `discipline_id` — из заблокированной строки родительского Competition. Попытка передать эти поля в JSON отклоняется как неизвестное поле. Успешный ответ: `201 Created` и полный Event.
 
-Создавать Event можно только у Competition со статусом `draft`. Repository начинает транзакцию, блокирует строку Competition через `SELECT ... FOR UPDATE`, проверяет статус и только затем выполняет INSERT. Будущая операция публикации должна блокировать ту же строку Competition; тогда публикация и изменение Events не смогут пройти одновременно на противоречивых состояниях.
+Создавать Event можно только у Competition со статусом `draft`. Repository начинает транзакцию, блокирует строку Competition через `SELECT ... FOR UPDATE`, проверяет статус и только затем выполняет INSERT. Переходы статуса описаны в [Competition API](./competition-api.md).
 
 ## Частичное изменение
 

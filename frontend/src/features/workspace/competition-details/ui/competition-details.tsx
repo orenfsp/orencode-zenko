@@ -6,20 +6,22 @@ import {
   CalendarDays,
   ExternalLink,
   FileText,
-  Gavel,
   LoaderCircle,
   MapPin,
-  Trophy,
+  Pencil,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { competitionApi } from "@/entities/competition";
 import { competitionApplicationApi } from "@/entities/competition-application";
-import { competitionEventApi } from "@/entities/competition-event";
+import { competitionEventApi, type CompetitionEvent } from "@/entities/competition-event";
 import { competitionJudgeApi } from "@/entities/competition-judge";
 import { competitionResultApi, type CompetitionResultTable } from "@/entities/competition-result";
 import { profileApi } from "@/entities/profile";
+import { referenceDataApi } from "@/entities/reference-data";
 import { userCoachApi } from "@/entities/user-coach";
 import { useAuth } from "@/entities/session";
 import { formatDate, fullName, StatusBadge } from "@/features/workspace/common";
@@ -36,6 +38,12 @@ import { Checkbox } from "@/shared/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { ResultEntryEditor } from "./result-entry-editor";
 
+interface EventEditor {
+  mode: "create" | "edit";
+  eventId?: number;
+  ageGroupId: number | null;
+}
+
 export function CompetitionDetails({ competitionId }: { competitionId: number }) {
   const { identity } = useAuth();
   const notify = useNotifications();
@@ -46,6 +54,10 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
   const canReadResults = permissions.has("competition_results.read");
   const canManageResults = permissions.has("competition_results.manage");
   const canApproveResults = permissions.has("competition_results.approve");
+  const canReadEvents = permissions.has("competition_events.read");
+  const canCreateEvents = permissions.has("competition_events.create");
+  const canUpdateEvents = permissions.has("competition_events.update");
+  const canDeleteEvents = permissions.has("competition_events.delete");
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<CompetitionResultTable | null>(null);
   const [resultEventId, setResultEventId] = useState<number | null>(null);
@@ -53,19 +65,22 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
   const [resultInputError, setResultInputError] = useState<string | null>(null);
   const [resultVersion, setResultVersion] = useState(0);
   const [applyingEventId, setApplyingEventId] = useState<number | null>(null);
+  const [eventEditor, setEventEditor] = useState<EventEditor | null>(null);
+  const [deletingEvent, setDeletingEvent] = useState<CompetitionEvent | null>(null);
   const load = useCallback(
     async () => {
-      const [competition, events, judges, profile] = await Promise.all([
+      const [competition, events, judges, profile, ageGroups] = await Promise.all([
         competitionApi.get(competitionId),
-        competitionEventApi.publicList(competitionId),
+        canReadEvents ? competitionEventApi.adminList(competitionId) : competitionEventApi.publicList(competitionId),
         canManageJudges ? competitionJudgeApi.adminList(competitionId) : competitionJudgeApi.publicList(competitionId),
         profileApi.me(),
+        canCreateEvents || canUpdateEvents ? referenceDataApi.ageGroups() : Promise.resolve([]),
       ]);
       const activeRole = profile.roles.find((role) => role.id === identity?.roleId)?.code;
       const athletes = activeRole === "coach" ? await userCoachApi.byCoach({ limit: 100 }) : [];
-      return { competition, events, judges, activeRole, athletes };
+      return { competition, events, judges, activeRole, athletes, ageGroups };
     },
-    [canManageJudges, competitionId, identity?.roleId],
+    [canCreateEvents, canManageJudges, canReadEvents, canUpdateEvents, competitionId, identity?.roleId],
   );
   const state = useAsyncData(load);
 
@@ -100,6 +115,26 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
       router.push("/workspace/applications");
     } catch (cause) { notify.error(cause instanceof Error ? cause.message : "Не удалось подать заявку"); }
     finally { setPending(false); }
+  }
+
+  function saveEvent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!eventEditor) return;
+    const ageGroupId = eventEditor.ageGroupId;
+    const action = eventEditor.mode === "create"
+      ? () => competitionEventApi.create(competitionId, { age_group_id: ageGroupId })
+      : eventEditor.eventId
+        ? () => competitionEventApi.update(competitionId, eventEditor.eventId!, { age_group_id: ageGroupId })
+        : null;
+    if (!action) return;
+    void run(action, eventEditor.mode === "create" ? "Зачёт создан" : "Зачёт обновлён");
+    setEventEditor(null);
+  }
+
+  function removeEvent() {
+    if (!deletingEvent) return;
+    void run(() => competitionEventApi.remove(competitionId, deletingEvent.id), "Зачёт удалён");
+    setDeletingEvent(null);
   }
 
   async function openResults(eventId: number) {
@@ -180,7 +215,7 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
   if (state.error) return <DataError message={state.error} retry={state.reload} />;
   if (!state.data) return null;
 
-  const { competition, events, judges, activeRole, athletes } = state.data;
+  const { competition, events, judges, activeRole, athletes, ageGroups } = state.data;
   const canApply = activeRole === "participant" || activeRole === "coach";
   const applyingEvent = events.find((event) => event.id === applyingEventId);
   const eligibleAthletes = applyingEvent ? athletes.filter((relation) => relation.status === "confirmed" && relation.discipline_id === applyingEvent.discipline.id) : [];
@@ -211,22 +246,24 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
       {canUpdate && competition.status === "draft" ? <Card className="mt-4 bg-white/75 p-4 shadow-none"><form className="grid gap-2 md:grid-cols-[1fr_1fr_auto]" onSubmit={updateCompetition}><Input name="name" defaultValue={competition.name} required /><Input name="description" defaultValue={competition.description ?? ""} placeholder="Описание" /><Button disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Сохранить карточку</Button></form></Card> : null}
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-        <Card className="bg-white/75 p-5 shadow-none">
-          <CardHeader>
+        <Card className="border-0 bg-white/75 p-5 shadow-none">
+          <CardHeader className="flex-row items-start justify-between gap-3 p-0">
+            <div>
             <CardTitle>Зачёты соревнования</CardTitle>
             <CardDescription>Дисциплины и возрастные группы.</CardDescription>
+            </div>
+            {canCreateEvents && competition.status === "draft" ? <Button size="sm" onClick={() => setEventEditor({ mode: "create", ageGroupId: null })}><Plus />Создать</Button> : null}
           </CardHeader>
           <div className="mt-4 grid gap-3">
             {events.map((event) => (
               <div key={event.id} className="flex flex-col gap-4 rounded-xl bg-muted/60 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 gap-3">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary"><Trophy className="size-5" /></span>
                   <div>
                     <p className="font-medium">{event.discipline.name}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{event.age_group?.name ?? "Без возрастной группы"}</p>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">{canApply && competition.status === "registration_open" ? <Button size="sm" disabled={pending} onClick={() => setApplyingEventId(event.id)}>Подать заявку</Button> : null}{canReadResults ? <Button variant="outline" size="sm" disabled={pending} onClick={() => void openResults(event.id)}>Результаты</Button> : null}{event.protocol_url ? <Button variant="outline" size="sm" disabled={pending} onClick={() => void downloadProtocol(event.id)}><FileText />Протокол</Button> : null}</div>
+                <div className="flex flex-wrap gap-2">{canApply && competition.status === "registration_open" ? <Button size="sm" disabled={pending} onClick={() => setApplyingEventId(event.id)}>Подать заявку</Button> : null}{canReadResults ? <Button variant="outline" size="sm" disabled={pending} onClick={() => void openResults(event.id)}>Результаты</Button> : null}{event.protocol_url ? <Button variant="outline" size="sm" disabled={pending} onClick={() => void downloadProtocol(event.id)}><FileText />Протокол</Button> : null}{canUpdateEvents && competition.status === "draft" ? <Button variant="ghost" size="icon" aria-label={`Изменить зачёт №${event.id}`} onClick={() => setEventEditor({ mode: "edit", eventId: event.id, ageGroupId: event.age_group?.id ?? null })}><Pencil /></Button> : null}{canDeleteEvents && competition.status === "draft" ? <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" aria-label={`Удалить зачёт №${event.id}`} onClick={() => setDeletingEvent(event)}><Trash2 /></Button> : null}</div>
               </div>
             ))}
             {!events.length ? <p className="text-sm text-muted-foreground">Зачёты пока не опубликованы.</p> : null}
@@ -243,7 +280,6 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
             {canManageJudges && competition.status !== "draft" ? <p className="text-sm text-muted-foreground">Состав судей можно менять только до публикации соревнования.</p> : null}
             {judges.map((assignment) => (
               <div key={assignment.id} className="flex gap-3 rounded-xl bg-muted/60 p-4">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-primary"><Gavel className="size-4" /></span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{fullName(assignment.judge.last_name, assignment.judge.first_name, assignment.judge.middle_name)}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{assignment.position.name}</p>
@@ -263,6 +299,33 @@ export function CompetitionDetails({ competitionId }: { competitionId: number })
           <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={pending || !result.entries.length} onClick={() => void resultAction(() => competitionResultApi.calculate(competitionId, resultEventId), "Места рассчитаны")}>Рассчитать</Button>{canApproveResults ? <Button variant="outline" disabled={pending || !result.entries.length} onClick={() => void resultAction(() => competitionResultApi.approve(competitionId, resultEventId), "Результаты утверждены")}>Утвердить</Button> : null}</div>
         </div> : <div className="mt-4 grid gap-2">{result.entries.map((entry) => <div key={entry.id} className="rounded-xl bg-muted/60 p-3 text-sm">#{entry.id} · место {entry.place ?? "—"} · решено {entry.solved_count}</div>)}</div>}
       </Card> : null}
+      <Dialog open={eventEditor !== null} onOpenChange={(open) => { if (!open && !pending) setEventEditor(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{eventEditor?.mode === "create" ? "Новый зачёт" : "Изменение зачёта"}</DialogTitle>
+            <DialogDescription>Выберите возрастную группу для зачёта. Дисциплина берётся из соревнования.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={saveEvent} className="grid gap-4">
+            <div className="grid max-h-72 gap-2 overflow-y-auto scroll-mask-y pr-1">
+              <Button type="button" variant={eventEditor?.ageGroupId === null ? "default" : "outline"} className="justify-start" onClick={() => setEventEditor((value) => value ? { ...value, ageGroupId: null } : value)}>Без возрастной группы</Button>
+              {ageGroups.map((group) => <Button key={group.id} type="button" variant={eventEditor?.ageGroupId === group.id ? "default" : "outline"} className="justify-start" onClick={() => setEventEditor((value) => value ? { ...value, ageGroupId: group.id } : value)}>{group.name}</Button>)}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={pending} onClick={() => setEventEditor(null)}>Отмена</Button>
+              <Button type="submit" disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : null}Сохранить</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={deletingEvent !== null} onOpenChange={(open) => { if (!open && !pending) setDeletingEvent(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Удалить зачёт?</DialogTitle><DialogDescription>Удаление доступно только для черновика без заявок. Отменить его нельзя.</DialogDescription></DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={pending} onClick={() => setDeletingEvent(null)}>Отмена</Button>
+            <Button variant="destructive" disabled={pending} onClick={removeEvent}>{pending ? <LoaderCircle className="animate-spin" /> : <Trash2 />}Удалить</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={applyingEventId !== null} onOpenChange={(open) => { if (!open) setApplyingEventId(null); }}>
         <DialogContent><DialogHeader><DialogTitle>Заявка на соревнование</DialogTitle><DialogDescription>{applyingEvent?.discipline.name}{applyingEvent?.age_group ? ` · ${applyingEvent.age_group.name}` : ""}. Заявка будет отправлена на рассмотрение федерации.</DialogDescription></DialogHeader>
           {activeRole === "coach" && !eligibleAthletes.length ? <div className="grid gap-3 text-sm text-muted-foreground"><p>Нет подтверждённых спортсменов по этой дисциплине. Сначала создайте связь и дождитесь подтверждения спортсмена.</p><Button asChild variant="outline"><Link href="/workspace/coaches">К моим спортсменам</Link></Button></div> : <form className="grid gap-4" onSubmit={applyForEvent}>

@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { CalendarDays, ClipboardList, Medal, Trophy, Users } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import Link from "next/link";
 
 import { dashboardApi, type DashboardData } from "@/entities/dashboard";
@@ -18,10 +18,10 @@ type OverviewData =
   | { kind: "personal"; deadlines: DeadlineItem[] };
 
 const metricCards = [
-  { key: "athletes", label: "Спортсмены", icon: Users },
-  { key: "competitions", label: "Соревнования", icon: Trophy },
-  { key: "participants", label: "Участники", icon: ClipboardList },
-  { key: "active_ranks", label: "Активные разряды", icon: Medal },
+  { key: "athletes", label: "Спортсмены" },
+  { key: "competitions", label: "Соревнования" },
+  { key: "participants", label: "Участники" },
+  { key: "active_ranks", label: "Активные разряды" },
 ] as const;
 
 
@@ -53,7 +53,7 @@ export function WorkspaceOverview() {
 
   if (data.kind === "personal") {
     return (
-      <div className="mx-auto w-full max-w-5xl">
+      <div className="mx-auto w-full max-w-6xl">
         <div className="mb-4 flex justify-end">
           <Button asChild variant="outline" size="sm">
             <Link href="/workspace/competitions">Все соревнования</Link>
@@ -69,9 +69,7 @@ export function WorkspaceOverview() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 gap-3">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary">
-                      <CalendarDays className="size-5" />
-                    </span>
+                    <CalendarDays className="mt-1 size-4 shrink-0 text-primary" />
 
                     <div className="min-w-0">
                       <p className="font-medium">
@@ -104,15 +102,11 @@ export function WorkspaceOverview() {
   return (
     <div className="mx-auto w-full max-w-6xl">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {metricCards.map(({ key, label, icon: Icon }) => (
+        {metricCards.map(({ key, label }) => (
           <Card
             key={key}
             className="bg-white/75 p-5 shadow-none"
           >
-            <span className="mb-4 flex size-10 items-center justify-center rounded-xl bg-[#eeebff] text-primary">
-              <Icon className="size-5" />
-            </span>
-
             <p className="text-2xl font-medium">
               {dashboard.metrics[key]}
             </p>

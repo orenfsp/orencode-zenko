@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useCallback, useState } from "react";
-import { LoaderCircle, Pencil, Plus, Search, Trash2, Trophy } from "lucide-react";
+import { FormEvent, useCallback, useMemo, useState } from "react";
+import { LoaderCircle, Pencil, Trash2 } from "lucide-react";
 
 import {
   competitionEventApi,
@@ -24,6 +24,7 @@ import {
 } from "@/shared/ui/dialog";
 import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { WorkspaceToolbar } from "@/shared/ui/workspace-toolbar";
 
 interface EventEditor {
   mode: "create" | "edit";
@@ -37,6 +38,7 @@ export function EventManagement() {
   const [editor, setEditor] = useState<EventEditor | null>(null);
   const [deleting, setDeleting] = useState<CompetitionEvent | null>(null);
   const [pending, setPending] = useState(false);
+  const [search, setSearch] = useState("");
 
   const loadEvents = useCallback(
     () =>
@@ -50,6 +52,11 @@ export function EventManagement() {
   const events = useAsyncData(loadEvents);
   const ageGroups = useAsyncData(loadAgeGroups);
   const competitions = useAsyncData(loadCompetitions);
+  const selectedCompetition = competitions.data?.find((competition) => competition.id === competitionId);
+  const visibleEvents = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("ru");
+    return (events.data ?? []).filter((item) => `${item.id} ${item.discipline.name} ${item.age_group?.name ?? ""}`.toLocaleLowerCase("ru").includes(query));
+  }, [events.data, search]);
 
   async function saveEvent(event: FormEvent) {
     event.preventDefault();
@@ -92,51 +99,46 @@ export function EventManagement() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
-      {competitionId ? (
-        <div className="mb-4 flex justify-end">
-          <Button onClick={() => setEditor({ mode: "create", ageGroupId: null })}>
-            <Plus />Создать зачёт
-          </Button>
-        </div>
-      ) : null}
-
-      <Card className="mb-5 bg-white/75 p-5 shadow-none">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1 space-y-2">
+    <div className="mx-auto w-full max-w-6xl">
+      <WorkspaceToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Найти зачёт"
+        filterContent={
+          <div className="grid gap-2">
             <Label htmlFor="competition-id">Соревнование</Label>
             <Select value={competitionId ? String(competitionId) : ""} onValueChange={(value) => setCompetitionId(Number(value))}>
-              <SelectTrigger id="competition-id" className="bg-white shadow-none"><SelectValue placeholder={competitions.loading ? "Загрузка соревнований…" : "Выберите соревнование"} /></SelectTrigger>
+              <SelectTrigger id="competition-id"><SelectValue placeholder={competitions.loading ? "Загрузка соревнований…" : "Выберите соревнование"} /></SelectTrigger>
               <SelectContent>{competitions.data?.map((competition) => <SelectItem key={competition.id} value={String(competition.id)}>{competition.name} · #{competition.id}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <Button type="button" variant="outline" disabled={!competitionId} onClick={() => events.reload()}><Search />Открыть</Button>
-        </div>
-      </Card>
+        }
+        createLabel="Создать зачёт"
+        onCreate={competitionId ? () => setEditor({ mode: "create", ageGroupId: null }) : undefined}
+      />
+
+      {selectedCompetition ? <p className="mb-4 text-sm text-muted-foreground">Зачёты соревнования: <span className="font-medium text-foreground">{selectedCompetition.name}</span></p> : null}
 
       {events.loading && competitionId ? <DataLoading rows={3} /> : null}
       {events.error ? <DataError message={events.error} retry={events.reload} /> : null}
       {!competitionId ? (
         <DataEmpty title="Выберите соревнование" description="Выберите соревнование из списка, чтобы загрузить его зачёты." />
       ) : null}
-      {competitionId && !events.loading && !events.error && !events.data?.length ? (
-        <DataEmpty title="Зачётов пока нет" description="Создайте первый зачёт для выбранного соревнования." />
+      {competitionId && !events.loading && !events.error && !visibleEvents.length ? (
+        <DataEmpty title={search ? "Зачёты не найдены" : "Зачётов пока нет"} description={search ? "Измените поисковый запрос." : "Создайте первый зачёт для выбранного соревнования."} />
       ) : null}
 
       <div className="grid gap-3">
-        {events.data?.map((item) => (
-          <Card key={item.id} className="bg-white/75 p-5 shadow-none">
+        {visibleEvents.map((item) => (
+          <Card key={item.id} className="border-0 bg-white/75 p-4 shadow-none sm:p-5">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-              <div className="flex gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary"><Trophy className="size-5" /></span>
-                <div>
-                  <p className="font-medium">Зачёт #{item.id}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{item.discipline.name} · {item.age_group?.name ?? "Без возрастной группы"}</p>
-                </div>
+              <div className="min-w-0">
+                <p className="font-medium">Зачёт #{item.id}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{item.discipline.name} · {item.age_group?.name ?? "Без возрастной группы"}</p>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setEditor({ mode: "edit", eventId: item.id, ageGroupId: item.age_group?.id ?? null })}><Pencil />Изменить</Button>
-                <Button variant="destructive" size="sm" onClick={() => setDeleting(item)}><Trash2 />Удалить</Button>
+                <Button variant="ghost" size="icon" aria-label={`Изменить зачёт №${item.id}`} title="Изменить" onClick={() => setEditor({ mode: "edit", eventId: item.id, ageGroupId: item.age_group?.id ?? null })}><Pencil /></Button>
+                <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" aria-label={`Удалить зачёт №${item.id}`} title="Удалить" onClick={() => setDeleting(item)}><Trash2 /></Button>
               </div>
             </div>
           </Card>
@@ -150,7 +152,7 @@ export function EventManagement() {
             <DialogDescription>Выберите возрастную группу. Дисциплину backend возьмёт из соревнования.</DialogDescription>
           </DialogHeader>
           <form onSubmit={saveEvent} className="grid gap-4">
-            <div className="grid max-h-72 gap-2 overflow-y-auto pr-1">
+            <div className="grid max-h-72 gap-2 overflow-y-auto scroll-mask-y pr-1">
               <Button type="button" variant={editor?.ageGroupId === null ? "default" : "outline"} className="justify-start" onClick={() => setEditor((value) => value ? { ...value, ageGroupId: null } : value)}>Без возрастной группы</Button>
               {ageGroups.data?.map((group) => (
                 <Button key={group.id} type="button" variant={editor?.ageGroupId === group.id ? "default" : "outline"} className="justify-start" onClick={() => setEditor((value) => value ? { ...value, ageGroupId: group.id } : value)}>{group.name}</Button>

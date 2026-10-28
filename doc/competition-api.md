@@ -19,7 +19,7 @@ GET /api/v1/admin/competitions?status=draft
 Authorization: Bearer <access_token>
 ```
 
-Доступны статусы `draft`, `under_review`, `published`, `cancelled`. Получить одно своё соревнование можно через `GET /api/v1/admin/competitions/{id}`.
+Для списка допускается фильтр `status`: `draft`, `under_review`, `published`, `cancelled`. Получить одно своё соревнование можно через `GET /api/v1/admin/competitions/{id}`. Все административные маршруты этого раздела требуют access-токен и `competitions.update`; применяются проверки владельца.
 
 Переходы выполняются отдельными POST-ручками:
 
@@ -31,6 +31,8 @@ POST /api/v1/admin/competitions/{id}/return
 ```
 
 Переходы: `draft -> under_review`, `under_review -> published`, `under_review|published -> cancelled`, `under_review -> draft` (возврат на доработку). История доступна через `GET /api/v1/admin/competitions/{id}/history`.
+
+В текущем API нет перехода `published -> registration_open`, хотя создание заявки на соревнование требует именно `registration_open`. Публикация сама по себе не открывает регистрацию; это функциональное ограничение текущего backend.
 
 
 ## Маршруты и доступ
@@ -46,6 +48,29 @@ POST /api/v1/admin/competitions/{id}/return
 Публичные GET показывают соревнования в статусах `published`, `registration_open`, `registration_closed`, `ongoing`, `results_pending` и `completed`. Статусы `draft` и `under_review` через публичные маршруты недоступны. Поэтому каждое соревнование из календаря можно получить через `GET /competitions/{id}`.
 
 Для защищённых запросов нужен заголовок `Authorization: Bearer <access_token>`. Значение `created_by` backend всегда берёт из проверенного JWT-контекста; клиент не может его задать.
+
+## Публичный список и пагинация
+
+`GET /api/v1/competitions` принимает `limit` (по умолчанию 50, от 1 до 100), `offset` (по умолчанию 0, неотрицательный) и необязательный `with_meta`. Сортировка — по `start_at`, затем `id`. Неверные параметры, пустой `with_meta` и значения кроме `true` или `false` возвращают `400` с кодом `invalid_request`.
+
+Без `with_meta` или при `with_meta=false` сохраняется прежний формат:
+
+```json
+{"data": [{"id": 7, "name": "Кубок Оренбуржья", "status": "published"}]}
+```
+
+Объект соревнования показан сокращённо; фактические поля не меняются. При `with_meta=true`:
+
+```json
+{"data": {"items": [{"id": 7, "name": "Кубок Оренбуржья", "status": "published"}], "total": 31, "limit": 1, "offset": 0, "has_next": true}}
+```
+
+`total` — число всех соревнований с публичными статусами без учёта страницы; `has_next` равен `offset + len(items) < total`. Для пустой страницы `items` — `[]`, а `total` остаётся общим числом. Подсчёт выполняется только в режиме с метаданными. В условиях одновременного изменения соревнований список и подсчёт выполняются отдельными запросами и могут отражать разные моменты времени.
+
+```bash
+curl 'http://localhost:8080/api/v1/competitions?limit=20&offset=0'
+curl 'http://localhost:8080/api/v1/competitions?limit=20&offset=0&with_meta=true'
+```
 
 ## Публичный календарь
 
@@ -202,13 +227,7 @@ PATCH поддерживает настоящую частичную семан�
 - `competitions.create` — создание соревнования;
 - `competitions.update` — изменение черновика.
 
-Они намеренно не добавлены миграцией и не внесены в модуль авторизации. Минимальная отдельная задача для владельца RBAC:
-
-1. Добавить оба определения в `rbac.DefaultPermissions`.
-2. Запустить существующий `cmd/seed-rbac`: он вызовет `UpsertPermission` и назначит новые permissions системной роли `super_admin`.
-3. Для роли сотрудника федерации получить ID через `GetPermissionIDByCode` и назначить оба permission существующим `AssignRolePermission`. Если роль создаётся заново, её можно создать через Admin API с этими кодами в `permission_codes`.
-
-Миграция и изменение JWT/middleware для этого не нужны. После назначения текущий `HasPermission` начнёт разрешать маршруты по актуальным данным БД. Пока permissions отсутствуют или не назначены, авторизованный пользователь корректно получает `403`.
+Оба кода входят в `rbac.DefaultPermissions`. `cmd/seed-rbac` создаёт их и назначает системным ролям `admin` и `super_admin`. Другим ролям права назначаются через существующий RBAC. Если permission отсутствует у пользователя, middleware возвращает `403`.
 
 ## Примеры curl
 

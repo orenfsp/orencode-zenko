@@ -11,6 +11,9 @@ import (
 
 type repositoryStub struct {
 	items          []Competition
+	total          int64
+	countErr       error
+	countCalls     int
 	calendarItems  []Competition
 	item           Competition
 	created        Competition
@@ -27,6 +30,11 @@ type repositoryStub struct {
 	seenReferences CompetitionReferences
 	seenCreate     CreateCompetition
 	seenUpdate     UpdateCompetition
+}
+
+func (s *repositoryStub) CountPublic(context.Context) (int64, error) {
+	s.countCalls++
+	return s.total, s.countErr
 }
 
 func (s *repositoryStub) ListPublic(_ context.Context, limit, offset int32) ([]Competition, error) {

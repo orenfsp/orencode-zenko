@@ -34,7 +34,7 @@ function SelectValue(props: React.ComponentProps<typeof SelectPrimitive.Value>) 
 function SelectContent({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Content>) {
   return (
     <SelectPrimitive.Portal>
-      <SelectPrimitive.Content position="popper" className={cn("z-50 max-h-72 min-w-(--radix-select-trigger-width) overflow-y-auto rounded-xl border bg-popover p-1 text-popover-foreground shadow-md", className)} {...props} />
+      <SelectPrimitive.Content position="popper" className={cn("z-50 max-h-72 min-w-(--radix-select-trigger-width) overflow-y-auto scroll-mask-y rounded-xl border bg-popover p-1 text-popover-foreground shadow-md", className)} {...props} />
     </SelectPrimitive.Portal>
   );
 }

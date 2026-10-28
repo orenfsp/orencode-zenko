@@ -106,6 +106,7 @@ type CalendarFilter struct {
 
 type Repository interface {
 	ListPublic(ctx context.Context, limit, offset int32) ([]Competition, error)
+	CountPublic(ctx context.Context) (int64, error)
 	ListCalendar(ctx context.Context, filter CalendarFilter) ([]Competition, error)
 	GetPublic(ctx context.Context, id int64) (Competition, error)
 	ValidateReferences(ctx context.Context, references CompetitionReferences) error

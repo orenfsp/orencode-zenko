@@ -13,8 +13,10 @@ import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { Checkbox } from "@/shared/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
+import { WorkspaceToolbar } from "@/shared/ui/workspace-toolbar";
 
 interface Candidate {
   id: number;
@@ -36,6 +38,8 @@ export function TeamsView() {
   const [memberIds, setMemberIds] = useState<number[]>([]);
   const [coachIds, setCoachIds] = useState<number[]>([]);
   const [pending, setPending] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const canReadRegistry =
     identity?.permissions?.includes("registry.read") ?? false;
   const load = useCallback(async () => {
@@ -79,6 +83,7 @@ export function TeamsView() {
     !canReadRegistry && identity?.userId
       ? [...new Set([identity.userId, ...coachIds])]
       : coachIds;
+  const filteredTeams = (state.data?.teams ?? []).filter((team) => team.name.toLocaleLowerCase("ru").includes(search.trim().toLocaleLowerCase("ru")));
 
   function toggle(
     id: number,
@@ -105,6 +110,7 @@ export function TeamsView() {
         coach_ids: selectedCoachIds,
       });
       notify.success("Сборная создана");
+      setCreateOpen(false);
       setMemberIds([]);
       setCoachIds([]);
       event.currentTarget.reset();
@@ -120,8 +126,8 @@ export function TeamsView() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <Card className="mb-5 bg-white/75 p-5 shadow-none">
-        <form className="grid gap-4" onSubmit={(event) => void create(event)}>
+      <WorkspaceToolbar search={search} searchPlaceholder="Найти сборную" onSearchChange={setSearch} filterContent={<p className="text-sm text-muted-foreground">Фильтры для сборных появятся после добавления разрезов по дисциплине и сезону.</p>} createLabel="Создать сборную" onCreate={() => setCreateOpen(true)} />
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent className="max-h-[90vh] overflow-y-auto scroll-mask-y sm:max-w-2xl"><DialogHeader><DialogTitle>Новая сборная</DialogTitle><DialogDescription>Выберите спортсменов и тренеров, которые войдут в состав.</DialogDescription></DialogHeader><form className="grid gap-4" onSubmit={(event) => void create(event)}>
           <Input
             name="name"
             required
@@ -131,7 +137,7 @@ export function TeamsView() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="mb-2 font-medium">Спортсмены</p>
-              <div className="grid max-h-52 gap-2 overflow-y-auto">
+              <div className="grid max-h-52 gap-2 overflow-y-auto scroll-mask-y">
                 {state.data?.members.map((candidate) => (
                   <label
                     key={candidate.id}
@@ -150,7 +156,7 @@ export function TeamsView() {
             </div>
             <div>
               <p className="mb-2 font-medium">Тренеры</p>
-              <div className="grid max-h-52 gap-2 overflow-y-auto">
+              <div className="grid max-h-52 gap-2 overflow-y-auto scroll-mask-y">
                 {state.data?.coaches.map((candidate) => (
                   <label
                     key={candidate.id}
@@ -195,28 +201,27 @@ export function TeamsView() {
               Выберите хотя бы одного тренера.
             </p>
           ) : null}
-          <Button
-            className="w-fit"
+          <DialogFooter><Button
             disabled={
               pending || !state.data?.members.length || !selectedCoachIds.length
             }
           >
             {pending ? "Создание…" : "Создать сборную"}
-          </Button>
+          </Button></DialogFooter>
         </form>
-      </Card>
+      </DialogContent></Dialog>
       {state.loading ? <DataLoading rows={4} /> : null}
       {state.error ? (
         <DataError message={state.error} retry={state.reload} />
       ) : null}
-      {!state.loading && !state.error && !state.data?.teams.length ? (
+      {!state.loading && !state.error && !filteredTeams.length ? (
         <DataEmpty
           title="Сборных пока нет"
           description="Выберите спортсменов и тренеров выше, чтобы создать первую сборную."
         />
       ) : null}
       <div className="grid gap-3">
-        {state.data?.teams.map((team) => (
+        {filteredTeams.map((team) => (
           <Card key={team.id} className="bg-white/75 p-5 shadow-none">
             <p className="font-medium">{team.name}</p>
             <p className="mt-1 text-xs text-muted-foreground">

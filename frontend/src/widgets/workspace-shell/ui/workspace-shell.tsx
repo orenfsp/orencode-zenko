@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -78,6 +79,35 @@ import {
 import RibbonGlow from "@/widgets/auth-shell/ui/bg-effect";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cn } from "@/shared/lib/utils";
+import { ScrollMask } from "@/shared/ui/scroll-mask";
+
+const workspacePageTitles: Array<[string, string]> = [
+  ["/workspace/profile", "Профиль"],
+  ["/workspace/competitions/", "Соревнование"],
+  ["/workspace/competitions", "Соревнования"],
+  ["/workspace/applications", "Заявки"],
+  ["/workspace/deadlines", "Сроки"],
+  ["/workspace/coaches", "Тренеры и спортсмены"],
+  ["/workspace/results", "Результаты"],
+  ["/workspace/ranks", "Мой разряд"],
+  ["/workspace/documents", "Антидопинг"],
+  ["/workspace/teams", "Сборные команды"],
+  ["/workspace/judge-competitions", "Мои соревнования"],
+  ["/workspace/notifications", "Уведомления"],
+  ["/workspace/registry", "Реестр"],
+  ["/workspace/calendar-plans", "Календарные планы"],
+  ["/workspace/files", "Файлы"],
+  ["/workspace/rating", "Рейтинг спортсменов"],
+  ["/workspace/administration/rank-standards", "Нормативы разрядов"],
+  ["/workspace/administration/roles", "Роли и права"],
+  ["/workspace/administration/directories", "Справочники"],
+  ["/workspace/administration/reviews", "Проверки"],
+  ["/workspace/administration/audit", "Журнал аудита"],
+];
+
+function pageTitle(pathname: string) {
+  return workspacePageTitles.find(([path]) => pathname === path || pathname.startsWith(path))?.[1] ?? "Обзор";
+}
 
 interface NavigationItem {
   label: string;
@@ -333,9 +363,6 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
       href: "/workspace/calendar-plans",
     });
   }
-  if (permissions.has("competition_events.read")) {
-    administration.push({ label: "Зачёты", icon: ListTree, href: "/workspace/events" });
-  }
   if (permissions.has("files.read")) {
     administration.push({ label: "Файлы", icon: FileText, href: "/workspace/files" });
   }
@@ -359,7 +386,7 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
       "rank_applications.review",
     ].some((permission) => permissions.has(permission));
   if (canAdminister) {
-    if (permissions.has("roles.read") || permissions.has("roles.create") || permissions.has("roles.assign")) {
+    if (permissions.has("roles.read") || permissions.has("roles.create")) {
       administration.push({ label: "Роли и права", icon: ShieldCheck, href: "/workspace/administration/roles" });
     }
     if (permissions.has("municipalities.create") || permissions.has("rank_applications.review")) {
@@ -398,10 +425,19 @@ function NavigationSkeleton() {
 }
 
 function WorkspaceNavigation({ user }: { user: WorkspaceUser }) {
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
   const pathname = usePathname();
+  const activeItemRef = useRef<HTMLAnchorElement | null>(null);
 
   const navigation = workspaceNavigation(user);
+
+  useEffect(() => {
+    if (!isMobile || !openMobile || !activeItemRef.current) return;
+    const frame = requestAnimationFrame(() => {
+      activeItemRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isMobile, openMobile, pathname]);
 
   const isNavigationLoading = user.profileLoading;
 
@@ -422,7 +458,7 @@ function WorkspaceNavigation({ user }: { user: WorkspaceUser }) {
           <>
             <Icon />
 
-            <span className="transition-opacity duration-150 group-data-[collapsible=icon]:opacity-0">
+            <span className="text-[14px] leading-5 font-normal transition-opacity duration-150 group-data-[collapsible=icon]:opacity-0">
               {label}
             </span>
 
@@ -438,14 +474,14 @@ function WorkspaceNavigation({ user }: { user: WorkspaceUser }) {
               asChild
               isActive={isActive}
               tooltip={label}
-              className="h-10 data-[active=true]:bg-[#402fff] data-[active=true]:text-white data-[active=true]:hover:bg-[#402fff]/90"
+              className="h-10 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90"
               onClick={() => {
                 if (isMobile) {
                   setOpenMobile(false);
                 }
               }}
             >
-              <Link href={href}>{content}</Link>
+              <Link ref={isActive ? activeItemRef : undefined} href={href}>{content}</Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
               );
@@ -517,7 +553,7 @@ function DesktopUserMenu({ user }: { user: WorkspaceUser }) {
           asChild
           isActive={pathname === "/workspace/notifications"}
           tooltip="Уведомления"
-          className="h-10 data-[active=true]:bg-[#402fff] data-[active=true]:text-white data-[active=true]:hover:bg-[#402fff]/90"
+          className="h-10 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90"
         >
           <Link href="/workspace/notifications">
             <Bell />
@@ -595,6 +631,7 @@ function DesktopUserMenu({ user }: { user: WorkspaceUser }) {
 function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
   const { setOpenMobile } = useSidebar();
   const pathname = usePathname();
+  const mobileMenuButtonClass = "h-10 text-sm font-normal data-[active=true]:font-medium";
 
   return (
     <div className="flex flex-col gap-3">
@@ -603,11 +640,11 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
           <SidebarMenuButton
             asChild
             isActive={pathname === "/workspace/notifications"}
-            className="h-10 data-[active=true]:bg-[#f0eeff] data-[active=true]:text-[#402fff]"
+            className={`${mobileMenuButtonClass} data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90`}
           >
             <Link href="/workspace/notifications" onClick={() => setOpenMobile(false)}>
               <Bell />
-              <span>Уведомления</span>
+              <span className="text-[14px] leading-5 font-normal">Уведомления</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -618,9 +655,9 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
         <SidebarMenu className="gap-1">
           {user.profileLoading ? (
             <SidebarMenuItem>
-              <SidebarMenuButton disabled>
+              <SidebarMenuButton disabled className={mobileMenuButtonClass}>
                 <LoaderCircle className="animate-spin" />
-                <span>Загружаем роли…</span>
+                <span className="text-[14px] leading-5 font-normal">Загружаем роли…</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ) : user.profile?.roles.length ? (
@@ -636,7 +673,7 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
                       user.pendingRoleId !== null ||
                       (!isActive && !user.rolesCanBeReordered)
                     }
-                    className="h-10 data-[active=true]:bg-[#f0eeff] data-[active=true]:text-[#402fff]"
+                    className={`${mobileMenuButtonClass} data-[active=true]:bg-primary/10 data-[active=true]:text-primary`}
                     onClick={() => void user.switchRole(role)}
                   >
                     {isPending ? (
@@ -644,19 +681,19 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
                     ) : (
                       <RoleIcon role={role} />
                     )}
-                    <span className="flex-1">{role.name}</span>
+                    <span className="flex-1 text-[14px] leading-5 font-normal">{role.name}</span>
                     {isActive ? <Check /> : null}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );
             })
           ) : user.profileError ? (
-            <SidebarMenuItem><SidebarMenuButton onClick={() => user.retryProfile()}><ShieldCheck /><span>Повторить загрузку профиля</span></SidebarMenuButton></SidebarMenuItem>
+            <SidebarMenuItem><SidebarMenuButton className={mobileMenuButtonClass} onClick={() => user.retryProfile()}><ShieldCheck /><span className="text-[14px] leading-5 font-normal">Повторить загрузку профиля</span></SidebarMenuButton></SidebarMenuItem>
           ) : (
             <SidebarMenuItem>
-              <SidebarMenuButton disabled>
+              <SidebarMenuButton disabled className={mobileMenuButtonClass}>
                 <ShieldCheck />
-                <span>Роли пока не назначены</span>
+                <span className="text-[14px] leading-5 font-normal">Роли пока не назначены</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
@@ -666,14 +703,14 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
       <SidebarSeparator className="mx-0" />
       <Button
         variant="ghost"
-        className="h-10 w-full justify-start px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+        className="h-10 w-full justify-start px-2 text-sm font-normal text-destructive hover:bg-destructive/10 hover:text-destructive"
         onClick={() => {
           setOpenMobile(false);
           void user.signOut();
         }}
       >
         <LogOut />
-        Выйти
+        <span className="text-[14px] leading-5 font-normal">Выйти</span>
       </Button>
     </div>
   );
@@ -681,10 +718,10 @@ function MobileSidebarFooter({ user }: { user: WorkspaceUser }) {
 
 function MobileHeader({ user }: { user: WorkspaceUser }) {
   return (
-    <header className="grid h-[72px] shrink-0 grid-cols-[40px_1fr_40px] items-center px-4 md:hidden">
+    <header className="grid h-16 shrink-0 grid-cols-[40px_1fr_auto] items-center gap-2 px-4 md:hidden">
       <SidebarTrigger
         aria-label="Открыть меню"
-        className="size-10 rounded-full text-foreground hover:bg-white/70"
+        className="size-9 rounded-lg text-foreground hover:bg-muted"
       >
         <Menu className="size-6" />
       </SidebarTrigger>
@@ -692,31 +729,33 @@ function MobileHeader({ user }: { user: WorkspaceUser }) {
         href="/workspace"
         className="mx-auto h-7 gap-2.5 [&_img:first-child]:size-7 [&_img:last-child]:h-auto [&_img:last-child]:w-10"
       />
-      <Button
-        asChild
-        variant="ghost"
-        size="icon"
-        className="size-10 rounded-full p-0 hover:bg-white/70"
-      >
-        <Link href="/workspace/profile" aria-label="Открыть профиль">
-          <ProfileAvatar
-            name={user.displayName}
-            className="size-9 rounded-full border border-white/80"
-          />
-        </Link>
-      </Button>
+      <div className="flex items-center gap-1">
+        <Button
+          asChild
+          variant="ghost"
+          size="icon"
+          className="size-9 rounded-lg p-0 hover:bg-muted"
+        >
+          <Link href="/workspace/profile" aria-label="Открыть профиль">
+            <ProfileAvatar
+              name={user.displayName}
+              className="size-9 rounded-full border border-white/80"
+            />
+          </Link>
+        </Button>
+      </div>
     </header>
   );
 }
 
 export function WorkspaceShell({
   children,
-  title = "Обзор",
 }: {
   children?: ReactNode;
-  title?: string;
 }) {
   const user = useWorkspaceUser();
+  const pathname = usePathname();
+  const title = pageTitle(pathname);
 
   return (
     <main className="relative h-svh min-w-0 overflow-hidden bg-[#f2efff] md:min-w-[1200px]">
@@ -735,7 +774,7 @@ export function WorkspaceShell({
         >
           <Sidebar
             collapsible="icon"
-            className="border-0 max-md:shadow-none [&_[data-sidebar=sidebar]]:bg-white"
+            className="border-0 max-md:shadow-none [&_[data-sidebar=sidebar]]:border-r [&_[data-sidebar=sidebar]]:border-border [&_[data-sidebar=sidebar]]:bg-white"
           >
             <SidebarHeader className="hidden gap-2 px-5 py-2 md:flex">
               <div className="flex h-10 items-center">
@@ -762,19 +801,22 @@ export function WorkspaceShell({
 
           <SidebarInset className="h-svh min-w-0 bg-white/40 backdrop-blur-[20px]">
             <MobileHeader user={user} />
-            <header className="hidden h-16 shrink-0 items-center gap-3 px-3 md:flex">
+            <header className="hidden h-14 shrink-0 items-center gap-3 px-3 md:flex">
               <SidebarTrigger aria-label="Свернуть боковое меню" />
-              <h1 className="text-sm font-medium">{title}</h1>
+              <h1 className="text-sm font-semibold tracking-[-0.01em]">{title}</h1>
             </header>
-            <div className="px-4 pb-5 text-center md:hidden">
+            <div className="px-4 pb-2 text-center md:hidden">
               <h1 className="text-xl leading-7 font-medium tracking-[-0.01em]">
                 {title}
               </h1>
             </div>
+            <div data-workspace-toolbar-host className="shrink-0 px-4 md:px-6" />
             {children ? (
-              <section className="min-h-0 flex-1 overflow-y-auto p-4 pt-0 md:p-6 md:pt-0">
-                {children}
-              </section>
+              <div className="relative min-h-0 flex-1">
+                <ScrollMask className="h-full p-4 pb-7 pt-4 md:px-6 md:pb-9 md:pt-5" fade={32}>
+                  {children}
+                </ScrollMask>
+              </div>
             ) : null}
           </SidebarInset>
         </SidebarProvider>

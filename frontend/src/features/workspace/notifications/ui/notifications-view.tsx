@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Bell, Check, LoaderCircle } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Check, LoaderCircle } from "lucide-react";
 
 import { notificationApi } from "@/entities/notification";
 import { formatDate } from "@/features/workspace/common";
@@ -10,12 +10,17 @@ import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
+import { WorkspaceToolbar } from "@/shared/ui/workspace-toolbar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
 export function NotificationsView() {
   const notify = useNotifications();
   const [pendingId, setPendingId] = useState<number | null>(null);
   const load = useCallback(() => notificationApi.list({ limit: 100 }), []);
   const state = useAsyncData(load);
+  const [search, setSearch] = useState("");
+  const [readFilter, setReadFilter] = useState("all");
+  const items = useMemo(() => (state.data ?? []).filter((item) => `${item.title} ${item.message}`.toLocaleLowerCase("ru").includes(search.trim().toLocaleLowerCase("ru")) && (readFilter === "all" || (readFilter === "unread" ? !item.is_read : item.is_read))), [readFilter, search, state.data]);
 
   async function markRead(id: number) {
     setPendingId(id);
@@ -31,30 +36,41 @@ export function NotificationsView() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-6xl">
+      <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти уведомление" filterContent={<Select value={readFilter} onValueChange={setReadFilter}><SelectTrigger><SelectValue placeholder="Статус" /></SelectTrigger><SelectContent><SelectItem value="all">Все уведомления</SelectItem><SelectItem value="unread">Непрочитанные</SelectItem><SelectItem value="read">Прочитанные</SelectItem></SelectContent></Select>} />
       {state.loading ? <DataLoading rows={5} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
-      {!state.loading && !state.error && !state.data?.length ? <DataEmpty title="Уведомлений пока нет" /> : null}
+      {!state.loading && !state.error && !items.length ? <DataEmpty title="Уведомлений пока нет" /> : null}
       <div className="grid gap-3">
-        {state.data?.map((item) => (
-          <Card key={item.id} className="bg-white/75 p-5 shadow-none">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eeebff] text-primary"><Bell className="size-5" /></span>
-                <div>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{item.message}</p>
-                  <p className="mt-2 text-xs text-muted-foreground">{formatDate(item.created_at, true)}</p>
-                </div>
+        {items.map((item) => {
+          const isGenericTitle = item.title.trim().toLocaleLowerCase("ru") === "уведомление";
+          const headingClass = item.is_read ? "font-medium text-foreground/55" : "font-medium text-foreground";
+
+          return (
+          <Card key={item.id} className="border-0 bg-white/75 p-4 shadow-none sm:p-5">
+            <div className="relative">
+              <div className="min-w-0 pr-8">
+                {!isGenericTitle ? <p className={headingClass}>{item.title}</p> : null}
+                <p className={isGenericTitle ? `${headingClass} leading-5` : "mt-1 text-sm leading-5 text-muted-foreground"}>{item.message}</p>
+                <p className="mt-2 text-xs text-muted-foreground">{formatDate(item.created_at, true)}</p>
               </div>
               {!item.is_read ? (
-                <Button variant="outline" size="sm" disabled={pendingId !== null} onClick={() => void markRead(item.id)}>
-                  {pendingId === item.id ? <LoaderCircle className="animate-spin" /> : <Check />}Прочитано
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Отметить уведомление как прочитанное"
+                  title="Отметить как прочитанное"
+                  disabled={pendingId !== null}
+                  onClick={() => void markRead(item.id)}
+                  className="absolute right-0 bottom-0 size-8 shrink-0 text-primary hover:bg-primary/10 hover:text-primary"
+                >
+                  {pendingId === item.id ? <LoaderCircle className="animate-spin" /> : <Check />}
                 </Button>
-              ) : <span className="text-xs text-muted-foreground">Прочитано</span>}
+              ) : <Check className="absolute right-1 bottom-1 size-4 text-primary" aria-label="Прочитано" />}
             </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

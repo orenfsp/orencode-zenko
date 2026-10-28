@@ -11,6 +11,21 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countPublicCompetitions = `-- name: CountPublicCompetitions :one
+SELECT count(*) FROM competition AS c
+JOIN discipline AS d ON d.id = c.discipline_id
+JOIN competition_type AS ct ON ct.id = c.competition_type_id
+JOIN competition_level AS cl ON cl.id = c.competition_level_id
+WHERE c.status = ANY($1::text[])
+`
+
+func (q *Queries) CountPublicCompetitions(ctx context.Context, pPublicStatuses []string) (int64, error) {
+	row := q.db.QueryRow(ctx, countPublicCompetitions, pPublicStatuses)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createCompetition = `-- name: CreateCompetition :one
 WITH created AS (
     INSERT INTO competition (

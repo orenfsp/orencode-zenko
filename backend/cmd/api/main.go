@@ -42,6 +42,7 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/orenfsp/orencode-zenko.git/internal/parentalconsent"
 )
 
 func main() {
@@ -323,6 +324,10 @@ func main() {
 	notificationRepo := notification.NewRepository(queries)
 	notificationHandler := notification.NewHandler(notificationRepo)
 
+		// --- Родительские согласия ---
+	parentalConsentRepo := parentalconsent.NewRepository(queries)
+	parentalConsentHandler := parentalconsent.NewHandler(parentalConsentRepo)
+
 	// HTTP routes.
 	mux := http.NewServeMux()
 
@@ -431,6 +436,10 @@ func main() {
 	mux.Handle("GET /api/v1/admin/report-deadlines", protected(deadline.PermissionManage, deadlineHandler.ListReports))
 	mux.Handle("POST /api/v1/admin/report-deadlines", protected(deadline.PermissionManage, deadlineHandler.CreateReport))
 	mux.Handle("PATCH /api/v1/admin/report-deadlines/{id}", protected(deadline.PermissionManage, deadlineHandler.UpdateReport))
+
+	// --- Родительские согласия ---
+	mux.Handle("GET /api/v1/admin/parental-consents", protected(rbac.PermissionRolesRead, parentalConsentHandler.List))
+	mux.Handle("PATCH /api/v1/admin/parental-consents/{id}", protected(rbac.PermissionRolesRead, parentalConsentHandler.UpdateStatus))
 
 	// Rankings.
 	mux.Handle("POST /api/v1/admin/rank", protected(rbac.PermissionRankApplicationsReview, rankHandler.CreateRank))
