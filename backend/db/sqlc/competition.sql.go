@@ -505,9 +505,12 @@ SELECT
     c.format,
     c.start_at,
     c.end_at,
+    c.registration_starts_at,
+    c.registration_ends_at,
     c.venue_address,
     c.online_url,
-    c.status
+    c.status,
+    c.regulation_url
 FROM competition AS c
 JOIN discipline AS d ON d.id = c.discipline_id
 JOIN competition_type AS ct ON ct.id = c.competition_type_id
@@ -550,9 +553,12 @@ type ListCalendarCompetitionsRow struct {
 	Format               string
 	StartAt              pgtype.Timestamptz
 	EndAt                pgtype.Timestamptz
+	RegistrationStartsAt pgtype.Timestamptz
+	RegistrationEndsAt   pgtype.Timestamptz
 	VenueAddress         pgtype.Text
 	OnlineUrl            pgtype.Text
 	Status               string
+	RegulationUrl        pgtype.Text
 }
 
 func (q *Queries) ListCalendarCompetitions(ctx context.Context, arg ListCalendarCompetitionsParams) ([]ListCalendarCompetitionsRow, error) {
@@ -585,9 +591,12 @@ func (q *Queries) ListCalendarCompetitions(ctx context.Context, arg ListCalendar
 			&i.Format,
 			&i.StartAt,
 			&i.EndAt,
+			&i.RegistrationStartsAt,
+			&i.RegistrationEndsAt,
 			&i.VenueAddress,
 			&i.OnlineUrl,
 			&i.Status,
+			&i.RegulationUrl,
 		); err != nil {
 			return nil, err
 		}

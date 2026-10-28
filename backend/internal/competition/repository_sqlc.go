@@ -214,13 +214,24 @@ func fromListRow(row db.ListPublicCompetitionsRow) Competition {
 
 func fromCalendarRow(row db.ListCalendarCompetitionsRow) Competition {
 	return Competition{
-		ID: row.ID, Name: row.Name,
-		DisciplineID: row.DisciplineID, DisciplineName: row.DisciplineName,
-		CompetitionTypeID: row.CompetitionTypeID, CompetitionTypeName: row.CompetitionTypeName,
-		CompetitionLevelID: row.CompetitionLevelID, CompetitionLevelCode: textPointer(row.CompetitionLevelCode),
-		CompetitionLevelName: textPointer(row.CompetitionLevelName), Format: row.Format,
-		StartAt: row.StartAt.Time, EndAt: row.EndAt.Time,
-		VenueAddress: textPointer(row.VenueAddress), OnlineURL: textPointer(row.OnlineUrl), Status: row.Status,
+		ID: row.ID, 
+		Name: row.Name,
+		DisciplineID: row.DisciplineID, 
+		DisciplineName: row.DisciplineName,
+		CompetitionTypeID: row.CompetitionTypeID, 
+		CompetitionTypeName: row.CompetitionTypeName,
+		CompetitionLevelID: row.CompetitionLevelID, 
+		CompetitionLevelCode: textPointer(row.CompetitionLevelCode),
+		CompetitionLevelName: textPointer(row.CompetitionLevelName), 
+		Format: row.Format,
+		StartAt: row.StartAt.Time,
+		EndAt: row.EndAt.Time,
+		RegistrationStartsAt: row.RegistrationStartsAt.Time,
+        RegistrationEndsAt:   row.RegistrationEndsAt.Time,
+		VenueAddress: textPointer(row.VenueAddress), 
+		OnlineURL: textPointer(row.OnlineUrl),
+		RegulationURL: textPointer(row.RegulationUrl), 
+		Status: row.Status,
 	}
 }
 

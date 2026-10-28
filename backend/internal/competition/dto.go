@@ -113,8 +113,12 @@ type CalendarCompetitionDTO struct {
 	CompetitionType  ReferenceDTO        `json:"competition_type"`
 	CompetitionLevel CompetitionLevelDTO `json:"competition_level"`
 	Format           string              `json:"format"`
-	StartAt          time.Time           `json:"start_at"`
-	EndAt            time.Time           `json:"end_at"`
+	StartAt          time.Time             `json:"start_at"`
+    EndAt            time.Time             `json:"end_at"`
+
+	RegistrationStartsAt time.Time `json:"registration_starts_at"`
+    RegistrationEndsAt   time.Time `json:"registration_ends_at"`
+	RegulationURL *string `json:"regulation_url"`
 	VenueAddress     *string             `json:"venue_address"`
 	OnlineURL        *string             `json:"online_url"`
 	Status           string              `json:"status"`

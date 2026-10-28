@@ -467,9 +467,18 @@ func toCalendarResponse(item Competition) CalendarCompetitionDTO {
 		Discipline:      ReferenceDTO{ID: item.DisciplineID, Name: item.DisciplineName},
 		CompetitionType: ReferenceDTO{ID: item.CompetitionTypeID, Name: item.CompetitionTypeName},
 		CompetitionLevel: CompetitionLevelDTO{
-			ID: item.CompetitionLevelID, Code: item.CompetitionLevelCode, Name: item.CompetitionLevelName,
+			ID: item.CompetitionLevelID, 
+			Code: item.CompetitionLevelCode, 
+			Name: item.CompetitionLevelName,
 		},
-		Format: item.Format, StartAt: item.StartAt, EndAt: item.EndAt,
-		VenueAddress: item.VenueAddress, OnlineURL: item.OnlineURL, Status: item.Status,
+		Format: item.Format, 
+		StartAt: item.StartAt, 
+		EndAt: item.EndAt,
+		VenueAddress: item.VenueAddress,
+		OnlineURL: item.OnlineURL,
+		Status: item.Status,
+		RegistrationStartsAt: item.RegistrationStartsAt,
+        RegistrationEndsAt:   item.RegistrationEndsAt,
+        RegulationURL:         item.RegulationURL,
 	}
 }
