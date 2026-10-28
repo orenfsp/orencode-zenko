@@ -291,12 +291,21 @@ SET
     reviewed_at = now(),
     rejection_reason = $3,
     assigned_at = $4,
-    expires_at = $5,
+    expires_at = COALESCE(
+        $5,
+        CASE
+            WHEN $1 = 'approved' AND rank.ttl IS NOT NULL
+            THEN (COALESCE($4, CURRENT_DATE) + make_interval(years => rank.ttl))::date
+            ELSE NULL
+        END
+    ),
     order_number = $6,
     updated_at = now()
-WHERE id = $7
-  AND status = 'pending'
-RETURNING id, athlete_user_id, rank_id, discipline_id, submitted_by_user_id, status, reviewed_by_user_id, reviewed_at, rejection_reason, created_at, updated_at, application_type, competition_id, result_id, assigned_at, expires_at, order_number
+FROM rank
+WHERE rank_application.id = $7
+  AND rank_application.rank_id = rank.id
+  AND rank_application.status = 'pending'
+RETURNING rank_application.id, rank_application.athlete_user_id, rank_application.rank_id, rank_application.discipline_id, rank_application.submitted_by_user_id, rank_application.status, rank_application.reviewed_by_user_id, rank_application.reviewed_at, rank_application.rejection_reason, rank_application.created_at, rank_application.updated_at, rank_application.application_type, rank_application.competition_id, rank_application.result_id, rank_application.assigned_at, rank_application.expires_at, rank_application.order_number
 `
 
 type ReviewRankApplicationParams struct {

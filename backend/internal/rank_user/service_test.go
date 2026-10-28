@@ -66,12 +66,12 @@ func TestCreateAllowsAthleteWithoutConfirmedCoach(t *testing.T) {
 	}
 }
 
-func TestCreateAllowsAthleteWithConfirmedCoach(t *testing.T) {
+func TestCreateRejectsAthleteWithConfirmedCoach(t *testing.T) {
 	service := NewService(&repositoryStub{hasCoach: true})
 
 	_, err := service.Create(context.Background(), 10, validCreateRequest())
-	if err != nil {
-		t.Fatalf("Create() error = %v", err)
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("error=%v, want ErrForbidden", err)
 	}
 }
 

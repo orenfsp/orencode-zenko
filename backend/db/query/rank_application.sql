@@ -77,12 +77,21 @@ SET
     reviewed_at = now(),
     rejection_reason = sqlc.narg(rejection_reason),
     assigned_at = sqlc.narg(assigned_at),
-    expires_at = sqlc.narg(expires_at),
+    expires_at = COALESCE(
+        sqlc.narg(expires_at),
+        CASE
+            WHEN sqlc.arg(status) = 'approved' AND rank.ttl IS NOT NULL
+            THEN (COALESCE(sqlc.narg(assigned_at), CURRENT_DATE) + make_interval(years => rank.ttl))::date
+            ELSE NULL
+        END
+    ),
     order_number = sqlc.narg(order_number),
     updated_at = now()
-WHERE id = sqlc.arg(id)
-  AND status = 'pending'
-RETURNING *;
+FROM rank
+WHERE rank_application.id = sqlc.arg(id)
+  AND rank_application.rank_id = rank.id
+  AND rank_application.status = 'pending'
+RETURNING rank_application.*;
 
 -- name: ListRankApplicationsByAthlete :many
 SELECT *

@@ -26,7 +26,15 @@ func (s *Service) Create(ctx context.Context, actorUserID int64, req CreateReque
 		return Response{}, ErrInvalidInput
 	}
 
-	if actorUserID != athleteUserID {
+	if actorUserID == athleteUserID {
+		hasCoach, err := s.repo.HasConfirmedCoach(ctx, athleteUserID, req.DisciplineID)
+		if err != nil {
+			return Response{}, err
+		}
+		if hasCoach {
+			return Response{}, ErrForbidden
+		}
+	} else {
 		isCoach, err := s.repo.IsConfirmedCoach(ctx, athleteUserID, actorUserID, req.DisciplineID)
 		if err != nil {
 			return Response{}, err
