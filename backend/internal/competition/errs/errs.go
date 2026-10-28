@@ -15,5 +15,6 @@ var (
 	ErrInvalidCalendarPeriod = errors.New("invalid calendar period")
 	ErrInvalidCalendarFilter = errors.New("invalid calendar filter")
 	ErrInvalidTransition     = errors.New("invalid competition status transition")
+	ErrInvalidAdminFilter    = errors.New("invalid administrative competition filter")
 	ErrNotOwner              = errors.New("competition is not owned by user")
 )

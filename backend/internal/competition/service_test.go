@@ -3,6 +3,7 @@ package competition
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,26 +11,29 @@ import (
 )
 
 type repositoryStub struct {
-	items          []Competition
-	total          int64
-	countErr       error
-	countCalls     int
-	calendarItems  []Competition
-	item           Competition
-	created        Competition
-	listErr        error
-	calendarErr    error
-	getErr         error
-	referenceErr   error
-	createErr      error
-	updateErr      error
-	seenLimit      int32
-	seenOffset     int32
-	seenCalendar   CalendarFilter
-	seenID         int64
-	seenReferences CompetitionReferences
-	seenCreate     CreateCompetition
-	seenUpdate     UpdateCompetition
+	items           []Competition
+	total           int64
+	countErr        error
+	countCalls      int
+	calendarItems   []Competition
+	item            Competition
+	created         Competition
+	listErr         error
+	calendarErr     error
+	getErr          error
+	referenceErr    error
+	createErr       error
+	updateErr       error
+	seenLimit       int32
+	seenOffset      int32
+	seenCalendar    CalendarFilter
+	seenID          int64
+	seenReferences  CompetitionReferences
+	seenCreate      CreateCompetition
+	seenUpdate      UpdateCompetition
+	adminItems      []Competition
+	seenAdminActor  int64
+	seenAdminStatus *string
 }
 
 func (s *repositoryStub) CountPublic(context.Context) (int64, error) {
@@ -71,6 +75,41 @@ func (s *repositoryStub) GetByID(_ context.Context, id int64) (Competition, erro
 func (s *repositoryStub) UpdateDraft(_ context.Context, input UpdateCompetition) (Competition, error) {
 	s.seenUpdate = input
 	return s.created, s.updateErr
+}
+
+func (s *repositoryStub) ListAdmin(_ context.Context, actorID int64, status *string) ([]Competition, error) {
+	s.seenAdminActor = actorID
+	s.seenAdminStatus = status
+	return s.adminItems, s.listErr
+}
+
+func TestServiceListsOwnAdminCompetitionsWithEveryLifecycleStatus(t *testing.T) {
+	for _, status := range []string{
+		"draft", "under_review", "published", "registration_open", "registration_closed",
+		"ongoing", "results_pending", "completed", "cancelled",
+	} {
+		t.Run(status, func(t *testing.T) {
+			item := testCompetition()
+			item.Status = status
+			repo := &repositoryStub{adminItems: []Competition{item}}
+			input := "  " + strings.ToUpper(status) + "  "
+			result, err := NewService(repo).ListAdmin(context.Background(), 42, &input)
+			if err != nil || len(result) != 1 {
+				t.Fatalf("ListAdmin() = %#v, %v", result, err)
+			}
+			if repo.seenAdminActor != 42 || repo.seenAdminStatus == nil || *repo.seenAdminStatus != status {
+				t.Fatalf("filter = actor:%d status:%v", repo.seenAdminActor, repo.seenAdminStatus)
+			}
+		})
+	}
+}
+
+func TestServiceAdminCompetitionListRejectsUnknownStatus(t *testing.T) {
+	status := "unknown"
+	_, err := NewService(&repositoryStub{}).ListAdmin(context.Background(), 42, &status)
+	if !errors.Is(err, competitionerrs.ErrInvalidAdminFilter) {
+		t.Fatalf("ListAdmin() error = %v", err)
+	}
 }
 
 func testCompetition() Competition {

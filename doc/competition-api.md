@@ -19,7 +19,7 @@ GET /api/v1/admin/competitions?status=draft
 Authorization: Bearer <access_token>
 ```
 
-Для списка допускается фильтр `status`: `draft`, `under_review`, `published`, `cancelled`. Получить одно своё соревнование можно через `GET /api/v1/admin/competitions/{id}`. Все административные маршруты этого раздела требуют access-токен и `competitions.update`; применяются проверки владельца.
+Без фильтра ручка возвращает все соревнования текущего администратора, включая скрытые из публичного списка. Фильтр `status` принимает: `draft`, `under_review`, `published`, `registration_open`, `registration_closed`, `ongoing`, `results_pending`, `completed`, `cancelled`. Получить одно своё соревнование можно через `GET /api/v1/admin/competitions/{id}`. Все административные маршруты этого раздела требуют access-токен и `competitions.update`; применяются проверки владельца.
 
 Переходы выполняются отдельными POST-ручками:
 

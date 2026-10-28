@@ -14,6 +14,12 @@ const (
 	MaxLimit     int32 = 100
 )
 
+var adminCompetitionStatuses = map[string]struct{}{
+	"draft": {}, "under_review": {}, "published": {},
+	"registration_open": {}, "registration_closed": {}, "ongoing": {},
+	"results_pending": {}, "completed": {}, "cancelled": {},
+}
+
 type Service struct {
 	repo Repository
 }
@@ -182,10 +188,11 @@ func (s *Service) ListAdmin(ctx context.Context, actorID int64, status *string) 
 		return nil, competitionerrs.ErrForbidden
 	}
 	if status != nil {
-		allowed := map[string]bool{"draft": true, "under_review": true, "published": true, "cancelled": true}
-		if !allowed[*status] {
-			return nil, competitionerrs.ErrInvalidTransition
+		normalized := strings.ToLower(strings.TrimSpace(*status))
+		if _, allowed := adminCompetitionStatuses[normalized]; !allowed {
+			return nil, competitionerrs.ErrInvalidAdminFilter
 		}
+		status = &normalized
 	}
 	items, err := repo.ListAdmin(ctx, actorID, status)
 	if err != nil {
@@ -480,18 +487,18 @@ func toCalendarResponse(item Competition) CalendarCompetitionDTO {
 		Discipline:      ReferenceDTO{ID: item.DisciplineID, Name: item.DisciplineName},
 		CompetitionType: ReferenceDTO{ID: item.CompetitionTypeID, Name: item.CompetitionTypeName},
 		CompetitionLevel: CompetitionLevelDTO{
-			ID: item.CompetitionLevelID, 
-			Code: item.CompetitionLevelCode, 
+			ID:   item.CompetitionLevelID,
+			Code: item.CompetitionLevelCode,
 			Name: item.CompetitionLevelName,
 		},
-		Format: item.Format, 
-		StartAt: item.StartAt, 
-		EndAt: item.EndAt,
-		VenueAddress: item.VenueAddress,
-		OnlineURL: item.OnlineURL,
-		Status: item.Status,
+		Format:               item.Format,
+		StartAt:              item.StartAt,
+		EndAt:                item.EndAt,
+		VenueAddress:         item.VenueAddress,
+		OnlineURL:            item.OnlineURL,
+		Status:               item.Status,
 		RegistrationStartsAt: item.RegistrationStartsAt,
-        RegistrationEndsAt:   item.RegistrationEndsAt,
-        RegulationURL:         item.RegulationURL,
+		RegistrationEndsAt:   item.RegistrationEndsAt,
+		RegulationURL:        item.RegulationURL,
 	}
 }

@@ -317,6 +317,8 @@ func handleServiceError(w http.ResponseWriter, err error) {
 		httpx.WriteError(w, http.StatusConflict, "invalid_competition_status", "редактировать можно только черновик соревнования")
 	case errors.Is(err, competitionerrs.ErrInvalidTransition):
 		httpx.WriteError(w, http.StatusConflict, "invalid_competition_status", "недопустимый переход статуса соревнования")
+	case errors.Is(err, competitionerrs.ErrInvalidAdminFilter):
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_filter", "некорректный фильтр статуса соревнования")
 	case errors.Is(err, competitionerrs.ErrNotOwner):
 		writeError(w, http.StatusForbidden, "соревнование принадлежит другому администратору")
 	case errors.Is(err, competitionerrs.ErrForbidden):

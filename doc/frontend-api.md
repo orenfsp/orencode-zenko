@@ -1064,3 +1064,16 @@ Every competition Event now has a required `name` field. Send it when creating a
 ```
 
 It can be changed through the existing Event `PATCH` endpoint. The generated protocol displays this name instead of `Мероприятие №{id}`.
+## Administrative competition list
+
+```http
+GET /api/v1/admin/competitions
+GET /api/v1/admin/competitions?status=draft
+GET /api/v1/admin/competitions?status=under_review
+GET /api/v1/admin/competitions?status=completed
+GET /api/v1/admin/competitions?status=cancelled
+Authorization: Bearer <access_token>
+```
+
+Without `status`, the endpoint returns every competition created by the current administrator. Supported statuses are `draft`, `under_review`, `published`, `registration_open`, `registration_closed`, `ongoing`, `results_pending`, `completed` and `cancelled`. The endpoint requires `competitions.update` and never returns another administrator's competitions.
+
