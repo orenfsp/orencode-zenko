@@ -8,7 +8,23 @@ export type PermissionCode =
   | "calendar_plans.create"
   | "calendar_plans.update"
   | "competitions.create"
-  | "competitions.update";
+  | "competitions.update"
+  | "competition_events.create"
+  | "competition_events.update"
+  | "competition_events.delete"
+  | "competition_events.read"
+  | "competition_judges.manage"
+  | "competition_results.read"
+  | "competition_results.manage"
+  | "competition_results.approve"
+  | "municipalities.read"
+  | "municipalities.create"
+  | "anti_doping.review"
+  | "dashboard.read"
+  | "registry.read"
+  | "judge_categories.review"
+  | "rank_applications.review"
+  | "deadlines.manage";
 
 export interface Permission {
   id: number;

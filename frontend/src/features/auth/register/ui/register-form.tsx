@@ -281,8 +281,8 @@ export function RegisterForm() {
         Далее
       </Button>
 
-      <OAuthSeparator />
-      <VkButton />
+      {/* <OAuthSeparator />
+      <VkButton /> */}
 
       <p className="text-center text-sm leading-5 text-muted-foreground">
         Есть аккаунт?{" "}

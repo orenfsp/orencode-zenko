@@ -1,171 +1,848 @@
+"use client";
+
+import * as React from "react";
+import Image from "next/image";
+import Link from "next/link";
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  X,
+  CalendarDays,
+  MapPin,
+} from "lucide-react";
+
 import { BrandLogo } from "@/shared/ui/brand-logo";
 import { Button } from "@/shared/ui/button";
 import RibbonGlowDark from "@/widgets/auth-shell/ui/bg-effect-dark";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
+import { cn } from "@/shared/lib/utils";
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetClose,
+} from "@/shared/ui/sheet";
+
+// Демонстрационные данные.
+// Позже их можно заменить ответами API.
+const news = [
+  {
+    id: 1,
+    date: "09 октября 2026",
+    title:
+      "Пять лет Федерации спортивного программирования: Москва принимает финал Кубка 2026",
+    image: "/assets/new_1.png",
+    category: "Новость",
+  },
+  {
+    id: 2,
+    date: "29 июля 2026",
+    title: "Федерация спортивного программирования представила технологические разработки на заседании комиссии Госсовета",
+    image: "/assets/new_2.png",
+    category: "Новость",
+  },
+  {
+    id: 3,
+    date: "20 сентября 2026",
+    title: "Пять лет Федерации спортивного программирования: в Москве подвели итоги Кубка ФСП 2026",
+    image: "/assets/new_3.png",
+    category: "Новость",
+  },
+  {
+    id: 4,
+    date: "09 сентября 2026",
+    title: "Завершился первый Кубок Дальнего Востока по спортивному программированию",
+    image: "/assets/new_4.png",
+    category: "Новость",
+  },
+];
+
+const categories = [
+  { id: "all", label: "Все" },
+  { id: "product", label: "Продуктовое" },
+  { id: "algorithm", label: "Алгоритмы" },
+  { id: "security", label: "Информационная безопасность" },
+  { id: "robotics", label: "Робототехника" },
+  { id: "bas", label: "БАС" },
+] as const;
+
+type Category = (typeof categories)[number]["id"];
+
+const competitions: {
+  id: number;
+  title: string;
+  category: Exclude<Category, "all">;
+  discipline: string;
+  date: string;
+  location: string;
+  format: string;
+}[] = [
+  {
+    id: 1,
+    title: "Открытый чемпионат по алгоритмическому программированию",
+    category: "algorithm",
+    discipline: "Алгоритмическое программирование",
+    date: "10–12 ноября",
+    location: "Оренбург",
+    format: "Очно",
+  },
+  {
+    id: 2,
+    title: "Региональный турнир по продуктовому программированию",
+    category: "product",
+    discipline: "Продуктовое программирование",
+    date: "16–18 ноября",
+    location: "Онлайн",
+    format: "Дистанционно",
+  },
+  {
+    id: 3,
+    title: "Первенство по информационной безопасности",
+    category: "security",
+    discipline: "Информационная безопасность",
+    date: "21–22 ноября",
+    location: "Москва",
+    format: "Очно",
+  },
+  {
+    id: 4,
+    title: "Кубок по программированию робототехники",
+    category: "robotics",
+    discipline: "Программирование робототехники",
+    date: "28–29 ноября",
+    location: "Казань",
+    format: "Очно",
+  },
+  {
+    id: 5,
+    title: "Соревнования по программированию беспилотных систем",
+    category: "bas",
+    discipline: "Программирование БАС",
+    date: "04–05 декабря",
+    location: "Онлайн",
+    format: "Дистанционно",
+  },
+];
+
+function SectionHeading({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <h2
+      className={cn(
+        "font-mono text-[36px] font-light leading-[0.98] tracking-[-0.045em]",
+        "sm:text-[48px] lg:text-[64px] xl:text-[76px]",
+        className,
+      )}
+    >
+      {children}
+    </h2>
+  );
+}
+
+function HomeHeader() {
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [headerVisible, setHeaderVisible] = React.useState(true);
+  const [isScrolled, setIsScrolled] = React.useState(false);
+
+  const lastScrollY = React.useRef(0);
+  const scrollDirectionDistance = React.useRef(0);
+
+  React.useEffect(() => {
+    lastScrollY.current = window.scrollY;
+
+    const handleScroll = () => {
+      const currentScrollY = Math.max(0, window.scrollY);
+      const difference = currentScrollY - lastScrollY.current;
+
+      setIsScrolled(currentScrollY > 40);
+
+      // В самом верху хедер всегда отображается
+      if (currentScrollY <= 80) {
+        setHeaderVisible(true);
+        scrollDirectionDistance.current = 0;
+      } else if (!menuOpen) {
+        // Игнорируем слишком маленькие движения
+        if (Math.abs(difference) < 1) {
+          lastScrollY.current = currentScrollY;
+          return;
+        }
+
+        // Сброс накопления при смене направления
+        if (
+          Math.sign(difference) !== Math.sign(scrollDirectionDistance.current)
+        ) {
+          scrollDirectionDistance.current = 0;
+        }
+
+        scrollDirectionDistance.current += difference;
+
+        // Скролл вниз — прячем хедер
+        if (scrollDirectionDistance.current > 8) {
+          setHeaderVisible(false);
+          scrollDirectionDistance.current = 0;
+        }
+
+        // Скролл вверх — показываем хедер
+        if (scrollDirectionDistance.current < -8) {
+          setHeaderVisible(true);
+          scrollDirectionDistance.current = 0;
+        }
+      }
+
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [menuOpen]);
+
+  return (
+    <header
+      className={cn(
+        "fixed inset-x-0 top-0 z-50",
+        "transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "will-change-transform",
+        isScrolled ? "bg-[#111217]/85 backdrop-blur-xl" : "bg-transparent",
+      )}
+      style={{
+        transform:
+          headerVisible || menuOpen
+            ? "translate3d(0,0,0)"
+            : "translate3d(0,-100%,0)",
+      }}
+    >
+      <div className="relative mx-auto grid w-full max-w-[1800px] grid-cols-[1fr_auto] items-center px-5 py-4 sm:px-8 lg:grid-cols-[1fr_auto_1fr] lg:px-10">
+        {/* Логотип */}
+        <BrandLogo
+          theme="light"
+          href="/"
+          aria-label="На главную"
+          className="relative z-10 w-fit"
+        />
+
+        {/* Навигация на десктопе */}
+        <nav
+          aria-label="Основная навигация"
+          className="hidden items-center justify-center gap-8 text-sm text-white/80 lg:flex"
+        >
+          <a href="#news" className="transition-colors hover:text-white">
+            Новости
+          </a>
+          <a
+            href="#competitions"
+            className="transition-colors hover:text-white"
+          >
+            Соревнования
+          </a>
+          <a href="#contacts" className="transition-colors hover:text-white">
+            Контакты
+          </a>
+        </nav>
+
+        {/* Авторизация на десктопе */}
+        <div className="hidden justify-self-end lg:block">
+          <Button asChild variant="secondary" className="rounded-xl">
+            <Link href="/login">
+              Личный кабинет
+              <ArrowRight className="ml-2 size-4" />
+            </Link>
+          </Button>
+        </div>
+
+        {/* Мобильное боковое меню */}
+        <div className="justify-self-end lg:hidden">
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+            <SheetTrigger asChild>
+              <button
+                type="button"
+                aria-label="Открыть меню"
+                className={cn(
+                  "flex size-10 items-center justify-center",
+                  "rounded-xl bg-transparent text-white",
+                  "border-0 outline-none",
+                  "transition-colors hover:bg-white/10",
+                  "focus-visible:ring-0 focus-visible:outline-none",
+                )}
+              >
+                <Menu className="size-6" />
+              </button>
+            </SheetTrigger>
+
+            <SheetContent
+              side="right"
+              className="flex h-dvh w-[min(280px,100vw)] flex-col gap-0 border-l-0 bg-[#1B1C21] p-0 text-white sm:max-w-[400px] [&>button]:text-white [&>button]:opacity-70"
+            >
+              <SheetHeader className=" px-6 pb-6 pt-8 text-left">
+                <SheetTitle className="font-mono text-2xl font-light text-white">
+                  Меню
+                </SheetTitle>
+              </SheetHeader>
+
+              {/* Ссылки на секции */}
+              <nav
+                aria-label="Мобильная навигация"
+                className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-6"
+              >
+                {[
+                  { label: "Новости", href: "#news" },
+                  { label: "Соревнования", href: "#competitions" },
+                  { label: "Контакты", href: "#contacts" },
+                ].map((item) => (
+                  <SheetClose asChild key={item.href}>
+                    <a
+                      href={item.href}
+                      className="flex min-h-14 items-center justify-between rounded-xl px-4 text-base transition-colors hover:bg-white/10"
+                    >
+                      {item.label}
+                      <ChevronRight className="size-5 text-white/40" />
+                    </a>
+                  </SheetClose>
+                ))}
+              </nav>
+
+              {/* Кнопка входа внизу */}
+              <div className=" px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-5">
+                <SheetClose asChild>
+                  <Button asChild size="lg" className="h-12 w-full rounded-xl">
+                    <Link href="/login">
+                      Личный кабинет
+                      <ArrowRight className="ml-2 size-4" />
+                    </Link>
+                  </Button>
+                </SheetClose>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function HeroSection() {
+  return (
+    <section className="relative flex min-h-[650px] h-[100svh] max-h-[1100px] items-center justify-center overflow-hidden bg-[#111217]">
+      <div className="pointer-events-none absolute inset-0">
+        <RibbonGlowDark />
+      </div>
+
+      <div className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-col items-center gap-7 px-5 pt-16 text-center text-white sm:gap-9 sm:px-8 lg:px-10">
+        <h1 className="max-w-[1200px] font-mono text-[clamp(38px,7.2vw,104px)] font-light leading-[0.98] tracking-[-0.055em]">
+          Выстраивайте путь
+          <br className="hidden sm:block" /> к новым достижениям
+        </h1>
+
+        <p className="max-w-[550px] text-sm font-light leading-relaxed text-white/60 sm:text-base lg:text-lg">
+          Соревнования, рейтинг и вся спортивная история всегда доступны
+          спортсмену и тренеру.
+        </p>
+
+        <div className="flex w-full max-w-[480px] flex-col gap-3 pt-2 sm:flex-row">
+          <Button
+            asChild
+            size="lg"
+            className="h-12 w-full rounded-xl sm:flex-1"
+          >
+            <a href="#competitions">
+              Ближайшие соревнования
+              <ArrowRight className="ml-2 size-4" />
+            </a>
+          </Button>
+
+          <Button
+            asChild
+            size="lg"
+            variant="outline"
+            className="h-12 w-full rounded-xl border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white sm:flex-1"
+          >
+            <Link href="/login">Войти в аккаунт</Link>
+          </Button>
+        </div>
+      </div>
+
+      <a
+        href="#news"
+        className="absolute bottom-16 left-1/2 z-10 hidden -translate-x-1/2 flex-col items-center gap-3 text-white/50 transition-colors hover:text-white sm:flex"
+      >
+        <span className="text-xs">Листайте вниз</span>
+        <div className="h-12 w-px bg-gradient-to-b from-white/50 to-transparent" />
+      </a>
+    </section>
+  );
+}
+
+function NewsSection() {
+  const AUTOPLAY_DELAY = 10_000;
+
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [progressKey, setProgressKey] = React.useState(0);
+
+  const activeIndexRef = React.useRef(0);
+  const programmaticScrollRef = React.useRef(false);
+  const programmaticScrollTimerRef = React.useRef<
+    ReturnType<typeof setTimeout> | undefined
+  >(undefined);
+
+  const resetProgress = React.useCallback(() => {
+    setProgressKey((value) => value + 1);
+  }, []);
+
+  // Переключение на указанную карточку
+  const scrollToCard = React.useCallback(
+    (index: number) => {
+      const container = scrollRef.current;
+      if (!container) return;
+
+      const cards = container.querySelectorAll<HTMLElement>("[data-news-card]");
+
+      const target = cards[index];
+      if (!target) return;
+
+      const scrollPadding =
+        Number.parseFloat(getComputedStyle(container).scrollPaddingLeft) || 0;
+
+      if (programmaticScrollTimerRef.current !== undefined) {
+        clearTimeout(programmaticScrollTimerRef.current);
+      }
+
+      programmaticScrollRef.current = true;
+
+      container.scrollTo({
+        left: target.offsetLeft - container.offsetLeft - scrollPadding,
+        behavior: "smooth",
+      });
+
+      activeIndexRef.current = index;
+      setActiveIndex(index);
+      resetProgress();
+
+      // Защита от сброса таймера во время плавной прокрутки
+      programmaticScrollTimerRef.current = setTimeout(() => {
+        programmaticScrollRef.current = false;
+      }, 700);
+    },
+    [resetProgress],
+  );
+
+  // Отслеживаем ручную прокрутку карточек
+  const updateActiveIndex = React.useCallback(() => {
+    if (programmaticScrollRef.current) return;
+
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const cards = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-news-card]"),
+    );
+
+    if (!cards.length) return;
+
+    const scrollPadding =
+      Number.parseFloat(getComputedStyle(container).scrollPaddingLeft) || 0;
+
+    const index = cards.reduce(
+      (closest, card, index) => {
+        const distance = Math.abs(
+          card.offsetLeft -
+            container.offsetLeft -
+            container.scrollLeft -
+            scrollPadding,
+        );
+
+        return distance < closest.distance ? { index, distance } : closest;
+      },
+      { index: 0, distance: Infinity },
+    ).index;
+
+    if (index !== activeIndexRef.current) {
+      activeIndexRef.current = index;
+      setActiveIndex(index);
+      resetProgress();
+    }
+  }, [resetProgress]);
+
+  // Автоматическая смена новости каждые 10 секунд
+  React.useEffect(() => {
+    if (news.length <= 1) return;
+
+    const timer = window.setTimeout(() => {
+      const nextIndex = (activeIndex + 1) % news.length;
+      scrollToCard(nextIndex);
+    }, AUTOPLAY_DELAY);
+
+    return () => window.clearTimeout(timer);
+  }, [activeIndex, progressKey, scrollToCard]);
+
+  // Очистка таймера прокрутки при размонтировании
+  React.useEffect(() => {
+    return () => {
+      if (programmaticScrollTimerRef.current !== undefined) {
+        clearTimeout(programmaticScrollTimerRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <section
+      id="news"
+      className="relative z-20 -mt-9 scroll-mt-8 rounded-t-[32px] bg-white py-16 text-[#1B1C21] sm:rounded-t-[40px] sm:py-20 lg:py-28"
+    >
+      <div className="mx-auto max-w-[1800px]">
+        {/* Заголовок */}
+        <div className="mb-8 flex items-end justify-between gap-5 px-5 sm:mb-12 sm:px-8 lg:px-10">
+          <SectionHeading>
+            Новости
+            <br /> и события
+          </SectionHeading>
+
+          <p className="hidden max-w-[280px] text-sm leading-relaxed text-black/50 md:block">
+            Следите за событиями, новостями и достижениями в спортивном
+            программировании.
+          </p>
+        </div>
+
+        {/* Горизонтальная карусель */}
+        <div
+          ref={scrollRef}
+          onScroll={updateActiveIndex}
+          className={cn(
+            "scrollbar-none flex snap-x snap-mandatory",
+            "gap-3 overflow-x-auto pb-2 sm:gap-5",
+            "pl-5 pr-5 sm:pl-8 sm:pr-8 lg:pl-10 lg:pr-10",
+            "scroll-pl-5 sm:scroll-pl-8 lg:scroll-pl-10",
+            "scroll-pr-5 sm:scroll-pr-8 lg:scroll-pr-10",
+          )}
+        >
+          {news.map((item) => (
+            <article
+              key={item.id}
+              data-news-card
+              className="group relative h-[390px] w-[85vw] max-w-[450px] shrink-0 snap-start overflow-hidden rounded-[20px] bg-[#1B1C21] sm:h-[460px] sm:w-[65vw] lg:h-[510px] lg:w-[calc((100%-20px)/2)] lg:max-w-none"
+            >
+              <Image
+                src={item.image}
+                alt=""
+                fill
+                sizes="(max-width: 640px) 85vw, (max-width: 1024px) 65vw, 50vw"
+                className="object-cover object-center opacity-80 transition-transform duration-700 group-hover:scale-105"
+              />
+
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
+
+              <div className="absolute inset-x-0 bottom-0 flex flex-col gap-4 p-5 text-white sm:p-7 lg:p-8">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-white/65 sm:text-sm">
+                  <span>{item.date}</span>
+                  <span className="size-1 rounded-full bg-white/50" />
+                  <span>{item.category}</span>
+                </div>
+
+                <h3 className="max-w-[600px] font-mono text-[23px] font-light leading-[1.08] tracking-tight sm:text-[28px] lg:text-[34px]">
+                  {item.title}
+                </h3>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        {/* Навигация и прогресс */}
+        <div className="mt-8 flex items-center justify-between px-5 sm:mt-10 sm:px-8 lg:px-10">
+          {/* Номер текущей новости */}
+          <span className="text-sm text-black/40">
+            {String(activeIndex + 1).padStart(2, "0")}
+            <span className="mx-2">/</span>
+            {String(news.length).padStart(2, "0")}
+          </span>
+
+          {/* Индикаторы прогресса */}
+          <div className="flex items-center gap-1.5">
+            {news.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-label={`Перейти к новости ${index + 1}`}
+                aria-current={index === activeIndex ? "true" : undefined}
+                onClick={() => scrollToCard(index)}
+                className={cn(
+                  "relative h-1.5 overflow-hidden rounded-full",
+                  "transition-[width] duration-300",
+                  index === activeIndex
+                    ? "w-12 bg-black/15"
+                    : "w-1.5 bg-black/20 hover:bg-black/40",
+                )}
+              >
+                {index === activeIndex && (
+                  <span
+                    key={`${index}-${progressKey}`}
+                    className="absolute inset-y-0 left-0 w-full origin-left rounded-full bg-[#1B1C21] animate-[news-progress_10s_linear_forwards]"
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Стрелки навигации */}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-full"
+              aria-label="Предыдущая новость"
+              disabled={activeIndex === 0}
+              onClick={() => scrollToCard(activeIndex - 1)}
+            >
+              <ChevronLeft className="size-5" />
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-full"
+              aria-label="Следующая новость"
+              disabled={activeIndex === news.length - 1}
+              onClick={() => scrollToCard(activeIndex + 1)}
+            >
+              <ChevronRight className="size-5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CompetitionCard({
+  competition,
+}: {
+  competition: (typeof competitions)[number];
+}) {
+  return (
+    <article className="flex min-h-[280px] flex-col justify-between gap-8 rounded-[20px] bg-[#111216] p-5 text-white sm:min-h-[310px] sm:p-7">
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 text-xs text-white/50 sm:text-sm">
+          <span className="max-w-[260px]">{competition.discipline}</span>
+          <span className="whitespace-nowrap">{competition.date}</span>
+        </div>
+
+        <h3 className="max-w-[540px] font-mono text-[24px] font-light leading-[1.05] tracking-tight sm:text-[28px] xl:text-[32px]">
+          {competition.title}
+        </h3>
+      </div>
+
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-white/45 sm:text-sm">
+          <span className="flex items-center gap-2">
+            <MapPin className="size-4" />
+            {competition.location}
+          </span>
+          <span className="flex items-center gap-2">
+            <CalendarDays className="size-4" />
+            {competition.format}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Button asChild className="w-full rounded-xl sm:w-auto">
+            <Link href="/login">
+              Войти для участия
+              <ArrowRight className="ml-2 size-4" />
+            </Link>
+          </Button>
+
+          <span className="text-xs text-white/40">
+            Личный кабинет участника
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CompetitionsSection() {
+  const [category, setCategory] = React.useState<Category>("all");
+
+  const filteredCompetitions = React.useMemo(
+    () =>
+      category === "all"
+        ? competitions
+        : competitions.filter(
+            (competition) => competition.category === category,
+          ),
+    [category],
+  );
+
+  return (
+    <section
+      id="competitions"
+      className="relative z-30 -mt-9 scroll-mt-8 rounded-t-[32px] bg-[#1B1C21] py-16 text-white sm:rounded-t-[40px] sm:py-20 lg:py-28"
+    >
+      <div className="mx-auto flex w-full max-w-[1800px] flex-col items-center">
+        <div className="px-5 text-center">
+          <SectionHeading>
+            Ближайшие
+            <br /> соревнования
+          </SectionHeading>
+          <p className="mx-auto mt-6 max-w-[480px] text-sm leading-relaxed text-white/50 sm:text-base">
+            Выберите дисциплину и найдите соревнование, в котором хотите принять
+            участие.
+          </p>
+        </div>
+
+        <div
+          className={cn(
+            "scrollbar-none mt-10 flex w-full snap-x gap-2",
+            "overflow-x-auto pb-3",
+            "pl-5 pr-5 sm:pl-8 sm:pr-8 lg:pl-10 lg:pr-10",
+            "scroll-pl-5 sm:scroll-pl-8 lg:scroll-pl-10",
+            "lg:justify-center",
+          )}
+        >
+          {categories.map((item) => (
+            <Button
+              key={item.id}
+              type="button"
+              variant={category === item.id ? "secondary" : "ghost"}
+              aria-pressed={category === item.id}
+              onClick={() => setCategory(item.id)}
+              className={cn(
+                "h-10 shrink-0 snap-start rounded-xl px-4",
+                category !== item.id &&
+                  "text-white/60 hover:bg-white/10 hover:text-white",
+              )}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </div>
+
+        <div className="mt-5 grid w-full grid-cols-1 gap-3 px-5 sm:mt-8 sm:grid-cols-2 sm:gap-5 sm:px-8 lg:px-10">
+          {filteredCompetitions.length > 0 ? (
+            filteredCompetitions.map((competition) => (
+              <CompetitionCard key={competition.id} competition={competition} />
+            ))
+          ) : (
+            <div className="col-span-full flex min-h-[250px] flex-col items-center justify-center gap-3 rounded-[20px] border border-white/10 text-center">
+              <CalendarDays className="size-9 text-white/30" />
+              <p className="text-lg">Пока нет соревнований</p>
+              <p className="text-sm text-white/40">
+                Попробуйте выбрать другую дисциплину.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <Button
+          asChild
+          size="lg"
+          className="mt-10 rounded-xl"
+          variant="secondary"
+        >
+          <Link href="/login">
+            Перейти в личный кабинет
+            <ArrowRight className="ml-2 size-4" />
+          </Link>
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer
+      id="contacts"
+      className="relative z-40 -mt-9 rounded-t-[32px] bg-black px-5 pb-8 pt-16 text-white sm:rounded-t-[40px] sm:px-8 sm:pt-20 lg:px-10 lg:pt-24"
+    >
+      <div className="mx-auto flex max-w-[1800px] flex-col gap-16">
+        <div className="flex flex-col justify-between gap-12 lg:flex-row lg:gap-16">
+          <div className="flex flex-col gap-6">
+            <Image
+              src="/assets/full_logo.svg"
+              alt="Федерация спортивного программирования"
+              width={397}
+              height={80}
+              className="h-auto w-full max-w-[270px] object-contain object-left sm:max-w-[397px]"
+            />
+
+            <p className="max-w-[350px] text-sm leading-relaxed text-white/40">
+              Цифровая платформа для участников, тренеров и организаторов
+              соревнований по спортивному программированию.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:gap-20">
+            <div className="flex flex-col items-start gap-3 text-sm">
+              <span className="mb-2 text-white/40">Контакты</span>
+              <a
+                href="mailto:info@fsp-russia.ru"
+                className="transition-opacity hover:opacity-60"
+              >
+                info@fsp-russia.ru
+              </a>
+              <a
+                href="tel:+74996780305"
+                className="transition-opacity hover:opacity-60"
+              >
+                +7 (499) 678-03-05
+              </a>
+              <span className="max-w-[260px] leading-relaxed text-white/70">
+                125047, г. Москва,
+                <br />
+                2-я Брестская, д. 8, этаж 9
+              </span>
+            </div>
+
+            <div className="flex flex-col items-start gap-3 text-sm">
+              <span className="mb-2 text-white/40">Пресс-служба</span>
+              <a
+                href="mailto:press@fsp-russia.ru"
+                className="transition-opacity hover:opacity-60"
+              >
+                press@fsp-russia.ru
+              </a>
+              <span className="mt-3 text-white/40">Социальные сети</span>
+              <span className="text-white/70">ВКонтакте</span>
+              <span className="text-white/70">Telegram</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col justify-between gap-5  pt-6 text-xs text-white/40 sm:flex-row sm:items-center">
+          <span>
+            © {new Date().getFullYear()} Федерация спортивного программирования
+          </span>
+
+          <div className="flex flex-wrap gap-x-6 gap-y-3">
+            <span>Политика конфиденциальности</span>
+            <span>Пользовательское соглашение</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col">
-      <header className="z-20 fixed top-0 left-0 w-dvw p-3">
-        <BrandLogo className="absolute left-10 top-10" />
-      </header>
-      <div className="h-[92dvh] relative">
-        <RibbonGlowDark />
-        <div className="absolute top-[50%] w-full -translate-y-[50%] text-white flex flex-col gap-10 items-center px-10 text-center">
-          <h1 className="font-mono text-[80px] leading-[1] font-[300]">
-            Выстраивайте путь <br /> к новым достижениям
-          </h1>
-          <p className="opacity-60 font-[300]">
-            Соревнования, рейтинг и вся спортивная история всегда доступны
-            спортсмену и тренеру.
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <Button asChild className="w-full rounded-xl" size="lg">
-              <Link href="/#!">Ближайшие соревнования</Link>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="w-full bg-transparent rounded-xl"
-              size="lg"
-            >
-              <Link href="/login">Войти в аккаунт</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-      <div className="z-20 w-full bg-white rounded-[40px] -mt-10 py-20 pb-30 flex flex-col gap-10">
-        <h2 className="font-mono text-[64px] leading-[1] font-[300] px-10 ">
-          Новости <br /> и события
-        </h2>
-        <div className="w-full flex gap-5 overflow-x-auto overflow-y-hidden px-10 scrollbar-none">
-          <div className="shrink-0 w-[calc((100%-20px)/2)] h-120 bg-primary rounded-[20px] overflow-hidden relative p-[2px]">
-            <img
-              src="/assets/phone-mockup.png"
-              className="h-full w-full object-cover"
-              alt=""
-            />
-            <div className="absolute bottom-0 left-0 bg-primary px-5 pt-5 pb-10 text-white flex flex-col gap-2">
-              <p className="opacity-60 font-[300]">09 сентября 2026</p>
-              <h3 className="font-mono text-[24px] leading-[1] font-[300]">
-                Завершился первый Кубок Дальнего Востока по спортивному
-                программированию
-              </h3>
-            </div>
-          </div>
-          <div className="shrink-0 w-[calc((100%-20px)/2)] h-120 bg-primary rounded-[20px] overflow-hidden relative p-[2px]">
-            <img
-              src="/assets/phone-mockup.png"
-              className="h-full w-full object-cover"
-              alt=""
-            />
-            <div className="absolute bottom-0 left-0 bg-primary px-5 pt-5 pb-10 text-white flex flex-col gap-2">
-              <p className="opacity-60 font-[300]">09 сентября 2026</p>
-              <h3 className="font-mono text-[24px] leading-[1] font-[300]">
-                Завершился первый Кубок Дальнего Востока по спортивному
-                программированию
-              </h3>
-            </div>
-          </div>
-          <div className="shrink-0 w-[calc((100%-20px)/2)] h-120 bg-primary rounded-[20px] overflow-hidden relative p-[2px]">
-            <img
-              src="/assets/phone-mockup.png"
-              className="h-full w-full object-cover"
-              alt=""
-            />
-            <div className="absolute bottom-0 left-0 bg-primary px-5 pt-5 pb-10 text-white flex flex-col gap-2">
-              <p className="opacity-60 font-[300]">09 сентября 2026</p>
-              <h3 className="font-mono text-[24px] leading-[1] font-[300]">
-                Завершился первый Кубок Дальнего Востока по спортивному
-                программированию
-              </h3>
-            </div>
-          </div>
-          <div className="shrink-0 w-[calc((100%-20px)/2)] h-120 bg-primary rounded-[20px] overflow-hidden relative p-[2px]">
-            <img
-              src="/assets/phone-mockup.png"
-              className="h-full w-full object-cover"
-              alt=""
-            />
-            <div className="absolute bottom-0 left-0 bg-primary px-5 pt-5 pb-10 text-white flex flex-col gap-2">
-              <p className="opacity-60 font-[300]">09 сентября 2026</p>
-              <h3 className="font-mono text-[24px] leading-[1] font-[300]">
-                Завершился первый Кубок Дальнего Востока по спортивному
-                программированию
-              </h3>
-            </div>
-          </div>
-        </div>
-        <div className="px-10 flex items-center gap-4 justify-center">
-          <Button variant="ghost" size="icon-xs">
-            <ChevronLeft className="size-5" />
-          </Button>
-          <div className="flex  gap-1">
-            <div className="h-1 w-1 bg-black opacity-20 rounded-full"></div>
-            <div className="h-1 w-12 bg-black opacity-20 rounded-full"></div>
-            <div className="h-1 w-1 bg-black opacity-20 rounded-full"></div>
-            <div className="h-1 w-1 bg-black opacity-20 rounded-full"></div>
-            <div className="h-1 w-1 bg-black opacity-20 rounded-full"></div>
-          </div>
-
-          <Button variant="ghost" size="icon-xs">
-            <ChevronRight className="size-5" />
-          </Button>
-        </div>
-      </div>
-      <div className="z-20 w-full bg-[#1B1C21] rounded-[40px] -mt-10 py-20 pb-30 flex flex-col items-center gap-10">
-        <h2 className="font-mono text-[64px] text-white leading-[1] font-[300] px-10 text-center">
-          Ближайшие <br /> соревнования
-        </h2>
-        <div className="flex gap-2">
-          <Button variant="secondary">Все</Button>
-          <Button
-            variant="ghost"
-            className="text-white hover:bg-white/20 hover:text-white"
-          >
-            Все
-          </Button>
-          <Button
-            variant="ghost"
-            className="text-white hover:bg-white/20 hover:text-white"
-          >
-            Продуктовое
-          </Button>
-          <Button
-            variant="ghost"
-            className="text-white hover:bg-white/20 hover:text-white"
-          >
-            Алгоритмы
-          </Button>
-          <Button
-            variant="ghost"
-            className="text-white hover:bg-white/20 hover:text-white"
-          >
-            Информационная безопасность
-          </Button>
-          <Button
-            variant="ghost"
-            className="text-white hover:bg-white/20 hover:text-white"
-          >
-            Робототехника
-          </Button>
-          <Button
-            variant="ghost"
-            className="text-white hover:bg-white/20 hover:text-white"
-          >
-            БАС
-          </Button>
-        </div>
-        <div className="grid grid-cols-2 gap-5 w-full px-10">
-          <div className=" bg-black text-white rounded-[20px] w-full">
-            <div className="flex w-full justify-between">
-              <span className="opacity-60">Алгоритмическое программирование</span>
-              <span className="opacity-40">10-12 Ноября</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <main className="min-h-svh w-full overflow-x-clip bg-black">
+      <HomeHeader />
+      <HeroSection />
+      <NewsSection />
+      <CompetitionsSection />
+      <Footer />
+    </main>
   );
 }

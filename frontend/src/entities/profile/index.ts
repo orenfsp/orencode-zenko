@@ -1,2 +1,2 @@
 export { profileApi } from "./api/profile";
-export type { UpdateProfilePayload, UpdateProfileResult } from "./model/types";
+export type { OwnProfile, ProfileJudgeCategory, ProfileRank, ProfileReference, ProfileRole, PublicProfile, UpdateProfilePayload, UpdateProfileResult } from "./model/types";

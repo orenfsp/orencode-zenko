@@ -4,7 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { accessTokenHasRole, login, storeTokens } from "@/entities/session";
+import {
+  accessTokenHasRole,
+  getAccessIdentity,
+  login,
+  sessionMetadataStorage,
+  storeTokens,
+} from "@/entities/session";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Button } from "@/shared/ui/button";
 import { FormField } from "@/shared/ui/form-field";
@@ -30,6 +36,13 @@ export function LoginForm() {
         String(data.get("password") ?? ""),
       );
       storeTokens(tokens);
+      const identity = getAccessIdentity(tokens.access_token);
+      const email = String(data.get("email") ?? "").trim();
+      sessionMetadataStorage.set({
+        displayName: email.split("@")[0] || "Пользователь",
+        email,
+        roleIds: identity?.roleId ? [identity.roleId] : [],
+      });
       notify.success("Вы вошли в аккаунт");
       router.push(
         accessTokenHasRole(tokens.access_token)
@@ -80,8 +93,8 @@ export function LoginForm() {
         {pending ? "Входим…" : "Войти"}
       </Button>
 
-      <OAuthSeparator />
-      <VkButton />
+      {/* <OAuthSeparator />
+      <VkButton /> */}
 
       <p className="text-center text-sm leading-5">
         Нет аккаунта?{" "}

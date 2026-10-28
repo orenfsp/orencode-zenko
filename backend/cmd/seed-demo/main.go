@@ -135,13 +135,17 @@ func main() {
 
 	// ========== 5. СУПЕР-АДМИНИСТРАТОР ==========
 
-	// Пользователь создается предыдущим сидом rbac-seed.
+	// Resolve the configured RBAC super administrator rather than assuming an email address.
 	var adminID int64
 	err = pool.QueryRow(ctx, `
-		SELECT id
-		FROM "user"
-		WHERE email = $1
-	`, "admin@local.test").Scan(&adminID)
+		SELECT u.id
+		FROM "user" AS u
+		JOIN role_user AS ru ON ru.user_id = u.id
+		JOIN "role" AS r ON r.id = ru.role_id
+		WHERE r.code = 'super_admin'
+		ORDER BY u.id
+		LIMIT 1
+	`).Scan(&adminID)
 	if err != nil {
 		log.Fatalf("find RBAC super administrator: %v", err)
 	}

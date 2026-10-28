@@ -54,3 +54,29 @@ export interface CreateCompetitionPayload {
 }
 
 export type UpdateCompetitionPayload = Partial<CreateCompetitionPayload>;
+
+export interface PaginationQuery {
+  limit?: number;
+  offset?: number;
+}
+
+export interface CompetitionCalendarQuery extends PaginationQuery {
+  from: string;
+  to: string;
+  discipline_id?: number;
+  level_id?: number;
+}
+
+export interface CalendarCompetition {
+  id: number;
+  name: string;
+  discipline: CompetitionReference;
+  competition_type: CompetitionReference;
+  competition_level: CompetitionLevelReference;
+  format: string;
+  start_at: string;
+  end_at: string;
+  venue_address: string | null;
+  online_url: string | null;
+  status: string;
+}
