@@ -95,6 +95,7 @@ type ApprovalResponse struct {
 }
 
 type HistoryItem struct {
+	ResultID        int64     `json:"result_id"`
 	CompetitionID   int64     `json:"competition_id"`
 	CompetitionName string    `json:"competition_name"`
 	EventID         int64     `json:"event_id"`

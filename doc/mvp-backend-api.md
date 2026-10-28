@@ -212,6 +212,33 @@ curl -G http://localhost:8080/api/v1/coach/participants \
 
 `POST /api/v1/rank-applications` требует access-токен. Спортсмен может подать заявку за себя; подтверждённый тренер — за своего подопечного по той же дисциплине.
 
+Для выбора основания спортсмен получает историю через `GET /api/v1/profile/competition-results` с access-токеном. Необязательный `discipline_id` ограничивает результаты выбранной дисциплиной на стороне БД; он должен быть положительным целым числом. Без фильтра возвращается вся собственная история, включая результаты, которые ещё не являются допустимым основанием.
+
+```json
+{
+  "data": [{
+    "result_id": 25,
+    "competition_id": 8,
+    "competition_name": "Первенство области",
+    "event_id": 12,
+    "discipline_id": 1,
+    "discipline_name": "Программирование алгоритмическое",
+    "start_at": "2026-10-27T09:00:00Z",
+    "place": 2,
+    "score": 5,
+    "result_status": "finished",
+    "protocol_url": "/api/v1/competitions/8/events/12/protocol"
+  }]
+}
+```
+
+`result_id` — ID записи `competition_result` конкретного спортсмена, в том числе для командного зачёта; `event_id` — ID зачёта. Передавайте `result_id`, `competition_id` и `discipline_id` из одной записи истории в заявку. `place`, `score`, `result_status` и `protocol_url` могут быть `null`. Пример получения:
+
+```bash
+curl 'http://localhost:8080/api/v1/profile/competition-results?discipline_id=1' \
+  -H "Authorization: Bearer $ATHLETE_TOKEN"
+```
+
 ```json
 {
   "athlete_user_id": 17,
@@ -223,7 +250,18 @@ curl -G http://localhost:8080/api/v1/coach/participants \
 }
 ```
 
-`athlete_user_id` можно не передавать при подаче за себя. Backend проверяет, что результат существует, имеет статус `finished`, относится к выбранным спортсмену, дисциплине и соревнованию. Норматив ЕВСК автоматически не оценивается: решение остаётся за федерацией.
+Например, подача за себя:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/rank-applications \
+  -H "Authorization: Bearer $ATHLETE_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"rank_id":3,"discipline_id":1,"application_type":"assignment","competition_id":8,"result_id":25}'
+```
+
+`athlete_user_id` можно не передавать при подаче за себя. Если по дисциплине у спортсмена есть подтверждённый тренер, заявку подаёт этот тренер. Backend проверяет принадлежность результата спортсмену, дисциплине и соревнованию, статус `finished`, одобренную заявку на соревнование и утверждённый зачёт с соответствующей записью результата. Наличие подходящего результата не гарантирует присвоение: при одобрении дополнительно проверяется норматив ЕВСК.
+
+История возвращает `401` без токена и `400` при неверном `discipline_id`. Создание заявки возвращает `400` при неверном или неподтверждённом основании, `403` при отсутствии прав и `409` при дубликате. При рассмотрении одобрение без выполненного норматива ЕВСК возвращает `422`.
 
 ### Просмотр
 

@@ -66,7 +66,13 @@ SELECT
     ) AS competition_matches,
     EXISTS (
         SELECT 1 FROM competition_result AS basis
+        JOIN competition_application AS ca ON ca.id = basis.application_id
+        JOIN competition_event_result_entry_application AS link ON link.application_id = ca.id
+        JOIN competition_event_result_entry AS entry ON entry.id = link.entry_id
+        JOIN competition_event_result_sheet AS sheet ON sheet.id = entry.sheet_id AND sheet.event_id = ca.event_id
         WHERE basis.id = sqlc.arg(result_id) AND basis.result_status = 'finished'
+          AND ca.status = 'approved' AND sheet.status = 'approved' AND sheet.approved_at IS NOT NULL
+          AND entry.result_status = basis.result_status AND entry.place IS NOT DISTINCT FROM basis.place
     ) AS result_finished;
 
 -- name: ValidateRankApplicationEVSK :one

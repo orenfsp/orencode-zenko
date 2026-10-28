@@ -285,4 +285,5 @@ JOIN competition_event ce ON ce.id = ca.event_id
 JOIN competition c ON c.id = ce.competition_id
 JOIN discipline d ON d.id = ce.discipline_id
 WHERE ca.athlete_user_id = sqlc.arg(p_user_id)
+  AND (sqlc.narg(p_discipline_id)::bigint IS NULL OR ce.discipline_id = sqlc.narg(p_discipline_id))
 ORDER BY c.start_at DESC, ce.id DESC, cr.id DESC;
