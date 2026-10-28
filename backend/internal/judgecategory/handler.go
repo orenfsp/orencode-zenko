@@ -115,6 +115,15 @@ func (h *Handler) ListAssignments(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, items)
 }
 
+func (h *Handler) ListCategories(w http.ResponseWriter, r *http.Request) {
+	items, err := h.service.ListCategories(r.Context())
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, items)
+}
+
 func authenticatedUserID(r *http.Request) (int64, bool) {
 	identity, ok := rbac.IdentityFromContext(r.Context())
 	return identity.UserID, ok && identity.UserID > 0

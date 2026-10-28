@@ -10,6 +10,7 @@ type Repository interface {
 	Review(ctx context.Context, reviewerUserID, applicationID int64, input ReviewInput) (Application, error)
 	GetCurrent(ctx context.Context, judgeUserID int64) (*CurrentCategory, error)
 	ListAssignments(ctx context.Context, judgeUserID int64) ([]Assignment, error)
+	ListCategories(ctx context.Context) ([]Category, error)
 }
 
 type RoleChecker interface {

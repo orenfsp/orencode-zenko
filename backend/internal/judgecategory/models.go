@@ -79,3 +79,7 @@ type ReviewInput struct {
 	OrderNumber     *string
 	RejectionReason *string
 }
+type Category struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}

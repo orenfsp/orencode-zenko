@@ -444,6 +444,7 @@ func main() {
 		rbacMiddleware.Authenticate(http.HandlerFunc(judgeHandler.ListByUser)))
 	mux.Handle("GET /api/v1/profile/assignments",
 		rbacMiddleware.Authenticate(http.HandlerFunc(judgeHandler.ListAssignments)))
+	mux.HandleFunc("GET /api/v1/judge-categories", judgeCategoryHandler.ListCategories)
 
 	address := ":" + cfg.HTTP.Port
 	handler := httpx.CORS(cfg.HTTP.CORSAllowedOrigins)(auditMiddleware.Wrap(mux))

@@ -119,6 +119,16 @@ func (s *Service) ListAssignments(ctx context.Context, userID int64) ([]Assignme
 	return items, nil
 }
 
+func (s *Service) ListCategories(ctx context.Context) ([]Category, error) {
+	items, err := s.repository.ListCategories(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if items == nil {
+		items = make([]Category, 0)
+	}
+	return items, nil
+}
 func parseDate(value string) (*time.Time, error) {
 	parsed, err := time.Parse("2006-01-02", value)
 	if err != nil {
