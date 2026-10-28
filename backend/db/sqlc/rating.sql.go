@@ -53,6 +53,7 @@ WITH scored AS (
       AND c.start_at < make_date($3::integer + 1, 1, 1)
       AND ($4::bigint IS NULL OR d.id = $4::bigint)
       AND ($5::bigint IS NULL OR u.municipality_id = $5::bigint)
+      AND ($6::bigint IS NULL OR ce.age_group_id = $6::bigint)
 ), totals AS (
     SELECT user_id, last_name, first_name, middle_name, municipality_name,
            SUM(points)::double precision AS total_points,
@@ -75,6 +76,7 @@ type ListAthleteRatingParams struct {
 	Year           int32
 	DisciplineID   pgtype.Int8
 	MunicipalityID pgtype.Int8
+	AgeGroupID     pgtype.Int8
 }
 
 type ListAthleteRatingRow struct {
@@ -96,6 +98,7 @@ func (q *Queries) ListAthleteRating(ctx context.Context, arg ListAthleteRatingPa
 		arg.Year,
 		arg.DisciplineID,
 		arg.MunicipalityID,
+		arg.AgeGroupID,
 	)
 	if err != nil {
 		return nil, err

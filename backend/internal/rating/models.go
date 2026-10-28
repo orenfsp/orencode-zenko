@@ -6,6 +6,7 @@ type Filter struct {
 	Year           int32
 	DisciplineID   *int64
 	MunicipalityID *int64
+	AgeGroupID     *int64
 	Limit          int32
 	Offset         int32
 }
