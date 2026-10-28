@@ -158,6 +158,25 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, response)
 }
 
+func (h *Handler) SaveManual(w http.ResponseWriter, r *http.Request) {
+	competitionID, eventID, err := resultPathIDs(r)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	var request SaveManualResultsRequest
+	if err := decodeStrictJSON(r, &request); err != nil {
+		writeMessage(w, http.StatusBadRequest, "некорректный JSON")
+		return
+	}
+	response, err := h.service.SaveManual(r.Context(), competitionID, eventID, request)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, response)
+}
+
 func (h *Handler) Calculate(w http.ResponseWriter, r *http.Request) {
 	competitionID, eventID, err := resultPathIDs(r)
 	if err != nil {
@@ -272,6 +291,10 @@ func handleError(w http.ResponseWriter, err error) {
 		writeMessage(w, http.StatusConflict, "изменение конфигурации удалит черновик; требуется confirm_reset")
 	case errors.Is(err, ErrUnsupportedDiscipline):
 		writeMessage(w, http.StatusUnprocessableEntity, "автоматический расчёт для этой дисциплины пока не поддерживается")
+	case errors.Is(err, ErrTemplateNotFound):
+		writeMessage(w, http.StatusNotFound, "шаблон результатов не найден")
+	case errors.Is(err, ErrTemplateInactive), errors.Is(err, ErrTemplateDiscipline), errors.Is(err, ErrWrongScoringMode):
+		writeMessage(w, http.StatusUnprocessableEntity, "шаблон или режим зачёта не подходит")
 	default:
 		if logger.Log != nil {
 			logger.Log.Error("competition result request failed", zap.Error(err))
