@@ -1,5 +1,5 @@
-import { api } from "@/shared/api/client";
-import type { DownloadedFile } from "../model/types";
+import { api, type ApiEnvelope } from "@/shared/api/client";
+import type { DownloadedFile, FileListQuery, UploadedFile } from "../model/types";
 
 function getFilename(disposition: string | null, fallback: string) {
   if (!disposition) return fallback;
@@ -11,6 +11,13 @@ function getFilename(disposition: string | null, fallback: string) {
 }
 
 export const fileApi = {
+  list: async (query: FileListQuery = {}) =>
+    (
+      await api.get<ApiEnvelope<UploadedFile[]>>("/api/v1/admin/files", {
+        permission: "files.read",
+        params: { ...query },
+      })
+    ).data,
   async download(fileId: number): Promise<DownloadedFile> {
     const response = await api.get<Response>(`/api/v1/files/${fileId}/download`, { responseType: "response" });
     const blob = await response.blob();

@@ -7,6 +7,7 @@ import { CircleCheck, CirclePlus } from "lucide";
 
 import { chooseRoles, readTokens, storeTokens } from "@/entities/session";
 import { rbacApi, type Role } from "@/entities/rbac";
+import { profileApi } from "@/entities/profile";
 import { useNotifications } from "@/shared/lib/notifications";
 import { BrandLogo } from "@/shared/ui/brand-logo";
 import { Button } from "@/shared/ui/button";
@@ -59,15 +60,23 @@ const roles: Array<{
 export function RoleSelection() {
   const router = useRouter();
   const notify = useNotifications();
-  const [selected, setSelected] = useState<RoleKey[]>(["participant"]);
+  const [selected, setSelected] = useState<RoleKey[]>([]);
   const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
     let active = true;
-    rbacApi.selfAssignableRoles()
-      .then((result) => { if (active) setAvailableRoles(result); })
+    Promise.all([rbacApi.selfAssignableRoles(), profileApi.me()])
+      .then(([result, profile]) => {
+        if (!active) return;
+        setAvailableRoles(result);
+        setSelected(
+          profile.roles
+            .map((role) => role.code)
+            .filter((code): code is RoleKey => roles.some((item) => item.key === code)),
+        );
+      })
       .catch((cause) => { if (active) notify.error(cause instanceof Error ? cause.message : "Не удалось загрузить роли"); })
       .finally(() => { if (active) setRolesLoading(false); });
       

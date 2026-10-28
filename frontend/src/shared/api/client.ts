@@ -104,6 +104,9 @@ export const api = {
   patch<T>(path: string, body?: unknown, options?: RequestOptions) {
     return request<T>(path, { method: "PATCH", body: body instanceof FormData ? body : JSON.stringify(body) }, options);
   },
+  put<T>(path: string, body?: unknown, options?: RequestOptions) {
+    return request<T>(path, { method: "PUT", body: body instanceof FormData ? body : JSON.stringify(body) }, options);
+  },
   delete<T>(path: string, options?: RequestOptions) {
     return request<T>(path, { method: "DELETE" }, options);
   },

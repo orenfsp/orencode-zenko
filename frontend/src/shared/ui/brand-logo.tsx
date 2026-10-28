@@ -1,9 +1,20 @@
+
 import Image from "next/image";
 import Link from "next/link";
 
 import { cn } from "@/shared/lib/utils";
 
-export function BrandLogo({ className, href = "/" }: { className?: string; href?: string; theme?: "light" | "dark" }) {
+interface BrandLogoProps {
+  className?: string;
+  href?: string;
+  theme?: "light" | "dark";
+}
+
+export function BrandLogo({
+  className,
+  href = "/",
+  theme = "dark",
+}: BrandLogoProps) {
   return (
     <Link
       href={href}
@@ -17,12 +28,18 @@ export function BrandLogo({ className, href = "/" }: { className?: string; href?
         height={24}
         priority
       />
+
       <Image
         src="/assets/fsp-wordmark.svg"
         alt="ФСП"
         width={36}
         height={16}
         priority
+        className={cn(
+          theme != "dark"
+            ? "brightness-0 invert"
+            : "brightness-0",
+        )}
       />
     </Link>
   );

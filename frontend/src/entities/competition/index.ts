@@ -1,2 +1,2 @@
 export { competitionApi } from "./api/competition";
-export type { Competition, CompetitionCalendarPlanReference, CompetitionLevelReference, CompetitionReference, CreateCompetitionPayload, UpdateCompetitionPayload } from "./model/types";
+export type { CalendarCompetition, Competition, CompetitionCalendarPlanReference, CompetitionCalendarQuery, CompetitionLevelReference, CompetitionReference, CreateCompetitionPayload, PaginationQuery, UpdateCompetitionPayload } from "./model/types";

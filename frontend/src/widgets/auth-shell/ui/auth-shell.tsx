@@ -11,45 +11,42 @@ export function AuthShell({
   contentClassName?: string;
 }) {
   return (
-    <main className="grid h-svh grid-cols-2 overflow-hidden bg-card">
-      <section className="relative flex h-svh min-h-0 items-center justify-center overflow-hidden px-10 py-16">
-        <BrandLogo className="absolute left-10 top-10" />
-        <section
-          className={cn("w-full max-w-80 translate-y-5", contentClassName)}
-        >
-          {children}
-        </section>
-      </section>
-      <aside
-        className="relative h-svh w-full overflow-hidden bg-[#d9d9d9]"
-        aria-hidden="true"
-      >
-        {/* <Image
-          src="/assets/register_cover.png"
+    <main className="grid h-svh grid-cols-1 min-[1016px]:grid-cols-2 overflow-hidden bg-card">
+  <section className="relative flex h-svh min-h-0 items-center justify-center overflow-hidden px-5 py-16 min-[1016px]:px-10">
+    <BrandLogo className="absolute left-5 top-10 min-[1016px]:left-10" />
+
+    <section
+      className={cn("w-full max-w-80 translate-y-5", contentClassName)}
+    >
+      {children}
+    </section>
+  </section>
+
+  <aside
+    className="relative hidden h-svh w-full overflow-hidden bg-[#d9d9d9] min-[1016px]:block"
+    aria-hidden="true"
+  >
+    <RibbonGlowDark />
+
+    <div className="absolute top-0 left-0 flex h-full w-full flex-col gap-5 p-5 text-white">
+      <span className="font-mono text-[64px] leading-[1] font-[300]">
+        Выстраивайте <br /> путь к новым <br /> достижениям
+      </span>
+
+      <span className="w-1/2 font-[300] opacity-60">
+        Соревнования, рейтинг и вся спортивная история всегда доступны
+        спортсмену и тренеру.
+      </span>
+
+      <div className="-mx-5 -mb-5 min-h-0 flex-1">
+        <img
+          src="/assets/phone-mockup.png"
           alt=""
-          fill
-          priority
-          sizes="50vw"
-          className="object-cover object-top"
-        /> */}
-        <RibbonGlowDark />
-        <div className="absolute top-0 left-0 w-full h-full p-5 text-white flex flex-col gap-5">
-          <span className="font-mono text-[64px] leading-[1] font-[300]">
-            Выстраивайте <br /> путь к новым <br /> достижениям
-          </span>
-          <span className="opacity-60 font-[300] w-1/2">
-            Соревнования, рейтинг и вся спортивная история всегда доступны
-            спортсмену и тренеру.
-          </span>
-          <div className="flex-1 min-h-0 -mx-5 -mb-5">
-            <img
-              src="/assets/phone-mockup.png"
-              alt=""
-              className="w-full h-full object-cover object-top"
-            />
-          </div>
-        </div>
-      </aside>
-    </main>
+          className="h-full w-full object-cover object-top"
+        />
+      </div>
+    </div>
+  </aside>
+</main>
   );
 }

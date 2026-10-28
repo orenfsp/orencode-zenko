@@ -10,3 +10,9 @@ export interface AuthIdentity {
   permissions: string[] | null;
   expiresAt: number;
 }
+
+export interface SessionMetadata {
+  displayName: string;
+  email: string;
+  roleIds: number[];
+}
