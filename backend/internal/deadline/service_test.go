@@ -47,6 +47,7 @@ func (r *repositoryStub) CreateReport(_ context.Context, actorID int64, name str
 func (r *repositoryStub) UpdateReport(_ context.Context, report Report) (Report, error) {
 	return report, nil
 }
+func (r *repositoryStub) CreateReportDeadlineReminders(context.Context, int32) error { return nil }
 
 type permissionStub struct{ allowed bool }
 

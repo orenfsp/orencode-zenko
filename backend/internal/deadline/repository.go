@@ -19,6 +19,7 @@ type Repository interface {
 	GetReport(ctx context.Context, id int64) (Report, error)
 	CreateReport(ctx context.Context, actorID int64, name string, dueAt time.Time, status string) (Report, error)
 	UpdateReport(ctx context.Context, report Report) (Report, error)
+	CreateReportDeadlineReminders(ctx context.Context, daysBefore int32) error
 }
 
 type PermissionChecker interface {

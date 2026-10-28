@@ -298,6 +298,13 @@ type ReportDeadline struct {
 	UpdatedAt       pgtype.Timestamptz
 }
 
+type ReportDeadlineReminder struct {
+	DeadlineID  int64
+	RecipientID int64
+	DaysBefore  int32
+	CreatedAt   pgtype.Timestamptz
+}
+
 type Role struct {
 	ID int64
 	// Спортсмен, тренер, судья, сотрудник федерации

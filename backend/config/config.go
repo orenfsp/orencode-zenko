@@ -16,6 +16,7 @@ type Config struct {
 	Device   DeviceConfig
 	Storage  StorageConfig
 	Rank     RankConfig
+	Deadline DeadlineConfig
 }
 
 type HTTPConfig struct {
@@ -44,6 +45,11 @@ type StorageConfig struct {
 
 type RankConfig struct {
 	CleanupInterval time.Duration // RANK_CLEANUP_INTERVAL, default 24h
+}
+
+type DeadlineConfig struct {
+	ReminderInterval time.Duration
+	ReminderDays     []int32
 }
 
 func Load() (*Config, error) {
@@ -111,6 +117,13 @@ func Load() (*Config, error) {
 			return nil, err
 		}
 	}
+	deadlineReminderInterval := time.Hour
+	if value := os.Getenv("DEADLINE_REMINDER_INTERVAL"); value != "" {
+		deadlineReminderInterval, err = time.ParseDuration(value)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	cfg := &Config{
 		Database: DatabaseConfig{
@@ -133,7 +146,8 @@ func Load() (*Config, error) {
 			CleanupRetention: storageCleanupRetention,
 			CleanupBatch:     storageCleanupBatch,
 		},
-		Rank: RankConfig{CleanupInterval: rankCleanupInterval},
+		Rank:     RankConfig{CleanupInterval: rankCleanupInterval},
+		Deadline: DeadlineConfig{ReminderInterval: deadlineReminderInterval, ReminderDays: []int32{7, 1}},
 	}
 	return cfg, nil
 }

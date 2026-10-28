@@ -102,3 +102,34 @@ UPDATE report_deadline
 SET name = sqlc.arg(name), due_at = sqlc.arg(due_at), status = sqlc.arg(status), updated_at = now()
 WHERE id = sqlc.arg(id)
 RETURNING id, name, due_at, status, created_by_user_id, created_at, updated_at;
+
+-- name: CreateReportDeadlineReminders :exec
+WITH candidates AS (
+    SELECT d.id AS deadline_id, u.id AS recipient_id, sqlc.arg(days_before)::integer AS days_before,
+           d.name, d.due_at, d.status
+    FROM report_deadline AS d
+    JOIN role_user AS ru ON ru.user_id IS NOT NULL
+    JOIN role_permission AS rp ON rp.role_id = ru.role_id
+    JOIN permission AS p ON p.id = rp.permission_id AND p.code = 'deadlines.manage'
+    JOIN "user" AS u ON u.id = ru.user_id AND u.access_status = true
+    WHERE d.status = 'planned'
+      AND d.due_at >= now() + make_interval(days => sqlc.arg(days_before)::integer)
+      AND d.due_at < now() + make_interval(days => sqlc.arg(days_before)::integer + 1)
+), claimed AS (
+    INSERT INTO report_deadline_reminder (deadline_id, recipient_id, days_before)
+    SELECT deadline_id, recipient_id, days_before
+    FROM candidates
+    ON CONFLICT (deadline_id, recipient_id, days_before) DO NOTHING
+    RETURNING deadline_id, recipient_id, days_before
+)
+INSERT INTO notification_outbox (recipient_id, payload)
+SELECT c.recipient_id,
+       jsonb_build_object(
+           'type', 'report_deadline_reminder',
+           'report_deadline_id', d.id,
+           'days_before', c.days_before,
+           'due_at', d.due_at,
+           'text', format('Отчётный срок «%s» наступает через %s дн.', d.name, c.days_before)
+       )
+FROM claimed AS c
+JOIN report_deadline AS d ON d.id = c.deadline_id;

@@ -634,6 +634,16 @@ Authorization: Bearer <access_token>
 
 ## Уведомления
 
+Изменения отчётных сроков также создают уведомления администраторам с permission `deadlines.manage`:
+
+- `report_deadline_created` — срок создан;
+- `report_deadline_updated` — изменены название, дата или статус.
+- `report_deadline_reminder` — до отчётного срока осталось 7 или 1 день.
+
+Напоминания создаются фоновым worker backend один раз в час (интервал можно изменить через `DEADLINE_REMINDER_INTERVAL`). Повторная отправка для одного срока, получателя и периода не выполняется.
+
+Уведомления доступны через `GET /api/v1/notifications`; прочитать их можно через `PATCH /api/v1/notifications/{id}/read`.
+
 Уведомления создаются PostgreSQL-триггерами в `notification_outbox` и доставляются одновременно в in-app список и Telegram-очередь.
 
 ```http

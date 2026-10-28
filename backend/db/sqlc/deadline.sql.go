@@ -44,6 +44,43 @@ func (q *Queries) CreateReportDeadline(ctx context.Context, arg CreateReportDead
 	return i, err
 }
 
+const createReportDeadlineReminders = `-- name: CreateReportDeadlineReminders :exec
+WITH candidates AS (
+    SELECT d.id AS deadline_id, u.id AS recipient_id, $1::integer AS days_before,
+           d.name, d.due_at, d.status
+    FROM report_deadline AS d
+    JOIN role_user AS ru ON ru.user_id IS NOT NULL
+    JOIN role_permission AS rp ON rp.role_id = ru.role_id
+    JOIN permission AS p ON p.id = rp.permission_id AND p.code = 'deadlines.manage'
+    JOIN "user" AS u ON u.id = ru.user_id AND u.access_status = true
+    WHERE d.status = 'planned'
+      AND d.due_at >= now() + make_interval(days => $1::integer)
+      AND d.due_at < now() + make_interval(days => $1::integer + 1)
+), claimed AS (
+    INSERT INTO report_deadline_reminder (deadline_id, recipient_id, days_before)
+    SELECT deadline_id, recipient_id, days_before
+    FROM candidates
+    ON CONFLICT (deadline_id, recipient_id, days_before) DO NOTHING
+    RETURNING deadline_id, recipient_id, days_before
+)
+INSERT INTO notification_outbox (recipient_id, payload)
+SELECT c.recipient_id,
+       jsonb_build_object(
+           'type', 'report_deadline_reminder',
+           'report_deadline_id', d.id,
+           'days_before', c.days_before,
+           'due_at', d.due_at,
+           'text', format('Отчётный срок «%s» наступает через %s дн.', d.name, c.days_before)
+       )
+FROM claimed AS c
+JOIN report_deadline AS d ON d.id = c.deadline_id
+`
+
+func (q *Queries) CreateReportDeadlineReminders(ctx context.Context, daysBefore int32) error {
+	_, err := q.db.Exec(ctx, createReportDeadlineReminders, daysBefore)
+	return err
+}
+
 const getReportDeadline = `-- name: GetReportDeadline :one
 SELECT id, name, due_at, status, created_by_user_id, created_at, updated_at
 FROM report_deadline

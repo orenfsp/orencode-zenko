@@ -163,6 +163,10 @@ func (r *sqlRepository) UpdateReport(ctx context.Context, report Report) (Report
 	return fromReport(row), nil
 }
 
+func (r *sqlRepository) CreateReportDeadlineReminders(ctx context.Context, daysBefore int32) error {
+	return r.queries.CreateReportDeadlineReminders(ctx, daysBefore)
+}
+
 func fromReport(row db.ReportDeadline) Report {
 	return Report{ID: row.ID, Name: row.Name, DueAt: row.DueAt.Time, Status: row.Status, CreatedByUserID: row.CreatedByUserID, CreatedAt: row.CreatedAt.Time, UpdatedAt: row.UpdatedAt.Time}
 }

@@ -201,6 +201,9 @@ func main() {
 	deadlineRepository := deadline.NewRepository(queries)
 	deadlineService := deadline.NewService(deadlineRepository, rbacRepository)
 	deadlineHandler := deadline.NewHandler(deadlineService)
+	deadlineCtx, cancelDeadline := context.WithCancel(context.Background())
+	defer cancelDeadline()
+	go deadline.RunReminderWorker(deadlineCtx, deadlineRepository, cfg.Deadline.ReminderInterval, cfg.Deadline.ReminderDays)
 
 	// Reference data.
 	referenceRepository := reference.NewRepository(queries)
