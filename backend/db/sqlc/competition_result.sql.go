@@ -283,7 +283,7 @@ func (q *Queries) ListApprovedResultApplications(ctx context.Context, pEventID i
 }
 
 const listAthleteResultHistory = `-- name: ListAthleteResultHistory :many
-SELECT c.id AS competition_id, c.name AS competition_name, ce.id AS event_id,
+SELECT cr.id AS result_id, c.id AS competition_id, c.name AS competition_name, ce.id AS event_id,
        d.id AS discipline_id, d.name AS discipline_name, c.start_at,
        cr.place, cr.score, cr.result_status, ce.protocol_url
 FROM competition_result cr
@@ -296,6 +296,7 @@ ORDER BY c.start_at DESC, ce.id DESC, cr.id DESC
 `
 
 type ListAthleteResultHistoryRow struct {
+	ResultID        int64
 	CompetitionID   int64
 	CompetitionName string
 	EventID         int64
@@ -318,6 +319,7 @@ func (q *Queries) ListAthleteResultHistory(ctx context.Context, pUserID int64) (
 	for rows.Next() {
 		var i ListAthleteResultHistoryRow
 		if err := rows.Scan(
+			&i.ResultID,
 			&i.CompetitionID,
 			&i.CompetitionName,
 			&i.EventID,
