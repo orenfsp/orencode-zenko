@@ -23,6 +23,34 @@ func authenticatedUserID(r *http.Request) (int64, bool) {
 	return identity.UserID, ok && identity.UserID > 0
 }
 
+func (h *Handler) SearchParticipants(w http.ResponseWriter, r *http.Request) {
+	coachID, ok := authenticatedUserID(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
+		return
+	}
+	limit, offset, err := parsePagination(r)
+	if err != nil {
+		handleError(w, ErrInvalidPagination)
+		return
+	}
+	var disciplineID *int64
+	if raw := r.URL.Query().Get("discipline_id"); raw != "" {
+		id, parseErr := strconv.ParseInt(raw, 10, 64)
+		if parseErr != nil || id <= 0 {
+			handleError(w, ErrInvalidInput)
+			return
+		}
+		disciplineID = &id
+	}
+	result, err := h.service.SearchParticipants(r.Context(), coachID, r.URL.Query().Get("search"), disciplineID, limit, offset)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, result)
+}
+
 // POST /api/v1/coach/user-coaches
 func (h *Handler) Create(
 	w http.ResponseWriter,
