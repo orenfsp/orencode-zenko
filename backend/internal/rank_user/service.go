@@ -96,6 +96,13 @@ func (s *Service) Review(ctx context.Context, reviewerUserID, applicationID int6
 			return Response{}, ErrInvalidInput
 		}
 		rejectionReason = nil
+		validEVSK, err := s.repo.ValidateEVSK(ctx, applicationID)
+		if err != nil {
+			return Response{}, err
+		}
+		if !validEVSK {
+			return Response{}, ErrEVSKNotMet
+		}
 	} else {
 		assignedAt, expiresAt, orderNumber = nil, nil, nil
 	}

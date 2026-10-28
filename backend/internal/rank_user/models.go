@@ -8,6 +8,7 @@ import (
 var (
 	ErrInvalidInput = errors.New("invalid rank application input")
 	ErrForbidden    = errors.New("rank application is forbidden")
+	ErrEVSKNotMet   = errors.New("evsk standard is not met")
 	ErrConflict     = errors.New("active rank application already exists")
 	ErrNotFound     = errors.New("rank application not found")
 )
