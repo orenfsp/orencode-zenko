@@ -14,4 +14,7 @@ var (
 	ErrInvalidTeamSetup      = errors.New("invalid team result setup")
 	ErrEntryNotFound         = errors.New("result entry not found")
 	ErrProtocolNotFound      = errors.New("event protocol not found")
+	ErrProtocolNotApproved   = errors.New("event results are not approved")
+	ErrInvalidPDF            = errors.New("invalid PDF file")
+	ErrProtocolTooLarge      = errors.New("protocol file too large")
 )

@@ -83,6 +83,20 @@ func (r *repositoryStub) ListProtocolJudges(context.Context, int64) ([]Judge, er
 func (r *repositoryStub) ListHistory(context.Context, int64, *int64) ([]HistoryItem, error) {
 	return nil, r.err
 }
+func (r *repositoryStub) ReplaceProtocol(_ context.Context, _ int64, key, _ *string) (*string, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	if r.table.Sheet.Status != SheetApproved {
+		return nil, ErrProtocolNotApproved
+	}
+	old := r.table.Sheet.ProtocolStorageKey
+	if key == nil && old == nil {
+		return nil, ErrProtocolNotFound
+	}
+	r.table.Sheet.ProtocolStorageKey = key
+	return old, nil
+}
 
 type storageStub struct {
 	data     []byte
@@ -200,6 +214,8 @@ func TestServiceApprovesOnceAndStoresProtocol(t *testing.T) {
 	}
 	repo.table.Sheet.Status = SheetApproved
 	repo.table.Sheet.ApprovedAt = &response.ApprovedAt
+	key := "protocols/test.pdf"
+	repo.table.Sheet.ProtocolStorageKey = &key
 	response2, err := service.Approve(context.Background(), 1, 2, 42)
 	if err != nil || response2.ProtocolURL != response.ProtocolURL || storage.putCalls != 1 || repo.approveCalls != 1 {
 		t.Fatalf("idempotent Approve() = %#v, %v", response2, err)

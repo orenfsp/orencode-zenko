@@ -399,6 +399,8 @@ func main() {
 	mux.Handle("POST "+resultBase+"/calculate", judgeScoped(result.PermissionManage, resultHandler.Calculate))
 	mux.Handle("POST "+resultBase+"/approve", judgeScoped(result.PermissionApprove, resultHandler.Approve))
 	mux.HandleFunc("GET /api/v1/competitions/{competitionID}/events/{eventID}/protocol", resultHandler.DownloadProtocol)
+	mux.Handle("PUT /api/v1/admin/competitions/{competitionID}/events/{eventID}/protocol", protected(result.PermissionApprove, resultHandler.UploadProtocol))
+	mux.Handle("DELETE /api/v1/admin/competitions/{competitionID}/events/{eventID}/protocol", protected(result.PermissionApprove, resultHandler.DeleteProtocol))
 	mux.Handle("GET /api/v1/profile/competition-results", rbacMiddleware.Authenticate(http.HandlerFunc(resultHandler.History)))
 	mux.Handle("GET /api/v1/admin/calendar-plans", protected(calendarplan.PermissionRead, calendarPlanHandler.List))
 	mux.Handle("GET /api/v1/admin/calendar-plans/{id}", protected(calendarplan.PermissionRead, calendarPlanHandler.Get))

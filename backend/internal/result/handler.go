@@ -1,6 +1,7 @@
 package result
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,63 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/pkg/logger"
 	"go.uber.org/zap"
 )
+
+const maxProtocolBytes = 20 << 20
+
+func (h *Handler) UploadProtocol(w http.ResponseWriter, r *http.Request) {
+	competitionID, eventID, err := resultPathIDs(r)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxProtocolBytes+(1<<20))
+	reader, err := r.MultipartReader()
+	if err != nil {
+		writeMessage(w, http.StatusBadRequest, "ожидается multipart/form-data с полем file")
+		return
+	}
+	part, err := reader.NextPart()
+	if err != nil || part.FormName() != "file" || part.FileName() == "" {
+		writeMessage(w, http.StatusBadRequest, "необходим файл в поле file")
+		return
+	}
+	content, err := io.ReadAll(io.LimitReader(part, maxProtocolBytes+1))
+	if err != nil {
+		handleError(w, ErrInvalidRequest)
+		return
+	}
+	if len(content) > maxProtocolBytes {
+		handleError(w, ErrProtocolTooLarge)
+		return
+	}
+	if !bytes.HasPrefix(content, []byte("%PDF-")) || !bytes.Contains(content[max(0, len(content)-1024):], []byte("%%EOF")) {
+		handleError(w, ErrInvalidPDF)
+		return
+	}
+	if next, nextErr := reader.NextPart(); nextErr != io.EOF || next != nil {
+		writeMessage(w, http.StatusBadRequest, "ожидается один файл")
+		return
+	}
+	url, err := h.service.UploadProtocol(r.Context(), competitionID, eventID, content)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]string{"protocol_url": url})
+}
+
+func (h *Handler) DeleteProtocol(w http.ResponseWriter, r *http.Request) {
+	competitionID, eventID, err := resultPathIDs(r)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	if err := h.service.DeleteProtocol(r.Context(), competitionID, eventID); err != nil {
+		handleError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
 
 type Handler struct {
 	service *Service
@@ -197,6 +255,12 @@ func handleError(w http.ResponseWriter, err error) {
 		writeMessage(w, http.StatusNotFound, "строка результатов не найдена")
 	case errors.Is(err, ErrProtocolNotFound):
 		writeMessage(w, http.StatusNotFound, "протокол не найден")
+	case errors.Is(err, ErrProtocolNotApproved):
+		writeMessage(w, http.StatusConflict, "результаты зачёта не утверждены")
+	case errors.Is(err, ErrInvalidPDF):
+		writeMessage(w, http.StatusBadRequest, "файл не является PDF")
+	case errors.Is(err, ErrProtocolTooLarge):
+		writeMessage(w, http.StatusRequestEntityTooLarge, "размер PDF превышает 20 МБ")
 	case errors.Is(err, ErrAlreadyApproved):
 		writeMessage(w, http.StatusConflict, "результаты уже утверждены")
 	case errors.Is(err, ErrApplicationsChanged):
