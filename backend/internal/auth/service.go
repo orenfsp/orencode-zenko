@@ -201,6 +201,28 @@ func (s *Service) GetProfile(ctx context.Context, userID int64) (ProfileResponse
 	}, nil
 }
 
+func (s *Service) GetPublicProfile(ctx context.Context, userID int64) (PublicProfileResponse, error) {
+	if userID <= 0 {
+		return PublicProfileResponse{}, autherrs.ErrUserNotFound
+	}
+	profile, err := s.users.GetProfile(ctx, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return PublicProfileResponse{}, autherrs.ErrUserNotFound
+		}
+		return PublicProfileResponse{}, err
+	}
+	roles := profile.Roles
+	if roles == nil {
+		roles = make([]ProfileRole, 0)
+	}
+	return PublicProfileResponse{
+		ID: profile.ID, FirstName: profile.FirstName, LastName: profile.LastName,
+		MiddleName: profile.MiddleName, BirthDate: profile.BirthDate.Format("2006-01-02"),
+		Municipality: profile.Municipality, Organization: profile.Organization, Roles: roles,
+	}, nil
+}
+
 func (s *Service) PatchProfile(ctx context.Context, accessToken string, req PatchProfileRequest) (PatchProfileResponse, error) {
 	claims, err := s.tokens.Parse(accessToken)
 	if err != nil || claims.Type != "access" || claims.PrincipalType != "user" || claims.UserID == 0 {

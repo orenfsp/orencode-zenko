@@ -974,3 +974,27 @@ export interface Permission {
 - Нет списка пользователей для admin-интерфейса.
 - Нет стабильного машинного `error_code`; фронт пока получает только текст `message`.
 - OpenAPI/Swagger-схема ещё не подготовлена.
+## Public profile
+
+```http
+GET /api/v1/profiles/{userId}
+```
+
+This endpoint is public and does not require an access token. It returns only safe profile fields: name, birth date, municipality, organization and roles. Email, Telegram username, access status, documents and tokens are never returned.
+
+```json
+{
+  "data": {
+    "id": 42,
+    "first_name": "Ivan",
+    "last_name": "Ivanov",
+    "middle_name": "Ivanovich",
+    "birth_date": "2000-05-10",
+    "municipality": { "id": 3, "name": "Orenburg" },
+    "organization": { "id": 8, "name": "Sports school" },
+    "roles": [{ "id": 2, "code": "participant", "name": "Participant" }]
+  }
+}
+```
+
+For an invalid or unknown `userId`, the API returns `404 Not Found`.

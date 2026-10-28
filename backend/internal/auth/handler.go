@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -186,6 +187,24 @@ func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	response, err := h.service.GetProfile(r.Context(), identity.UserID)
 	if err != nil {
+		handleServiceError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, response)
+}
+
+func (h *Handler) GetPublicProfile(w http.ResponseWriter, r *http.Request) {
+	userID, err := strconv.ParseInt(r.PathValue("userID"), 10, 64)
+	if err != nil || userID <= 0 {
+		writeError(w, http.StatusBadRequest, "некорректный userId")
+		return
+	}
+	response, err := h.service.GetPublicProfile(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, autherrs.ErrUserNotFound) {
+			writeError(w, http.StatusNotFound, "пользователь не найден")
+			return
+		}
 		handleServiceError(w, err)
 		return
 	}

@@ -14,4 +14,5 @@ var (
 	ErrRoleNotFound            = errors.New("role not found")
 	ErrTelegramUsernameInvalid = errors.New("invalid telegram username")
 	ErrTelegramUsernameTaken   = errors.New("telegram username is already in use")
+	ErrUserNotFound            = errors.New("user not found")
 )

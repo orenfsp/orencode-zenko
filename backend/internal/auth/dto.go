@@ -52,6 +52,18 @@ type ProfileResponse struct {
 	Roles            []ProfileRole     `json:"roles"`
 }
 
+// PublicProfileResponse contains only fields safe to expose to other users.
+type PublicProfileResponse struct {
+	ID           int64             `json:"id"`
+	FirstName    string            `json:"first_name"`
+	LastName     string            `json:"last_name"`
+	MiddleName   *string           `json:"middle_name,omitempty"`
+	BirthDate    string            `json:"birth_date"`
+	Municipality *ProfileReference `json:"municipality,omitempty"`
+	Organization *ProfileReference `json:"organization,omitempty"`
+	Roles        []ProfileRole     `json:"roles"`
+}
+
 type ErrorResponse struct {
 	Message string `json:"message"`
 }
