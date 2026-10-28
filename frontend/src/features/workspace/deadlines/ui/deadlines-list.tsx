@@ -54,7 +54,7 @@ export function DeadlinesList() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>Новый отчётный срок</DialogTitle><DialogDescription>Добавьте срок, который будет отображаться федерации и ответственным пользователям.</DialogDescription></DialogHeader><form className="grid gap-3" onSubmit={createReport}>
             <Input name="name" placeholder="Название отчётного срока" required />
             <Select name="type" defaultValue="report"><SelectTrigger aria-label="Тип срока"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="report">Обычный отчёт</SelectItem><SelectItem value="governor_award">Губернаторская премия</SelectItem></SelectContent></Select>
-            <DatePicker id="report-due-at" name="due_at" required allowFuture />
+            <DatePicker id="report-due-at" name="due_at" required />
             <DialogFooter><Button disabled={pendingId !== null}>{pendingId === 0 ? <LoaderCircle className="animate-spin" /> : null}Добавить</Button></DialogFooter>
           </form></DialogContent></Dialog>
       {state.loading ? <DataLoading rows={4} /> : null}

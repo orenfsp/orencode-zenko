@@ -15,6 +15,9 @@ import {
 
 import { Button, buttonVariants } from "@/shared/ui/button"
 
+const calendarStartMonth = new Date(1900, 0, 1)
+const calendarEndMonth = new Date(2200, 11, 31)
+
 function Calendar({
   className,
   classNames,
@@ -23,6 +26,8 @@ function Calendar({
   buttonVariant = "ghost",
   formatters,
   components,
+  startMonth,
+  endMonth,
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"]
@@ -39,6 +44,8 @@ function Calendar({
         className
       )}
       captionLayout={captionLayout}
+      startMonth={captionLayout === "label" ? startMonth : (startMonth ?? calendarStartMonth)}
+      endMonth={captionLayout === "label" ? endMonth : (endMonth ?? calendarEndMonth)}
       formatters={{
         formatMonthDropdown: (date) =>
           date.toLocaleString("default", { month: "short" }),

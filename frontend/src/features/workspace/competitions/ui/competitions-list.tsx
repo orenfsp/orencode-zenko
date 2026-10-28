@@ -16,7 +16,7 @@ import { Button } from "@/shared/ui/button";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
 import { Input } from "@/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
-import { DateTimePicker } from "@/shared/ui/date-time-picker";
+import { DateTimeRangePicker } from "@/shared/ui/date-time-range-picker";
 import { Label } from "@/shared/ui/label";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
@@ -209,7 +209,16 @@ export function CompetitionsList() {
             </div>
             <Label htmlFor="regulation-url">Ссылка на положение</Label><Input id="regulation-url" name="regulation_url" type="url" placeholder="https://…" />
             <Label htmlFor="competition-format">Формат</Label><Select name="format" value={format} onValueChange={setFormat}><SelectTrigger id="competition-format"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="offline">Очно</SelectItem><SelectItem value="online">Онлайн</SelectItem><SelectItem value="mixed">Смешанный</SelectItem></SelectContent></Select>
-            <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="start-at">Начало</Label><DateTimePicker id="start-at" name="start_at" required /></div><div><Label htmlFor="end-at">Окончание</Label><DateTimePicker id="end-at" name="end_at" required /></div><div><Label htmlFor="registration-starts-at">Начало регистрации</Label><DateTimePicker id="registration-starts-at" name="registration_starts_at" required /></div><div><Label htmlFor="registration-ends-at">Конец регистрации</Label><DateTimePicker id="registration-ends-at" name="registration_ends_at" required /></div></div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="competition-period">Период проведения</Label>
+                <DateTimeRangePicker id="competition-period" startName="start_at" endName="end_at" required placeholder="Выберите даты проведения" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="registration-period">Период регистрации</Label>
+                <DateTimeRangePicker id="registration-period" startName="registration_starts_at" endName="registration_ends_at" defaultStartTime="09:00" defaultEndTime="23:59" required placeholder="Выберите период регистрации" />
+              </div>
+            </div>
             <Label htmlFor="venue-address">Адрес площадки{format !== "online" ? " *" : ""}</Label><Input id="venue-address" name="venue_address" required={format !== "online"} placeholder="Адрес площадки…" /><Label htmlFor="online-url">Ссылка на онлайн-площадку{format !== "offline" ? " *" : ""}</Label><Input id="online-url" name="online_url" type="url" required={format !== "offline"} placeholder="https://…" />
             {references.error ? <DataError message={references.error} retry={references.reload} /> : null}
             <DialogFooter><Button type="submit" disabled={pending || references.loading || Boolean(references.error)}>{pending ? <LoaderCircle className="animate-spin" /> : null}Создать</Button></DialogFooter>
