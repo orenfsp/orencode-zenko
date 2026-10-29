@@ -65,7 +65,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let failedPermissions = false;
       if (next.roleId !== null) {
         try {
-          resolved = { ...next, permissions: await rbacApi.myPermissions() };
+          resolved = {
+            ...next,
+            permissions: await rbacApi.permissionsForActiveRole(),
+          };
         } catch {
           resolved = { ...next, permissions: null };
           failedPermissions = true;

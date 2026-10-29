@@ -1,15 +1,22 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 
 import { rankApplicationApi } from "@/entities/rank-application";
-import { formatDate } from "@/features/workspace/common";
+import {
+  expiryDescription,
+  formatDate,
+  isExpiringSoon,
+} from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
 import { ChartLine } from "@/shared/ui/chart";
 import { WorkspaceToolbar } from "@/shared/ui/workspace-toolbar";
+import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 
 export function RankHistory() {
   const load = useCallback(() => rankApplicationApi.history(), []);
@@ -20,10 +27,29 @@ export function RankHistory() {
     .filter((rank) => rank.awarded_at)
     .sort((a, b) => new Date(a.awarded_at as string).getTime() - new Date(b.awarded_at as string).getTime())
     .map((rank, index) => ({ label: formatDate(rank.awarded_at), value: index + 1 }));
+  const expiringRanks = (state.data ?? []).filter((rank) =>
+    isExpiringSoon(rank.expires_at),
+  );
 
   return (
     <div className="mx-auto w-full max-w-6xl">
       <WorkspaceToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Найти разряд" />
+      {expiringRanks.length ? (
+        <Alert className="mb-4 border-amber-500/30 bg-amber-500/10 text-foreground">
+          <AlertTriangle className="text-amber-600" />
+          <AlertTitle>Срок действия разряда скоро закончится</AlertTitle>
+          <AlertDescription className="grid gap-2">
+            {expiringRanks.map((rank) => (
+              <p key={rank.id}>
+                {rank.rank_name} · {rank.discipline_name}: {expiryDescription(rank.expires_at)} ({formatDate(rank.expires_at)}).
+              </p>
+            ))}
+            <Button asChild variant="outline" size="sm" className="mt-1 w-fit bg-background">
+              <Link href="/workspace/applications">Подать заявку на подтверждение</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {state.loading ? <DataLoading rows={3} /> : null}
       {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
       {!state.loading && !state.error && !items.length ? (

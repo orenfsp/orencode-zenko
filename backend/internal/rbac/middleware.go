@@ -42,16 +42,28 @@ func (m *Middleware) Require(permissionCode string) func(http.Handler) http.Hand
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			identity, ok := IdentityFromContext(r.Context())
-			if !ok {
+			if !ok || identity.RoleID == nil || *identity.RoleID <= 0 {
 				writeMiddlewareError(w, http.StatusUnauthorized, "требуется авторизация")
 				return
 			}
-			allowed, err := m.permissions.HasPermission(r.Context(), identity.UserID, permissionCode)
+			accountAllowed, err := m.permissions.HasPermission(r.Context(), identity.UserID, permissionCode)
 			if err != nil {
 				writeMiddlewareError(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
 				return
 			}
-			if !allowed {
+			rolePermissions, err := m.permissions.ListRolePermissions(r.Context(), *identity.RoleID)
+			if err != nil {
+				writeMiddlewareError(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
+				return
+			}
+			activeRoleAllowed := false
+			for _, code := range rolePermissions {
+				if code == permissionCode {
+					activeRoleAllowed = true
+					break
+				}
+			}
+			if !accountAllowed || !activeRoleAllowed {
 				writeMiddlewareError(w, http.StatusForbidden, "недостаточно прав")
 				return
 			}

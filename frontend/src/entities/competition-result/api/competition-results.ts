@@ -99,10 +99,11 @@ export const competitionResultApi = {
         { permission: "competition_results.approve" },
       )
     ).data,
-  history: async () =>
+  history: async (query: { athlete_user_id?: number; discipline_id?: number } = {}) =>
     (
       await api.get<ApiEnvelope<CompetitionResultHistoryItem[]>>(
         "/api/v1/profile/competition-results",
+        { params: { ...query } },
       )
     ).data,
   async protocol(

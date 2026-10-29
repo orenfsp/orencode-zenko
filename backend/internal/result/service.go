@@ -24,14 +24,46 @@ type ProtocolGenerator interface {
 	Generate(data ProtocolData) ([]byte, error)
 }
 
+type HistoryAccess interface {
+	IsConfirmedCoach(ctx context.Context, athleteUserID, coachUserID, disciplineID int64) (bool, error)
+}
+
 type Service struct {
 	repository Repository
 	storage    Storage
 	protocol   ProtocolGenerator
+	history    HistoryAccess
 }
 
 func NewService(repository Repository, storage Storage, protocol ProtocolGenerator) *Service {
 	return &Service{repository: repository, storage: storage, protocol: protocol}
+}
+
+func (s *Service) WithHistoryAccess(access HistoryAccess) *Service {
+	s.history = access
+	return s
+}
+
+func (s *Service) ListHistory(ctx context.Context, actorUserID, athleteUserID int64, disciplineID *int64) ([]HistoryItem, error) {
+	if athleteUserID == 0 {
+		athleteUserID = actorUserID
+	}
+	if actorUserID <= 0 || athleteUserID <= 0 {
+		return nil, ErrInvalidRequest
+	}
+	if actorUserID != athleteUserID {
+		if disciplineID == nil || *disciplineID <= 0 || s.history == nil {
+			return nil, ErrForbidden
+		}
+		allowed, err := s.history.IsConfirmedCoach(ctx, athleteUserID, actorUserID, *disciplineID)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, ErrForbidden
+		}
+	}
+	return s.repository.ListHistory(ctx, athleteUserID, disciplineID)
 }
 
 func (s *Service) Configure(

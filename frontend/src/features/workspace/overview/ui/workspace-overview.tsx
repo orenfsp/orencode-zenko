@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CalendarDays } from "lucide-react";
+import { AlertTriangle, CalendarDays } from "lucide-react";
 
 import { competitionApi, type Competition } from "@/entities/competition";
 import { competitionApplicationApi, type CompetitionApplication } from "@/entities/competition-application";
@@ -13,7 +13,7 @@ import { judgeCategoryApi, type CurrentJudgeCategory, type JudgeCategoryApplicat
 import { profileApi } from "@/entities/profile";
 import { userCoachApi, type UserCoachRelation } from "@/entities/user-coach";
 import { useAuth } from "@/entities/session";
-import { formatDate, StatusBadge } from "@/features/workspace/common";
+import { expiryDescription, formatDate, StatusBadge } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
 import { Button } from "@/shared/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -114,6 +114,45 @@ function DeadlineList({ deadlines }: { deadlines: DeadlineItem[] }) {
   );
 }
 
+function ExpiringCredentials({ dashboard }: { dashboard: DashboardData }) {
+  const items = [
+    ...dashboard.expiring_ranks.map((item) => ({ ...item, kind: "Разряд" })),
+    ...dashboard.expiring_judge_categories.map((item) => ({
+      ...item,
+      kind: "Судейская категория",
+    })),
+  ].sort(
+    (a, b) =>
+      new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime(),
+  );
+
+  return (
+    <div className="grid gap-3">
+      {items.slice(0, 8).map((item) => (
+        <Link
+          key={`${item.kind}-${item.id}`}
+          href={`/profile/${item.user_id}`}
+          className="flex items-start gap-3 rounded-xl bg-amber-500/10 p-3 transition-colors hover:bg-amber-500/15"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+          <span className="min-w-0 text-sm">
+            <span className="block font-medium">{item.user_name}</span>
+            <span className="text-muted-foreground">
+              {item.kind}: {item.credential_name}
+              {item.discipline_name ? ` · ${item.discipline_name}` : ""} · {expiryDescription(item.expires_at) ?? formatDate(item.expires_at)}
+            </span>
+          </span>
+        </Link>
+      ))}
+      {!items.length ? (
+        <p className="text-sm text-muted-foreground">
+          Ближайших истечений разрядов и категорий нет.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function PersonalDashboard({ data }: { data: PersonalOverview }) {
   const isCoach = data.role === "coach";
   const isJudge = data.role === "judge";
@@ -209,6 +248,7 @@ export function WorkspaceOverview() {
         <SectionCard title="Очередь на рассмотрение" description="Заявки, которые требуют решения федерации."><div className="grid gap-3"><QueueRow label="Заявки на соревнования" value={dashboard.pending_competition_applications.length} /><QueueRow label="Заявки на разряды" value={dashboard.pending_rank_applications.length} /><QueueRow label="Судейские категории" value={dashboard.pending_judge_category_applications.length} /><Button asChild variant="outline" className="mt-1 w-full"><Link href="/workspace/applications">Открыть заявки</Link></Button></div></SectionCard>
         <SectionCard title="Ближайшие соревнования" description="Опубликованные мероприятия из календаря."><div className="grid gap-3">{dashboard.upcoming_competitions.slice(0, 5).map((competition) => <Link key={competition.id} href={`/workspace/competitions/${competition.id}`} className="flex items-center justify-between gap-3 rounded-xl bg-muted/60 p-3 transition-colors hover:bg-muted"><div className="min-w-0"><p className="truncate text-sm font-medium">{competition.name}</p><p className="text-xs text-muted-foreground">{formatDate(competition.start_at)} · {competition.discipline_name}</p></div><StatusBadge status={competition.status} /></Link>)}{!dashboard.upcoming_competitions.length ? <p className="text-sm text-muted-foreground">Соревнований пока нет.</p> : null}</div></SectionCard>
       </div>
+      <SectionCard title="Истекающие квалификации" description="Разряды спортсменов и категории судей, которые требуют продления."><ExpiringCredentials dashboard={dashboard} /></SectionCard>
       <SectionCard title="Контрольные сроки" description="Ближайшие сроки и документы, требующие внимания."><DeadlineList deadlines={dashboard.deadlines.map((item, index) => ({ ...item, id: item.competition_id ?? index, status: "pending" }))} /></SectionCard>
       <div className="flex flex-wrap gap-2"><Button asChild><Link href="/workspace/registry">Открыть реестр</Link></Button><Button asChild variant="outline"><Link href="/workspace/administration/audit">Журнал аудита</Link></Button></div>
     </div>

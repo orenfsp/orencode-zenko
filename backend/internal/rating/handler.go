@@ -3,6 +3,7 @@ package rating
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -76,6 +77,24 @@ func (h *Handler) LockSelection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSuccess(w, http.StatusOK, selection)
+}
+
+func (h *Handler) DownloadOrder(w http.ResponseWriter, r *http.Request) {
+	scope, err := parseSelectionScope(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "некорректные параметры состава")
+		return
+	}
+	content, err := h.service.GenerateOrder(r.Context(), scope)
+	if err != nil {
+		handleSelectionError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="team-order-%d.pdf"`, scope.SeasonYear))
+	w.Header().Set("Content-Length", fmt.Sprint(len(content)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(content)
 }
 
 func parseSelectionScope(r *http.Request) (SelectionScope, error) {

@@ -1,5 +1,6 @@
 import { api, type ApiEnvelope } from "@/shared/api/client";
 import type {
+  RegistryDynamicsPoint,
   RegistryOrganization,
   RegistryOrganizationQuery,
   RegistryPage,
@@ -8,6 +9,13 @@ import type {
 } from "../model/types";
 
 export const registryApi = {
+  dynamics: async () =>
+    (
+      await api.get<ApiEnvelope<RegistryDynamicsPoint[]>>(
+        "/api/v1/admin/reports/users/dynamics",
+        { permission: "registry.read" },
+      )
+    ).data,
   report: async () => {
     const response = await api.get<Response>("/api/v1/admin/reports/users.xlsx", {
       permission: "registry.read",

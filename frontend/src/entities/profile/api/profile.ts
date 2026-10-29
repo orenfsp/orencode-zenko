@@ -39,6 +39,16 @@ function normalizeProfile<T extends ProfilePayload>(profile: T) {
 }
 
 export const profileApi = {
+  report: async (athleteUserId?: number) => {
+    const response = await api.get<Response>("/api/v1/profile/report.pdf", {
+      params: athleteUserId ? { athlete_user_id: athleteUserId } : undefined,
+      responseType: "response",
+    });
+    return {
+      blob: await response.blob(),
+      filename: response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] ?? `athlete-report${athleteUserId ? `-${athleteUserId}` : ""}.pdf`,
+    };
+  },
   me: async () =>
     normalizeProfile(
       (await api.get<ApiEnvelope<ProfilePayload>>("/api/v1/profile")).data,

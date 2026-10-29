@@ -4,12 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/go-pdf/fpdf"
 	"github.com/jackc/pgx/v5"
 	"github.com/orenfsp/orencode-zenko.git/config"
 	postgres "github.com/orenfsp/orencode-zenko.git/pkg/db"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/image/font/gofont/gobold"
+	"golang.org/x/image/font/gofont/goregular"
 )
 
 const (
@@ -145,6 +150,9 @@ func main() {
 	for _, userID := range []int64{athleteID, athleteTwoID, athleteThreeID} {
 		assignRole(userID, "participant")
 	}
+	// A single account with all self-assignable roles demonstrates active-role switching.
+	assignRole(athleteThreeID, "coach")
+	assignRole(athleteThreeID, "judge")
 	assignRole(coachID, "coach")
 	assignRole(judgeID, "judge")
 	assignRole(judgeCandidateID, "judge")
@@ -156,6 +164,17 @@ func main() {
 			ON CONFLICT (user_id, discipline_id) DO UPDATE
 			SET start_year = EXCLUDED.start_year
 		`, userID, disciplineID, 2022)
+	}
+
+	for userID, monthsAgo := range map[int64]int{
+		athleteID: 30, athleteTwoID: 24, athleteThreeID: 18,
+		coachID: 12, judgeID: 6, judgeCandidateID: 1,
+	} {
+		mustExec("set demo registration history", `
+			UPDATE "user"
+			SET created_at = date_trunc('month', now()) - make_interval(months => $2::int)
+			WHERE id = $1
+		`, userID, monthsAgo)
 	}
 
 	upsertCoachRelation := func(athleteUserID int64, status string) {
@@ -286,7 +305,7 @@ func main() {
 		now.AddDate(0, 0, -7), now.AddDate(0, 0, 7),
 	)
 
-		upsertEvent := func(competitionID int64) int64 {
+	upsertEvent := func(competitionID int64) int64 {
 		var id int64
 		scanErr := pool.QueryRow(ctx, `
 			SELECT id FROM competition_event
@@ -448,10 +467,14 @@ func main() {
 	}
 	createResultEntry(applicationOneID, 1, 3, 111600, 54900, 1)
 	createResultEntry(applicationTwoID, 2, 2, 89100, 37800, 2)
+	if err := writeDemoProtocol(cfg.Storage.Path); err != nil {
+		log.Fatal("write demo protocol:", err)
+	}
+	protocolURL := fmt.Sprintf("/api/v1/competitions/%d/events/%d/protocol", completedCompetitionID, completedEventID)
 	mustExec("set event protocol", `
-		UPDATE competition_event SET protocol_url = '/api/v1/files/demo/protocol.pdf'
+		UPDATE competition_event SET protocol_url = $2
 		WHERE id = $1
-	`, completedEventID)
+	`, completedEventID, protocolURL)
 
 	// Team data supports both the teams registry and team-result configuration examples.
 	var teamID int64
@@ -543,5 +566,44 @@ func main() {
 		`, deadline.name, deadline.dueAt, adminID, deadline.deadlineType)
 	}
 
-	log.Printf("Demo seed applied successfully: 6 users, 2 competitions, 3 applications, 2 results; password %q", demoPassword)
+	log.Printf("Demo seed applied successfully: 6 users, 2 competitions, 3 applications, 2 results; multi-role account athlete3@example.local; password %q", demoPassword)
+}
+
+func writeDemoProtocol(storagePath string) error {
+	path := filepath.Join(storagePath, "demo", "protocol.pdf")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	pdf := fpdf.New("L", "mm", "A4", "")
+	pdf.SetMargins(12, 12, 12)
+	pdf.AddUTF8FontFromBytes("Go", "", goregular.TTF)
+	pdf.AddUTF8FontFromBytes("Go", "B", gobold.TTF)
+	pdf.SetTitle("Протокол Кубка Оренбургской области", true)
+	pdf.AddPage()
+	pdf.SetFont("Go", "B", 14)
+	pdf.CellFormat(0, 8, "ПРОТОКОЛ РЕЗУЛЬТАТОВ", "", 1, "C", false, 0, "")
+	pdf.SetFont("Go", "", 10)
+	pdf.CellFormat(0, 7, "Кубок Оренбургской области · программирование алгоритмическое", "", 1, "C", false, 0, "")
+	pdf.Ln(5)
+	pdf.SetFont("Go", "B", 9)
+	for _, header := range []struct {
+		width float64
+		text  string
+	}{{15, "Место"}, {100, "Спортсмен"}, {40, "Решено задач"}, {40, "Баллы"}} {
+		pdf.CellFormat(header.width, 8, header.text, "1", 0, "C", false, 0, "")
+	}
+	pdf.Ln(-1)
+	pdf.SetFont("Go", "", 9)
+	for _, row := range [][]string{{"1", "Спортсменов Иван", "3", "300"}, {"2", "Быстрая Анна", "2", "220"}} {
+		for index, value := range row {
+			widths := []float64{15, 100, 40, 40}
+			pdf.CellFormat(widths[index], 8, value, "1", 0, "C", false, 0, "")
+		}
+		pdf.Ln(-1)
+	}
+	pdf.Ln(12)
+	pdf.CellFormat(65, 6, "Главный судья", "", 0, "L", false, 0, "")
+	pdf.CellFormat(55, 6, "____________________", "", 0, "C", false, 0, "")
+	pdf.CellFormat(0, 6, "С. Судейкин", "", 1, "L", false, 0, "")
+	return pdf.OutputFileAndClose(path)
 }

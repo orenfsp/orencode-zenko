@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/orenfsp/orencode-zenko.git/internal/file"
 	"github.com/orenfsp/orencode-zenko.git/internal/rbac"
@@ -18,6 +20,12 @@ import (
 type ReportHandler struct {
 	registry *Service
 	files    *file.Service
+}
+
+type DynamicsPoint struct {
+	Month      string `json:"month"`
+	NewUsers   int    `json:"new_users"`
+	TotalUsers int    `json:"total_users"`
 }
 
 func NewReportHandler(registry *Service, files *file.Service) *ReportHandler {
@@ -61,6 +69,15 @@ func (h *ReportHandler) UsersXLSX(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, download.Content)
 }
 
+func (h *ReportHandler) Dynamics(w http.ResponseWriter, r *http.Request) {
+	users, err := h.allUsers(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "не удалось сформировать динамику")
+		return
+	}
+	writeData(w, buildDynamics(users))
+}
+
 func (h *ReportHandler) allUsers(ctx context.Context) ([]User, error) {
 	users := make([]User, 0)
 	for offset := int32(0); ; offset += MaxLimit {
@@ -79,10 +96,10 @@ func buildUsersXLSX(users []User) ([]byte, error) {
 	var buffer bytes.Buffer
 	archive := zip.NewWriter(&buffer)
 	files := map[string]string{
-		"[Content_Types].xml":        `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`,
+		"[Content_Types].xml":        `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`,
 		"_rels/.rels":                `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
-		"xl/workbook.xml":            `<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Пользователи" sheetId="1" r:id="rId1"/></sheets></workbook>`,
-		"xl/_rels/workbook.xml.rels": `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
+		"xl/workbook.xml":            `<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Пользователи" sheetId="1" r:id="rId1"/><sheet name="Динамика" sheetId="2" r:id="rId2"/></sheets></workbook>`,
+		"xl/_rels/workbook.xml.rels": `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>`,
 	}
 	for name, content := range files {
 		if err := writeZipFile(archive, name, []byte(content)); err != nil {
@@ -119,10 +136,52 @@ func buildUsersXLSX(users []User) ([]byte, error) {
 	if err := writeZipFile(archive, "xl/worksheets/sheet1.xml", []byte(sheet.String())); err != nil {
 		return nil, err
 	}
+	if err := writeZipFile(archive, "xl/worksheets/sheet2.xml", []byte(buildDynamicsSheet(users))); err != nil {
+		return nil, err
+	}
 	if err := archive.Close(); err != nil {
 		return nil, err
 	}
 	return buffer.Bytes(), nil
+}
+
+func buildDynamicsSheet(users []User) string {
+	points := buildDynamics(users)
+	var sheet strings.Builder
+	sheet.WriteString(`<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>`)
+	writeRow(&sheet, 1, []string{"Месяц", "Новых пользователей", "Всего пользователей"})
+	for index, point := range points {
+		writeRow(&sheet, index+2, []string{point.Month, strconv.Itoa(point.NewUsers), strconv.Itoa(point.TotalUsers)})
+	}
+	sheet.WriteString(`</sheetData></worksheet>`)
+	return sheet.String()
+}
+
+func buildDynamics(users []User) []DynamicsPoint {
+	counts := make(map[string]int)
+	for _, user := range users {
+		if user.CreatedAt.IsZero() {
+			continue
+		}
+		counts[user.CreatedAt.Format("2006-01")]++
+	}
+	months := make([]string, 0, len(counts))
+	for month := range counts {
+		months = append(months, month)
+	}
+	sort.Strings(months)
+	points := make([]DynamicsPoint, 0, len(months))
+	total := 0
+	for _, month := range months {
+		total += counts[month]
+		parsed, err := time.Parse("2006-01", month)
+		label := month
+		if err == nil {
+			label = parsed.Format("01.2006")
+		}
+		points = append(points, DynamicsPoint{Month: label, NewUsers: counts[month], TotalUsers: total})
+	}
+	return points
 }
 
 func writeRow(sheet *strings.Builder, row int, values []string) {

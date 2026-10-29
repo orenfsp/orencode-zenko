@@ -52,6 +52,8 @@ services:
       rbac-seed:
         condition: service_completed_successfully
     restart: "no"
+    volumes:
+      - uploaded_files:/app/private_uploads
 
   server:
     build:
@@ -64,6 +66,7 @@ services:
       DATABASE_URL: ${DATABASE_URL_DOCKER}
       STORAGE_PATH: /app/private_uploads
       BACKEND_PORT: "8080"
+      TG_TOKEN_BOT: ${TG_TOKEN_BOT:-}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:

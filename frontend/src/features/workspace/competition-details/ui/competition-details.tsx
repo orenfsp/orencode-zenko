@@ -211,17 +211,27 @@ export function CompetitionDetails({
   }
 
   function transitionCompetition(
-    action: "submit" | "publish" | "cancel" | "return",
+    action: "submit" | "publish" | "openRegistration" | "closeRegistration" | "start" | "startResults" | "complete" | "cancel" | "return",
   ) {
     const actions = {
       submit: () => competitionApi.submit(competitionId),
       publish: () => competitionApi.publish(competitionId),
+      openRegistration: () => competitionApi.openRegistration(competitionId),
+      closeRegistration: () => competitionApi.closeRegistration(competitionId),
+      start: () => competitionApi.start(competitionId),
+      startResults: () => competitionApi.startResults(competitionId),
+      complete: () => competitionApi.complete(competitionId),
       cancel: () => competitionApi.cancel(competitionId),
       return: () => competitionApi.returnToDraft(competitionId),
     };
     const messages = {
       submit: "Соревнование отправлено на проверку",
       publish: "Соревнование опубликовано",
+      openRegistration: "Регистрация открыта",
+      closeRegistration: "Регистрация закрыта",
+      start: "Соревнование начато",
+      startResults: "Соревнование переведено к подведению итогов",
+      complete: "Соревнование завершено",
       cancel: "Соревнование отменено",
       return: "Соревнование возвращено на доработку",
     };
@@ -275,13 +285,6 @@ export function CompetitionDetails({
       return;
     }
     const ageGroupId = eventEditor.ageGroupId;
-    console.log("Создание зачёта:", {
-  competitionId,
-  ageGroupId,
-  payload: {
-    age_group_id: ageGroupId,
-  },
-});
     const action =
       eventEditor.mode === "create"
         ? () =>
@@ -606,8 +609,12 @@ export function CompetitionDetails({
               </Button>
             </>
           ) : null}
-          {competition.status === "under_review" ||
-          competition.status === "published" ? (
+          {competition.status === "published" ? <Button disabled={pending} onClick={() => transitionCompetition("openRegistration")}>Открыть регистрацию</Button> : null}
+          {competition.status === "registration_open" ? <Button disabled={pending} onClick={() => transitionCompetition("closeRegistration")}>Закрыть регистрацию</Button> : null}
+          {competition.status === "registration_closed" ? <Button disabled={pending} onClick={() => transitionCompetition("start")}>Начать соревнование</Button> : null}
+          {competition.status === "ongoing" ? <Button disabled={pending} onClick={() => transitionCompetition("startResults")}>Перейти к результатам</Button> : null}
+          {competition.status === "results_pending" ? <Button disabled={pending} onClick={() => transitionCompetition("complete")}>Завершить соревнование</Button> : null}
+          {["under_review", "published", "registration_open", "registration_closed", "ongoing", "results_pending"].includes(competition.status) ? (
             <ConfirmAction
               trigger={
                 <Button variant="outline" disabled={pending}>
@@ -615,7 +622,7 @@ export function CompetitionDetails({
                 </Button>
               }
               title="Отменить соревнование?"
-              description="Соревнование станет недоступно участникам. Вернуть его в публикацию через текущий API нельзя."
+              description="Соревнование станет недоступно участникам. Отмена сохранится в истории статусов."
               confirmLabel="Отменить соревнование"
               destructive
               onConfirm={() => transitionCompetition("cancel")}

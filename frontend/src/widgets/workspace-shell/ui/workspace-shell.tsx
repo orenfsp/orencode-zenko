@@ -314,7 +314,8 @@ function workspaceNavigation(user: WorkspaceUser): NavigationGroup[] {
     {
       label:
         permissions.has("rank_applications.review") ||
-        permissions.has("judge_categories.review")
+        permissions.has("judge_categories.review") ||
+        permissions.has("competition_applications.review")
           ? "Заявки на проверку"
           : "Мои заявки",
       icon: ClipboardList,
@@ -451,7 +452,9 @@ function WorkspaceNavigation({ user }: { user: WorkspaceUser }) {
           <p className="px-2 text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden">{group.label}</p>
           <SidebarMenu className="gap-1">
             {group.items.map(({ label, icon: Icon, href }) => {
-        const isActive = pathname === href;
+        const isActive =
+          pathname === href ||
+          (href !== "/workspace" && pathname.startsWith(`${href}/`));
 
         const content = (
           <>

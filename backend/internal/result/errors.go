@@ -4,6 +4,7 @@ import "errors"
 
 var (
 	ErrInvalidRequest        = errors.New("invalid competition result request")
+	ErrForbidden             = errors.New("competition result access forbidden")
 	ErrEventNotFound         = errors.New("competition event not found")
 	ErrNotConfigured         = errors.New("event results are not configured")
 	ErrAlreadyApproved       = errors.New("event results are already approved")

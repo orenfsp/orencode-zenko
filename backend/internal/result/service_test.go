@@ -21,6 +21,8 @@ type repositoryStub struct {
 	summaries       []EntrySummary
 	approval        Approval
 	approveCalls    int
+	historyUserID   int64
+	historyItems    []HistoryItem
 }
 
 func (r *repositoryStub) GetEventContext(context.Context, int64, int64) (EventContext, error) {
@@ -88,8 +90,9 @@ func (r *repositoryStub) Approve(_ context.Context, _ int64, _ int64, _ int64, s
 func (r *repositoryStub) ListProtocolJudges(context.Context, int64) ([]Judge, error) {
 	return []Judge{{PositionName: "главный судья", LastName: "Иванов", FirstName: "Иван"}}, r.err
 }
-func (r *repositoryStub) ListHistory(context.Context, int64, *int64) ([]HistoryItem, error) {
-	return nil, r.err
+func (r *repositoryStub) ListHistory(_ context.Context, userID int64, _ *int64) ([]HistoryItem, error) {
+	r.historyUserID = userID
+	return r.historyItems, r.err
 }
 func (r *repositoryStub) ReplaceProtocol(_ context.Context, _ int64, key, _ *string) (*string, error) {
 	if r.err != nil {
@@ -121,6 +124,33 @@ func (r *repositoryStub) UpdateTemplate(_ context.Context, item ResultTemplate) 
 type storageStub struct {
 	data     []byte
 	putCalls int
+}
+
+type historyAccessStub struct {
+	allowed bool
+	err     error
+}
+
+func (s historyAccessStub) IsConfirmedCoach(context.Context, int64, int64, int64) (bool, error) {
+	return s.allowed, s.err
+}
+
+func TestListHistoryAllowsConfirmedCoachForDiscipline(t *testing.T) {
+	repository := &repositoryStub{historyItems: []HistoryItem{{ResultID: 7}}}
+	service := NewService(repository, &storageStub{}, &protocolStub{}).WithHistoryAccess(historyAccessStub{allowed: true})
+	disciplineID := int64(4)
+	items, err := service.ListHistory(context.Background(), 10, 20, &disciplineID)
+	if err != nil || len(items) != 1 || repository.historyUserID != 20 {
+		t.Fatalf("items=%#v user=%d err=%v", items, repository.historyUserID, err)
+	}
+}
+
+func TestListHistoryRejectsUnconfirmedCoach(t *testing.T) {
+	service := NewService(&repositoryStub{}, &storageStub{}, &protocolStub{}).WithHistoryAccess(historyAccessStub{allowed: false})
+	disciplineID := int64(4)
+	if _, err := service.ListHistory(context.Background(), 10, 20, &disciplineID); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("error=%v, want ErrForbidden", err)
+	}
 }
 
 func (s *storageStub) Put(_ context.Context, _ string, src io.Reader) (int64, error) {

@@ -35,6 +35,7 @@ export interface RegistryUser {
   first_name: string;
   middle_name: string | null;
   birth: string;
+  created_at: string;
   organization: RegistryReference | null;
   municipality: RegistryReference | null;
   roles: RegistryRole[];
@@ -43,6 +44,12 @@ export interface RegistryUser {
   judge_category: RegistryJudgeCategory | null;
   coach_relations: RegistryCoachRelation[];
   judge_assignments: RegistryJudgeAssignment[];
+}
+
+export interface RegistryDynamicsPoint {
+  month: string;
+  new_users: number;
+  total_users: number;
 }
 
 export interface RegistryCoachRelation {

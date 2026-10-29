@@ -80,6 +80,36 @@ func (h *Handler) ListHistory(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, result)
 }
 
+func (h *Handler) ListBases(w http.ResponseWriter, r *http.Request) {
+	identity, ok := rbac.IdentityFromContext(r.Context())
+	if !ok || identity.UserID <= 0 {
+		writeError(w, http.StatusUnauthorized, "требуется авторизация")
+		return
+	}
+	disciplineID, err := strconv.ParseInt(r.URL.Query().Get("discipline_id"), 10, 64)
+	if err != nil || disciplineID <= 0 {
+		writeError(w, http.StatusBadRequest, "некорректный discipline_id")
+		return
+	}
+	var athleteUserID int64
+	if value := r.URL.Query().Get("athlete_user_id"); value != "" {
+		athleteUserID, err = strconv.ParseInt(value, 10, 64)
+		if err != nil || athleteUserID <= 0 {
+			writeError(w, http.StatusBadRequest, "некорректный athlete_user_id")
+			return
+		}
+	}
+	items, err := h.service.ListBases(r.Context(), identity.UserID, athleteUserID, disciplineID)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	if items == nil {
+		items = []BasisResponse{}
+	}
+	writeSuccess(w, http.StatusOK, items)
+}
+
 func (h *Handler) Review(w http.ResponseWriter, r *http.Request) {
 	identity, ok := rbac.IdentityFromContext(r.Context())
 	if !ok {

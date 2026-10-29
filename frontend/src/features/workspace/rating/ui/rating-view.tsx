@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { Info, LockKeyhole, Save, UsersRound } from "lucide-react";
+import { Download, Info, LoaderCircle, LockKeyhole, Save, UsersRound } from "lucide-react";
 
 import { ratingApi } from "@/entities/rating";
 import { municipalityApi } from "@/entities/municipality";
@@ -11,6 +11,7 @@ import { registryApi } from "@/entities/registry";
 import { useAuth } from "@/entities/session";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAsyncData } from "@/shared/lib/use-async-data";
+import { downloadBlob } from "@/shared/lib/download";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
@@ -51,7 +52,7 @@ export function RatingView() {
   const [search, setSearch] = useState("");
   const [selectionOpen, setSelectionOpen] = useState(false);
   const [lockOpen, setLockOpen] = useState(false);
-  const [pending, setPending] = useState<"save" | "lock" | null>(null);
+  const [pending, setPending] = useState<"save" | "lock" | "order" | null>(null);
 
   const state = useAsyncData(useCallback(() => ratingApi.list({ year, discipline_id: disciplineId || undefined, age_group_id: ageGroupId || undefined, municipality_id: municipalityId || undefined, limit: 50, offset }), [year, disciplineId, ageGroupId, municipalityId, offset]));
   const references = useAsyncData(useCallback(async () => {
@@ -126,6 +127,16 @@ export function RatingView() {
     finally { setPending(null); }
   }
 
+  async function downloadOrder() {
+    if (!selectionContextReady) return;
+    setPending("order");
+    try {
+      const order = await ratingApi.order({ year, discipline_id: disciplineId, age_group_id: ageGroupId });
+      downloadBlob(order.blob, order.filename);
+    } catch (cause) { notify.error(cause instanceof Error ? cause.message : "Не удалось сформировать проект приказа"); }
+    finally { setPending(null); }
+  }
+
   const selectionForm = <form className="grid min-h-0 gap-4 overflow-y-auto px-4 pb-4 md:overflow-visible md:px-0 md:pb-0" onSubmit={saveSelection}>
     <div className="grid gap-2"><label className="text-sm font-medium" htmlFor="rating-captain">Капитан</label><Select value={String(effectiveCaptainId)} onValueChange={(value) => { setDraftContext(currentContext); setCaptainId(Number(value)); }}><SelectTrigger id="rating-captain"><SelectValue placeholder="Не назначен" /></SelectTrigger><SelectContent><SelectItem value="0">Не назначен</SelectItem>{captainOptions.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></div>
     <div className="grid gap-2"><label className="text-sm font-medium" htmlFor="rating-coach">Тренер состава</label><Select value={String(effectiveCoachId)} onValueChange={(value) => { setDraftContext(currentContext); setCoachId(Number(value)); }} disabled={!canReadRegistry}><SelectTrigger id="rating-coach"><SelectValue placeholder="Не назначен" /></SelectTrigger><SelectContent><SelectItem value="0">Не назначен</SelectItem>{(coaches.data ?? []).map((coach) => <SelectItem key={coach.id} value={String(coach.id)}>{coach.last_name} {coach.first_name}</SelectItem>)}</SelectContent></Select>{!canReadRegistry ? <p className="text-xs text-muted-foreground">Назначить тренера может пользователь с доступом к реестру.</p> : null}</div>
@@ -143,7 +154,7 @@ export function RatingView() {
     </div>} onCreate={canEditSelection && selectionContextReady && effectiveSelectedIds.length ? openSelectionEditor : undefined} createLabel={selection ? "Изменить состав" : "Сохранить состав"} createClassName="hidden sm:inline-flex" />
 
     {canManageSelection && !selectionContextReady ? <Alert className="mb-4 bg-card/70"><Info /><AlertTitle>Чтобы сформировать состав, уточните рейтинг</AlertTitle><AlertDescription>Выберите дисциплину и возрастную группу в фильтрах. После этого можно отметить спортсменов.</AlertDescription></Alert> : null}
-    {selectionContextReady && !selectionState.loading ? <Card variant="glass" className="mb-4 p-4 sm:p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">Сезонный состав · {selection?.status === "locked" ? "зафиксирован" : selection ? "черновик" : "не сформирован"}</p><p className="mt-1 text-sm text-muted-foreground">{selection ? `${selection.members.length} спортсменов · ${selection.discipline.name} · ${selection.age_group.name}` : "Отметьте спортсменов в рейтинге и сохраните черновик состава."}</p></div>{canManageSelection && selection?.status === "draft" ? <Button variant="outline" onClick={() => setLockOpen(true)}><LockKeyhole />Зафиксировать состав</Button> : null}</div></Card> : null}
+    {selectionContextReady && !selectionState.loading ? <Card variant="glass" className="mb-4 p-4 sm:p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">Сезонный состав · {selection?.status === "locked" ? "зафиксирован" : selection ? "черновик" : "не сформирован"}</p><p className="mt-1 text-sm text-muted-foreground">{selection ? `${selection.members.length} спортсменов · ${selection.discipline.name} · ${selection.age_group.name}` : "Отметьте спортсменов в рейтинге и сохраните черновик состава."}</p></div>{selection ? <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={pending !== null} onClick={() => void downloadOrder()}>{pending === "order" ? <LoaderCircle className="animate-spin" /> : <Download />}Проект приказа</Button>{canManageSelection && selection.status === "draft" ? <Button variant="outline" disabled={pending !== null} onClick={() => setLockOpen(true)}><LockKeyhole />Зафиксировать состав</Button> : null}</div> : null}</div></Card> : null}
     {state.loading ? <DataLoading rows={5} /> : null}
     {state.error ? <DataError message={state.error} retry={state.reload} /> : null}
     {!state.loading && !state.error && !visibleItems.length ? <DataEmpty title={search || hasFilters ? "Спортсмены не найдены" : "Результатов рейтинга пока нет"} description={search || hasFilters ? "Измените запрос или сбросьте фильтры." : "Рейтинг появится после публикации результатов соревнований."} action={search || hasFilters ? <Button variant="outline" size="sm" onClick={() => { setSearch(""); resetFilters(); }}>Сбросить фильтры</Button> : undefined} /> : null}

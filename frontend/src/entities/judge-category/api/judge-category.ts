@@ -2,6 +2,7 @@ import { api, type ApiEnvelope } from "@/shared/api/client";
 import type {
   CreateJudgeCategoryApplicationPayload,
   CurrentJudgeCategory,
+  JudgeCategory,
   JudgeCategoryApplication,
   JudgeCategoryApplicationQuery,
   JudgeCompetitionAssignment,
@@ -9,6 +10,12 @@ import type {
 } from "../model/types";
 
 export const judgeCategoryApi = {
+  categories: async () =>
+    (
+      await api.get<ApiEnvelope<JudgeCategory[]>>("/api/v1/judge-categories", {
+        auth: false,
+      })
+    ).data,
   create: async (body: CreateJudgeCategoryApplicationPayload) =>
     (
       await api.post<ApiEnvelope<JudgeCategoryApplication>>(

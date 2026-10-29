@@ -12,6 +12,7 @@ import {
 import { referenceDataApi } from "@/entities/reference-data";
 import { municipalityApi } from "@/entities/municipality";
 import { rbacApi } from "@/entities/rbac";
+import { profileApi } from "@/entities/profile";
 import { useAuth } from "@/entities/session";
 import { formatDate, fullName } from "@/features/workspace/common";
 import { useAsyncData } from "@/shared/lib/use-async-data";
@@ -20,6 +21,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
+import { ChartLine } from "@/shared/ui/chart";
 import { DataEmpty, DataError, DataLoading } from "@/shared/ui/data-state";
 import { useNotifications } from "@/shared/lib/notifications";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
@@ -37,6 +39,7 @@ export function RegistryView() {
   const { identity } = useAuth();
   const notify = useNotifications();
   const [downloading, setDownloading] = useState(false);
+  const [reportingUserId, setReportingUserId] = useState<number | null>(null);
   const [mode, setMode] = useState<RegistryMode>("users");
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
@@ -57,6 +60,7 @@ export function RegistryView() {
     [mode, search, offset, disciplineId, ageGroupId, municipalityId, role],
   );
   const state = useAsyncData(load);
+  const dynamics = useAsyncData(useCallback(() => registryApi.dynamics(), []));
   const references = useAsyncData(useCallback(async () => {
     const [disciplines, ageGroups, municipalities, roles] = await Promise.all([
       referenceDataApi.disciplines(),
@@ -108,19 +112,42 @@ export function RegistryView() {
     }
   }
 
+  async function downloadAthleteReport(user: RegistryUser) {
+    setReportingUserId(user.id);
+    try {
+      const report = await profileApi.report(user.id);
+      downloadBlob(report.blob, report.filename);
+    } catch (cause) {
+      notify.error(cause instanceof Error ? cause.message : "Не удалось сформировать отчёт по спортсмену");
+    } finally {
+      setReportingUserId(null);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl">
       <ButtonGroup className="mb-3 w-full sm:w-fit [&>[data-slot=button]]:flex-1 sm:[&>[data-slot=button]]:flex-none" aria-label="Раздел реестра">
           <Button variant="outline" className={mode === "users" ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""} onClick={() => { setMode("users"); setOffset(0); }}><UserRound />Пользователи</Button>
           <Button variant="outline" className={mode === "organizations" ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""} onClick={() => { setMode("organizations"); setOffset(0); }}><Building2 />Организации</Button>
       </ButtonGroup>
-      <div className="fixed inset-x-4 bottom-4 z-30 flex sm:static sm:mb-4"><Button className="w-full sm:w-auto" variant="outline" disabled={downloading} onClick={() => void downloadReport()}><Download />Скачать таблицу пользователей</Button></div>
+      <div className="fixed inset-x-4 bottom-4 z-30 flex sm:static sm:mb-4"><Button className="w-full sm:w-auto" variant="outline" disabled={downloading} onClick={() => void downloadReport()}><Download />{downloading ? "Формируем XLSX…" : "Скачать реестр и динамику (XLSX)"}</Button></div>
       <WorkspaceToolbar search={search} onSearchChange={(value) => { setSearch(value); setOffset(0); }} searchPlaceholder="Поиск по реестру…" filterActive={mode === "users" && (disciplineId !== 0 || ageGroupId !== 0 || municipalityId !== 0 || role !== "all")} onResetFilters={() => { setDisciplineId(0); setAgeGroupId(0); setMunicipalityId(0); setRole("all"); setOffset(0); }} filterContent={mode === "users" ? <>
         <Select value={String(disciplineId)} onValueChange={(value) => { setDisciplineId(Number(value)); setOffset(0); }}><SelectTrigger aria-label="Фильтр по дисциплине"><SelectValue placeholder="Все дисциплины" /></SelectTrigger><SelectContent><SelectItem value="0">Все дисциплины</SelectItem>{references.data?.disciplines.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
         <Select value={String(ageGroupId)} onValueChange={(value) => { setAgeGroupId(Number(value)); setOffset(0); }}><SelectTrigger aria-label="Фильтр по возрастной группе"><SelectValue placeholder="Все возрастные группы" /></SelectTrigger><SelectContent><SelectItem value="0">Все возрастные группы</SelectItem>{references.data?.ageGroups.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
         <Select value={String(municipalityId)} onValueChange={(value) => { setMunicipalityId(Number(value)); setOffset(0); }}><SelectTrigger aria-label="Фильтр по муниципалитету"><SelectValue placeholder="Все муниципалитеты" /></SelectTrigger><SelectContent><SelectItem value="0">Все муниципалитеты</SelectItem>{references.data?.municipalities.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select>
         <Select value={role} onValueChange={(value) => { setRole(value); setOffset(0); }}><SelectTrigger aria-label="Фильтр по роли"><SelectValue placeholder="Все роли" /></SelectTrigger><SelectContent><SelectItem value="all">Все роли</SelectItem><SelectItem value="participant">Спортсмены</SelectItem><SelectItem value="coach">Тренеры</SelectItem><SelectItem value="judge">Судьи</SelectItem></SelectContent></Select>
       </> : undefined} />
+
+      {dynamics.error ? <DataError message={dynamics.error} retry={dynamics.reload} /> : null}
+      {!dynamics.loading && !dynamics.error && (dynamics.data?.length ?? 0) > 0 ? (
+        <Card variant="glass" className="mb-4 p-5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div><h2 className="font-medium">Динамика численности</h2><p className="mt-1 text-sm text-muted-foreground">Регистрации по месяцам и общее количество занимающихся.</p></div>
+            <div className="text-sm text-muted-foreground"><span className="text-2xl font-medium text-foreground tabular-nums">{dynamics.data?.at(-1)?.total_users ?? 0}</span> всего · +{dynamics.data?.at(-1)?.new_users ?? 0} за последний месяц</div>
+          </div>
+          {(dynamics.data?.length ?? 0) >= 2 ? <div className="mt-4"><ChartLine points={(dynamics.data ?? []).map((point) => ({ label: point.month, value: point.total_users }))} label="График динамики общей численности занимающихся" /></div> : null}
+        </Card>
+      ) : null}
 
       <Dialog open={assignOpen} onOpenChange={(open) => { setAssignOpen(open); if (!open) setSelectedRoleId(""); }}>
         <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-2xl">
@@ -219,6 +246,12 @@ export function RegistryView() {
                     </Button>
                   </DialogFooter>
                 </form>
+              ) : null}
+
+              {selectedUser.roles.some((role) => role.code === "participant") ? (
+                <Button type="button" variant="outline" disabled={reportingUserId !== null} onClick={() => void downloadAthleteReport(selectedUser)}>
+                  <Download />{reportingUserId === selectedUser.id ? "Формируем отчёт…" : "Скачать отчёт по спортсмену"}
+                </Button>
               ) : null}
             </div>
           ) : null}

@@ -237,10 +237,15 @@ func (s *Service) Transition(ctx context.Context, actorID, id int64, target stri
 		return ResponseDTO{}, competitionerrs.ErrNotOwner
 	}
 	allowed := map[string]map[string]bool{
-		"under_review": {"draft": true},
-		"published":    {"under_review": true},
-		"cancelled":    {"published": true, "under_review": true},
-		"draft":        {"under_review": true},
+		"under_review":        {"draft": true},
+		"published":           {"under_review": true},
+		"registration_open":   {"published": true},
+		"registration_closed": {"registration_open": true},
+		"ongoing":             {"registration_closed": true},
+		"results_pending":     {"ongoing": true},
+		"completed":           {"results_pending": true},
+		"cancelled":           {"published": true, "under_review": true, "registration_open": true, "registration_closed": true, "ongoing": true, "results_pending": true},
+		"draft":               {"under_review": true},
 	}
 	if !allowed[target][item.Status] {
 		return ResponseDTO{}, competitionerrs.ErrInvalidTransition

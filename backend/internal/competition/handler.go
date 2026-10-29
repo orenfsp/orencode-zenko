@@ -169,8 +169,19 @@ func (h *Handler) GetAdmin(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, item)
 }
 
-func (h *Handler) Submit(w http.ResponseWriter, r *http.Request)        { h.transition(w, r, "under_review") }
-func (h *Handler) Publish(w http.ResponseWriter, r *http.Request)       { h.transition(w, r, "published") }
+func (h *Handler) Submit(w http.ResponseWriter, r *http.Request)  { h.transition(w, r, "under_review") }
+func (h *Handler) Publish(w http.ResponseWriter, r *http.Request) { h.transition(w, r, "published") }
+func (h *Handler) OpenRegistration(w http.ResponseWriter, r *http.Request) {
+	h.transition(w, r, "registration_open")
+}
+func (h *Handler) CloseRegistration(w http.ResponseWriter, r *http.Request) {
+	h.transition(w, r, "registration_closed")
+}
+func (h *Handler) Start(w http.ResponseWriter, r *http.Request) { h.transition(w, r, "ongoing") }
+func (h *Handler) StartResults(w http.ResponseWriter, r *http.Request) {
+	h.transition(w, r, "results_pending")
+}
+func (h *Handler) Complete(w http.ResponseWriter, r *http.Request)      { h.transition(w, r, "completed") }
 func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request)        { h.transition(w, r, "cancelled") }
 func (h *Handler) ReturnToDraft(w http.ResponseWriter, r *http.Request) { h.transition(w, r, "draft") }
 

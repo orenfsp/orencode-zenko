@@ -4,14 +4,25 @@ import (
 	"context"
 	"strings"
 	"time"
+
+	"github.com/orenfsp/orencode-zenko.git/internal/result"
 )
 
 type Service struct {
-	repo Repository
+	repo    Repository
+	history ResultHistoryRepository
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
+type ResultHistoryRepository interface {
+	ListHistory(ctx context.Context, userID int64, disciplineID *int64) ([]result.HistoryItem, error)
+}
+
+func NewService(repo Repository, histories ...ResultHistoryRepository) *Service {
+	service := &Service{repo: repo}
+	if len(histories) > 0 {
+		service.history = histories[0]
+	}
+	return service
 }
 
 func (s *Service) Create(ctx context.Context, actorUserID int64, req CreateRequest) (Response, error) {
@@ -143,6 +154,44 @@ func (s *Service) ListHistory(ctx context.Context, athleteUserID int64) ([]Histo
 		})
 	}
 	return result, nil
+}
+
+func (s *Service) ListBases(ctx context.Context, actorUserID, athleteUserID, disciplineID int64) ([]BasisResponse, error) {
+	if athleteUserID == 0 {
+		athleteUserID = actorUserID
+	}
+	if actorUserID <= 0 || athleteUserID <= 0 || disciplineID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	if actorUserID != athleteUserID {
+		allowed, err := s.repo.IsConfirmedCoach(ctx, athleteUserID, actorUserID, disciplineID)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, ErrForbidden
+		}
+	}
+	if s.history == nil {
+		return nil, ErrInvalidInput
+	}
+	items, err := s.history.ListHistory(ctx, athleteUserID, &disciplineID)
+	if err != nil {
+		return nil, err
+	}
+	bases := make([]BasisResponse, 0, len(items))
+	for _, item := range items {
+		if item.ResultStatus == nil || *item.ResultStatus != result.ResultFinished {
+			continue
+		}
+		bases = append(bases, BasisResponse{
+			ResultID: item.ResultID, CompetitionID: item.CompetitionID,
+			CompetitionName: item.CompetitionName, EventID: item.EventID,
+			DisciplineID: item.DisciplineID, DisciplineName: item.DisciplineName,
+			StartAt: item.StartAt, Place: item.Place, Score: item.Score,
+		})
+	}
+	return bases, nil
 }
 
 func (s *Service) ListMine(ctx context.Context, athleteUserID int64) ([]Response, error) {

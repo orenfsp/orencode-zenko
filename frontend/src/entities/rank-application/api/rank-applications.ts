@@ -1,6 +1,8 @@
 import { api, type ApiEnvelope } from "@/shared/api/client";
 import type {
   CreateRankApplicationPayload,
+  RankApplicationBasis,
+  RankApplicationBasisQuery,
   RankApplication,
   RankApplicationListQuery,
   RankHistoryItem,
@@ -8,6 +10,13 @@ import type {
 } from "../model/types";
 
 export const rankApplicationApi = {
+  bases: async (query: RankApplicationBasisQuery) =>
+    (
+      await api.get<ApiEnvelope<RankApplicationBasis[]>>(
+        "/api/v1/rank-applications/bases",
+        { params: { ...query } },
+      )
+    ).data,
   create: async (body: CreateRankApplicationPayload) =>
     (
       await api.post<ApiEnvelope<RankApplication>>(

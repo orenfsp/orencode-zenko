@@ -51,3 +51,15 @@ type HistoryResponse struct {
 	CompetitionID   *int64     `json:"competition_id"`
 	CompetitionName *string    `json:"competition_name"`
 }
+
+type BasisResponse struct {
+	ResultID        int64     `json:"result_id"`
+	CompetitionID   int64     `json:"competition_id"`
+	CompetitionName string    `json:"competition_name"`
+	EventID         int64     `json:"event_id"`
+	DisciplineID    int64     `json:"discipline_id"`
+	DisciplineName  string    `json:"discipline_name"`
+	StartAt         time.Time `json:"start_at"`
+	Place           *int32    `json:"place"`
+	Score           *float64  `json:"score"`
+}

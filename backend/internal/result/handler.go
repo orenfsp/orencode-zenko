@@ -95,7 +95,16 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 		}
 		disciplineID = &id
 	}
-	items, err := h.service.repository.ListHistory(r.Context(), identity.UserID, disciplineID)
+	athleteUserID := identity.UserID
+	if raw := r.URL.Query().Get("athlete_user_id"); raw != "" {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || id <= 0 {
+			writeMessage(w, http.StatusBadRequest, "некорректный ID спортсмена")
+			return
+		}
+		athleteUserID = id
+	}
+	items, err := h.service.ListHistory(r.Context(), identity.UserID, athleteUserID, disciplineID)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -267,6 +276,8 @@ func handleError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, ErrInvalidRequest), errors.Is(err, ErrInvalidTeamSetup):
 		writeMessage(w, http.StatusBadRequest, "некорректные данные результатов")
+	case errors.Is(err, ErrForbidden):
+		writeMessage(w, http.StatusForbidden, "нет доступа к результатам спортсмена")
 	case errors.Is(err, ErrEventNotFound):
 		writeMessage(w, http.StatusNotFound, "мероприятие соревнования не найдено")
 	case errors.Is(err, ErrNotConfigured):

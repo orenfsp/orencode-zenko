@@ -27,7 +27,7 @@ func (r *sqlRepository) ListUsers(ctx context.Context, filter UserFilter) (Page[
 	for _, row := range rows {
 		user := User{
 			ID: row.ID, LastName: row.LastName, FirstName: row.FirstName,
-			MiddleName: textPointer(row.MiddleName), Birth: row.Birth.Time,
+			MiddleName: textPointer(row.MiddleName), Birth: row.Birth.Time, CreatedAt: row.CreatedAt.Time,
 			Organization: referencePointer(row.OrganizationID, row.OrganizationName),
 			Municipality: referencePointer(row.MunicipalityID, row.MunicipalityName),
 			Roles:        make([]Role, 0), Disciplines: make([]Reference, 0), Ranks: make([]Rank, 0),

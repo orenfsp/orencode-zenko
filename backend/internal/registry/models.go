@@ -74,6 +74,7 @@ type User struct {
 	FirstName        string            `json:"first_name"`
 	MiddleName       *string           `json:"middle_name"`
 	Birth            time.Time         `json:"birth"`
+	CreatedAt        time.Time         `json:"created_at"`
 	Organization     *Reference        `json:"organization"`
 	Municipality     *Reference        `json:"municipality"`
 	Roles            []Role            `json:"roles"`

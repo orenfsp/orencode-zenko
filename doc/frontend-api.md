@@ -43,7 +43,7 @@ Content-Type: application/json
 Authorization: Bearer <access_token>
 ```
 
-`401 Unauthorized` означает, что токен или сессия отсутствуют, недействительны либо истекли. `403 Forbidden` означает, что пользователь авторизован, но у его ролей нет необходимого permission.
+`401 Unauthorized` означает, что токен или сессия отсутствуют, недействительны либо истекли. `403 Forbidden` означает, что пользователь авторизован, но у выбранной активной роли нет необходимого permission. Для многоролевого аккаунта backend проверяет одновременно наличие permission у аккаунта и у роли из `role_id` текущего JWT; переключение роли на frontend обновляет пару токенов.
 
 ## Токены и сессия
 
@@ -276,6 +276,24 @@ Authorization: Bearer <access_token>
 
 Если муниципалитет или организация не выбраны, соответствующее поле будет `null` или отсутствует. При отсутствии ролей возвращается пустой массив `roles`.
 
+PDF-отчёт текущего спортсмена с профилем, результатами и разрядами:
+
+```http
+GET /api/v1/profile/report.pdf
+Authorization: Bearer <access_token>
+```
+
+Ответ имеет `Content-Type: application/pdf` и `Content-Disposition: attachment`.
+
+Пользователь с активной ролью, имеющей `registry.read`, может сформировать тот же отчёт для спортсмена из единого реестра:
+
+```http
+GET /api/v1/profile/report.pdf?athlete_user_id=42
+Authorization: Bearer <access_token>
+```
+
+Для обычного спортсмена параметр чужого пользователя запрещён (`403`).
+
 ## Изменение профиля и выбор роли
 
 ```http
@@ -419,6 +437,42 @@ Authorization: Bearer <access_token>
 
 Для получения содержимого используйте отдельный `GET /api/v1/files/{fileID}/download`.
 
+## Жизненный цикл соревнования
+
+Администратор федерации переводит соревнование по обязательной цепочке статусов:
+
+```text
+draft → under_review → published → registration_open → registration_closed
+      → ongoing → results_pending → completed
+```
+
+Frontend вызывает соответствующие методы (все требуют `competitions.update`):
+
+```http
+POST /api/v1/admin/competitions/{id}/submit
+POST /api/v1/admin/competitions/{id}/publish
+POST /api/v1/admin/competitions/{id}/open-registration
+POST /api/v1/admin/competitions/{id}/close-registration
+POST /api/v1/admin/competitions/{id}/start
+POST /api/v1/admin/competitions/{id}/start-results
+POST /api/v1/admin/competitions/{id}/complete
+Authorization: Bearer <access_token>
+```
+
+Тело не требуется. Отмена доступна до завершения через `POST /api/v1/admin/competitions/{id}/cancel`. Нарушение порядка переходов возвращает `409`.
+
+## История результатов спортсмена
+
+Спортсмен получает собственную историю, а подтверждённый тренер — историю выбранного спортсмена строго в рамках дисциплины подтверждённой связи:
+
+```http
+GET /api/v1/profile/competition-results
+GET /api/v1/profile/competition-results?athlete_user_id=42&discipline_id=2
+Authorization: Bearer <access_token>
+```
+
+Попытка тренера запросить неподтверждённого спортсмена или другую дисциплину возвращает `403`. В ответе каждого результата присутствуют сведения о соревновании и событии, место/баллы, статус и ссылка на утверждённый протокол.
+
 ## Заявки на спортивный разряд
 
 Для создания заявки обязательны `competition_id` и `result_id`. Результат должен принадлежать указанному спортсмену, дисциплине и соревнованию и иметь статус `finished`; эти проверки выполняются и в сервисе, и триггером PostgreSQL.
@@ -426,6 +480,15 @@ Authorization: Bearer <access_token>
 Спортсмен может подать заявку самостоятельно только без подтверждённого тренера по дисциплине. При наличии такого тренера заявка от спортсмена отклоняется (`403`), её может подать только этот подтверждённый тренер.
 
 ### Подача заявки
+
+Перед подачей frontend получает допустимые завершённые результаты-основания:
+
+```http
+GET /api/v1/rank-applications/bases?discipline_id=2&athlete_user_id=42
+Authorization: Bearer <access_token>
+```
+
+`athlete_user_id` не передаётся при самостоятельной подаче. Для чужого спортсмена backend требует подтверждённую связь тренера именно по выбранной дисциплине.
 
 ```http
 POST /api/v1/rank-applications
@@ -438,7 +501,10 @@ Content-Type: application/json
 ```json
 {
   "rank_id": 4,
-  "discipline_id": 2
+  "discipline_id": 2,
+  "application_type": "assignment",
+  "competition_id": 7,
+  "result_id": 19
 }
 ```
 
@@ -448,7 +514,10 @@ Content-Type: application/json
 {
   "athlete_user_id": 42,
   "rank_id": 4,
-  "discipline_id": 2
+  "discipline_id": 2,
+  "application_type": "assignment",
+  "competition_id": 7,
+  "result_id": 19
 }
 ```
 
@@ -833,16 +902,34 @@ Authorization: Bearer <access_token>
 
 После фиксации `status` становится `locked`, заполняется `locked_at`, а повторная замена или фиксация возвращает `409`. Получение состава требует `rating.read`; seed выдаёт это право в том числе тренеру. Сохранение и фиксация требуют `rating.manage`, которое seed выдаёт только ролям `admin` и `super_admin`.
 
+Проект приказа по текущему составу:
+
+```http
+GET /api/v1/admin/rating/selections/order.pdf?year=2026&discipline_id=2&age_group_id=3
+Authorization: Bearer <access_token>
+```
+
+Backend формирует PDF со списком сборной в сохранённом порядке, капитаном и тренером. Доступ требует `rating.read`.
+
 Ошибки: `400` — неверные данные или роли пользователей, `404` — состав не найден, `409` — состав уже зафиксирован.
 
 ### Выгрузка отчёта численности
+
+Данные для графика динамики на странице реестра:
+
+```http
+GET /api/v1/admin/reports/users/dynamics
+Authorization: Bearer <access_token>
+```
+
+Требуется `registry.read`. Ответ содержит помесячные точки `month`, `new_users` и `total_users` в хронологическом порядке.
 
 ```http
 GET /api/v1/admin/reports/users.xlsx
 Authorization: Bearer <access_token>
 ```
 
-Требуется permission `registry.read`. Backend формирует XLSX по актуальному реестру пользователей, сохраняет файл через общий file-модуль и возвращает его как скачивание. В ответе также передаётся заголовок `X-File-ID`.
+Требуется permission `registry.read`. Backend формирует XLSX с листами `Пользователи` и `Динамика`; второй лист содержит помесячный прирост и накопительную численность. Файл сохраняется через общий file-модуль и возвращается как скачивание. В ответе также передаётся заголовок `X-File-ID`.
 
 Все admin endpoint’ы требуют access-токен и соответствующий permission.
 

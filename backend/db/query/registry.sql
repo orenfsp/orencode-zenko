@@ -5,6 +5,7 @@ SELECT
     u.first_name,
     u.middle_name,
     u.birth,
+    u.created_at,
     o.id AS organization_id,
     o.name AS organization_name,
     m.id AS municipality_id,

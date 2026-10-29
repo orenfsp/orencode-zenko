@@ -8,6 +8,16 @@ import type {
 } from "../model/types";
 
 export const ratingApi = {
+  order: async (query: RatingSelectionQuery) => {
+    const response = await api.get<Response>(
+      "/api/v1/admin/rating/selections/order.pdf",
+      { permission: "rating.read", params: { ...query }, responseType: "response" },
+    );
+    return {
+      blob: await response.blob(),
+      filename: response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] ?? `team-order-${query.year}.pdf`,
+    };
+  },
   list: async (query: RatingQuery = {}) =>
     (await api.get<ApiEnvelope<RatingPage>>("/api/v1/admin/rating", {
       permission: "rating.read",

@@ -31,8 +31,11 @@ func (handlerRBACRepository) ListPermissions(context.Context) ([]rbac.Permission
 func (handlerRBACRepository) ListSelfAssignableRoles(context.Context) ([]rbac.Role, error) {
 	return nil, nil
 }
-func (handlerRBACRepository) ListRolePermissions(context.Context, int64) ([]string, error) {
-	return nil, nil
+func (r handlerRBACRepository) ListRolePermissions(context.Context, int64) ([]string, error) {
+	if !r.allowed {
+		return nil, nil
+	}
+	return []string{PermissionCreate, PermissionDelete}, nil
 }
 
 func TestHandlerPublicListAndGet(t *testing.T) {
@@ -108,7 +111,8 @@ func TestHandlerCreateWithRBACAndStrictJSON(t *testing.T) {
 	manager := token.New("competition-event-handler-test-secret", time.Minute, time.Hour)
 	middleware := rbac.NewMiddleware(manager, handlerRBACRepository{allowed: true})
 	protected := middleware.Authenticate(middleware.Require(PermissionCreate)(http.HandlerFunc(handler.Create)))
-	accessToken, err := manager.GenerateAccessToken(token.TokenPayload{UserID: 42})
+	roleID := int64(3)
+	accessToken, err := manager.GenerateAccessToken(token.TokenPayload{UserID: 42, RoleID: &roleID})
 	if err != nil {
 		t.Fatalf("GenerateAccessToken() error = %v", err)
 	}
@@ -139,7 +143,8 @@ func TestHandlerPermissionDenied(t *testing.T) {
 	middleware := rbac.NewMiddleware(manager, handlerRBACRepository{})
 	handler := NewHandler(NewService(&repositoryStub{}))
 	protected := middleware.Authenticate(middleware.Require(PermissionDelete)(http.HandlerFunc(handler.Delete)))
-	accessToken, err := manager.GenerateAccessToken(token.TokenPayload{UserID: 42})
+	roleID := int64(3)
+	accessToken, err := manager.GenerateAccessToken(token.TokenPayload{UserID: 42, RoleID: &roleID})
 	if err != nil {
 		t.Fatalf("GenerateAccessToken() error = %v", err)
 	}

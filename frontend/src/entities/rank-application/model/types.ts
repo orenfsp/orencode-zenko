@@ -55,3 +55,20 @@ export interface RankApplicationListQuery {
   limit?: number;
   offset?: number;
 }
+
+export interface RankApplicationBasis {
+  result_id: number;
+  competition_id: number;
+  competition_name: string;
+  event_id: number;
+  discipline_id: number;
+  discipline_name: string;
+  start_at: string;
+  place: number | null;
+  score: number | null;
+}
+
+export interface RankApplicationBasisQuery {
+  discipline_id: number;
+  athlete_user_id?: number;
+}

@@ -7,9 +7,10 @@ import (
 )
 
 type repositoryStub struct {
-	allowed       bool
-	permissionErr error
-	createRequest CreateRoleRequest
+	allowed         bool
+	permissionErr   error
+	rolePermissions []string
+	createRequest   CreateRoleRequest
 }
 
 func (r *repositoryStub) HasPermission(context.Context, int64, string) (bool, error) {
@@ -29,8 +30,8 @@ func (*repositoryStub) ListPermissions(context.Context) ([]Permission, error) {
 func (*repositoryStub) ListSelfAssignableRoles(context.Context) ([]Role, error) {
 	return nil, nil
 }
-func (*repositoryStub) ListRolePermissions(context.Context, int64) ([]string, error) {
-	return nil, nil
+func (r *repositoryStub) ListRolePermissions(context.Context, int64) ([]string, error) {
+	return r.rolePermissions, nil
 }
 
 func TestCreateRoleNormalizesAndDeduplicatesPermissions(t *testing.T) {

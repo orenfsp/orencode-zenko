@@ -3,11 +3,31 @@ package rating
 import (
 	"context"
 	"time"
+
+	"github.com/orenfsp/orencode-zenko.git/internal/auth"
 )
 
-type Service struct{ repository Repository }
+type ProfileRepository interface {
+	GetProfile(ctx context.Context, id int64) (auth.Profile, error)
+}
+
+type OrderGenerator interface {
+	Generate(selection Selection, coach *auth.Profile, createdAt time.Time) ([]byte, error)
+}
+
+type Service struct {
+	repository Repository
+	profiles   ProfileRepository
+	order      OrderGenerator
+}
 
 func NewService(repository Repository) *Service { return &Service{repository: repository} }
+
+func (s *Service) WithOrder(profiles ProfileRepository, generator OrderGenerator) *Service {
+	s.profiles = profiles
+	s.order = generator
+	return s
+}
 
 func (s *Service) List(ctx context.Context, filter Filter) (Page, error) {
 	if filter.Year < 2000 || filter.Year > int32(time.Now().Year()+1) || filter.Limit < 1 || filter.Limit > 100 || filter.Offset < 0 {
@@ -90,6 +110,25 @@ func (s *Service) LockSelection(ctx context.Context, selectionID int64) (Selecti
 		return Selection{}, ErrInvalidInput
 	}
 	return s.repository.LockSelection(ctx, selectionID)
+}
+
+func (s *Service) GenerateOrder(ctx context.Context, scope SelectionScope) ([]byte, error) {
+	if !validScope(scope) || s.order == nil {
+		return nil, ErrInvalidInput
+	}
+	selection, err := s.repository.GetSelection(ctx, scope)
+	if err != nil {
+		return nil, err
+	}
+	var coach *auth.Profile
+	if selection.CoachUserID != nil && s.profiles != nil {
+		profile, profileErr := s.profiles.GetProfile(ctx, *selection.CoachUserID)
+		if profileErr != nil {
+			return nil, profileErr
+		}
+		coach = &profile
+	}
+	return s.order.Generate(selection, coach, time.Now())
 }
 
 func validScope(scope SelectionScope) bool {

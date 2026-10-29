@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import Link from "next/link";
 
 import { competitionJudgeApi } from "@/entities/competition-judge";
 import { formatDate, StatusBadge } from "@/features/workspace/common";
@@ -28,7 +29,7 @@ export function JudgeAssignments() {
             <div className="flex items-start justify-between gap-4">
               <div className="flex gap-3">
                 <div>
-                  <p className="font-medium">{assignment.competition.name}</p>
+                  <Link className="font-medium hover:underline focus-visible:underline" href={`/workspace/competitions/${assignment.competition.id}`}>{assignment.competition.name}</Link>
                   <p className="mt-1 text-sm text-muted-foreground">{assignment.position.name}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{formatDate(assignment.competition.start_at)} — {formatDate(assignment.competition.end_at)}</p>
                 </div>

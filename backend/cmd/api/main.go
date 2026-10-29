@@ -10,6 +10,7 @@ import (
 	"github.com/orenfsp/orencode-zenko.git/config"
 	dbsqlc "github.com/orenfsp/orencode-zenko.git/db/sqlc"
 	"github.com/orenfsp/orencode-zenko.git/internal/antidoping"
+	"github.com/orenfsp/orencode-zenko.git/internal/athletereport"
 	"github.com/orenfsp/orencode-zenko.git/internal/audit"
 	"github.com/orenfsp/orencode-zenko.git/internal/auth"
 	"github.com/orenfsp/orencode-zenko.git/internal/calendarplan"
@@ -214,7 +215,7 @@ func main() {
 	registryHandler := registry.NewHandler(registryService)
 	registryReportHandler := registry.NewReportHandler(registryService, fileService)
 	ratingRepository := rating.NewRepository(queries, pool)
-	ratingService := rating.NewService(ratingRepository)
+	ratingService := rating.NewService(ratingRepository).WithOrder(authRepository, rating.NewPDFOrderGenerator())
 	ratingHandler := rating.NewHandler(ratingService)
 	roleChecker := rbac.NewRoleChecker(queries)
 	judgeScoped := func(permission string, handler http.HandlerFunc) http.Handler {
@@ -326,8 +327,11 @@ func main() {
 		}(cleanupCtx, cfg.Rank.CleanupInterval)
 	}
 	rankApplicationRepository := rankuser.NewRepository(queries)
-	rankApplicationService := rankuser.NewService(rankApplicationRepository)
+	resultService.WithHistoryAccess(rankApplicationRepository)
+	rankApplicationService := rankuser.NewService(rankApplicationRepository, resultRepository)
 	rankApplicationHandler := rankuser.NewHandler(rankApplicationService)
+	athleteReportService := athletereport.NewService(authRepository, resultRepository, rankApplicationRepository, athletereport.NewPDFGenerator())
+	athleteReportHandler := athletereport.NewHandler(athleteReportService, rbacRepository)
 
 	// --- Инициализация уведомлений для фронта ---
 	notificationRepo := notification.NewRepository(queries)
@@ -362,6 +366,7 @@ func main() {
 	mux.Handle("POST /api/v1/session/active-role", authenticated(authHandler.SwitchActiveRole))
 
 	mux.Handle("GET /api/v1/profile", authenticated(authHandler.GetProfile))
+	mux.Handle("GET /api/v1/profile/report.pdf", authenticated(athleteReportHandler.Download))
 	mux.HandleFunc("GET /api/v1/profiles/{userID}", authHandler.GetPublicProfile)
 	mux.HandleFunc("PATCH /api/v1/profile", authHandler.PatchProfile)
 
@@ -400,6 +405,11 @@ func main() {
 	mux.Handle("GET /api/v1/admin/competitions/{id}", protected(competition.PermissionUpdate, competitionHandler.GetAdmin))
 	mux.Handle("POST /api/v1/admin/competitions/{id}/submit", protected(competition.PermissionUpdate, competitionHandler.Submit))
 	mux.Handle("POST /api/v1/admin/competitions/{id}/publish", protected(competition.PermissionUpdate, competitionHandler.Publish))
+	mux.Handle("POST /api/v1/admin/competitions/{id}/open-registration", protected(competition.PermissionUpdate, competitionHandler.OpenRegistration))
+	mux.Handle("POST /api/v1/admin/competitions/{id}/close-registration", protected(competition.PermissionUpdate, competitionHandler.CloseRegistration))
+	mux.Handle("POST /api/v1/admin/competitions/{id}/start", protected(competition.PermissionUpdate, competitionHandler.Start))
+	mux.Handle("POST /api/v1/admin/competitions/{id}/start-results", protected(competition.PermissionUpdate, competitionHandler.StartResults))
+	mux.Handle("POST /api/v1/admin/competitions/{id}/complete", protected(competition.PermissionUpdate, competitionHandler.Complete))
 	mux.Handle("POST /api/v1/admin/competitions/{id}/cancel", protected(competition.PermissionUpdate, competitionHandler.Cancel))
 	mux.Handle("POST /api/v1/admin/competitions/{id}/return", protected(competition.PermissionUpdate, competitionHandler.ReturnToDraft))
 	mux.Handle("GET /api/v1/admin/competitions/{id}/history", protected(competition.PermissionUpdate, competitionHandler.History))
@@ -453,8 +463,10 @@ func main() {
 	mux.Handle("GET /api/v1/admin/users", protected(registry.PermissionRead, registryHandler.ListUsers))
 	mux.Handle("GET /api/v1/admin/registry/organizations", protected(registry.PermissionRead, registryHandler.ListOrganizations))
 	mux.Handle("GET /api/v1/admin/reports/users.xlsx", protected(registry.PermissionRead, registryReportHandler.UsersXLSX))
+	mux.Handle("GET /api/v1/admin/reports/users/dynamics", protected(registry.PermissionRead, registryReportHandler.Dynamics))
 	mux.Handle("GET /api/v1/admin/rating", protected(rating.PermissionRead, ratingHandler.List))
 	mux.Handle("GET /api/v1/admin/rating/selections", protected(rating.PermissionRead, ratingHandler.GetSelection))
+	mux.Handle("GET /api/v1/admin/rating/selections/order.pdf", protected(rating.PermissionRead, ratingHandler.DownloadOrder))
 	mux.Handle("PUT /api/v1/admin/rating/selections", protected(rating.PermissionManage, ratingHandler.SaveSelection))
 	mux.Handle("POST /api/v1/admin/rating/selections/{selectionID}/lock", protected(rating.PermissionManage, ratingHandler.LockSelection))
 	mux.Handle("GET /api/v1/admin/teams", protected(team.PermissionManage, teamHandler.List))
@@ -479,6 +491,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/rank/{id}", rankHandler.GetRank)
 	mux.HandleFunc("GET /api/v1/rank", rankHandler.ListRank)
 	mux.Handle("POST /api/v1/rank-applications", authenticated(rankApplicationHandler.Create))
+	mux.Handle("GET /api/v1/rank-applications/bases", authenticated(rankApplicationHandler.ListBases))
 	mux.Handle("GET /api/v1/rank-applications/mine", authenticated(rankApplicationHandler.ListMine))
 	mux.Handle("GET /api/v1/ranks/history", authenticated(rankApplicationHandler.ListHistory))
 	mux.Handle("GET /api/v1/admin/rank-applications", protected(rbac.PermissionRankApplicationsReview, rankApplicationHandler.ListPending))

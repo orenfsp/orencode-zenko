@@ -11,11 +11,12 @@ import (
 
 func TestPermissionMiddlewareAllowsAuthorizedUser(t *testing.T) {
 	manager := token.New("secret", time.Minute, time.Hour)
-	accessToken, err := manager.GenerateAccessToken(token.TokenPayload{UserID: 15})
+	roleID := int64(3)
+	accessToken, err := manager.GenerateAccessToken(token.TokenPayload{UserID: 15, RoleID: &roleID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	middleware := NewMiddleware(manager, &repositoryStub{allowed: true})
+	middleware := NewMiddleware(manager, &repositoryStub{allowed: true, rolePermissions: []string{PermissionRolesCreate}})
 	handler := middleware.Authenticate(middleware.Require(PermissionRolesCreate)(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			identity, ok := IdentityFromContext(r.Context())
@@ -37,7 +38,8 @@ func TestPermissionMiddlewareAllowsAuthorizedUser(t *testing.T) {
 
 func TestPermissionMiddlewareRejectsMissingPermission(t *testing.T) {
 	manager := token.New("secret", time.Minute, time.Hour)
-	accessToken, err := manager.GenerateAccessToken(token.TokenPayload{UserID: 15})
+	roleID := int64(3)
+	accessToken, err := manager.GenerateAccessToken(token.TokenPayload{UserID: 15, RoleID: &roleID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,6 +53,26 @@ func TestPermissionMiddlewareRejectsMissingPermission(t *testing.T) {
 	request.Header.Set("Authorization", "Bearer "+accessToken)
 	response := httptest.NewRecorder()
 
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", response.Code)
+	}
+}
+
+func TestPermissionMiddlewareRejectsPermissionFromInactiveRole(t *testing.T) {
+	manager := token.New("secret", time.Minute, time.Hour)
+	roleID := int64(3)
+	accessToken, err := manager.GenerateAccessToken(token.TokenPayload{UserID: 15, RoleID: &roleID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	middleware := NewMiddleware(manager, &repositoryStub{allowed: true, rolePermissions: []string{"another.permission"}})
+	handler := middleware.Authenticate(middleware.Require(PermissionRolesCreate)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("protected handler must not be called")
+	})))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/admin/roles", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403", response.Code)

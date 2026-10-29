@@ -420,8 +420,8 @@ export function CompetitionsList() {
             <Label htmlFor="competition-description">Описание</Label>
             <Input id="competition-description" name="description" />
             <div className="grid gap-3 sm:grid-cols-3">
-              <Select name="discipline_id">
-                <SelectTrigger>
+              <Select name="discipline_id" required>
+                <SelectTrigger aria-label="Дисциплина">
                   <SelectValue placeholder="Дисциплина" />
                 </SelectTrigger>
                 <SelectContent>
@@ -432,8 +432,8 @@ export function CompetitionsList() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select name="competition_type_id">
-                <SelectTrigger>
+              <Select name="competition_type_id" required>
+                <SelectTrigger aria-label="Тип соревнования">
                   <SelectValue placeholder="Тип" />
                 </SelectTrigger>
                 <SelectContent>
@@ -444,8 +444,8 @@ export function CompetitionsList() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select name="competition_level_id">
-                <SelectTrigger>
+              <Select name="competition_level_id" required>
+                <SelectTrigger aria-label="Уровень соревнования">
                   <SelectValue placeholder="Уровень" />
                 </SelectTrigger>
                 <SelectContent>

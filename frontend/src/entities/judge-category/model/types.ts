@@ -27,6 +27,11 @@ export interface CurrentJudgeCategory {
   order_number: string | null;
 }
 
+export interface JudgeCategory {
+  id: number;
+  name: string;
+}
+
 export interface JudgeCompetitionAssignment {
   id: number;
   competition_id: number;

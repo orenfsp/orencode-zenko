@@ -66,6 +66,16 @@ export const competitionApi = {
         { permission: "competitions.update" },
       )
     ).data,
+  openRegistration: async (competitionId: number) =>
+    (await api.post<ApiEnvelope<Competition>>(`/api/v1/admin/competitions/${competitionId}/open-registration`, undefined, { permission: "competitions.update" })).data,
+  closeRegistration: async (competitionId: number) =>
+    (await api.post<ApiEnvelope<Competition>>(`/api/v1/admin/competitions/${competitionId}/close-registration`, undefined, { permission: "competitions.update" })).data,
+  start: async (competitionId: number) =>
+    (await api.post<ApiEnvelope<Competition>>(`/api/v1/admin/competitions/${competitionId}/start`, undefined, { permission: "competitions.update" })).data,
+  startResults: async (competitionId: number) =>
+    (await api.post<ApiEnvelope<Competition>>(`/api/v1/admin/competitions/${competitionId}/start-results`, undefined, { permission: "competitions.update" })).data,
+  complete: async (competitionId: number) =>
+    (await api.post<ApiEnvelope<Competition>>(`/api/v1/admin/competitions/${competitionId}/complete`, undefined, { permission: "competitions.update" })).data,
   cancel: async (competitionId: number) =>
     (
       await api.post<ApiEnvelope<Competition>>(

@@ -85,6 +85,7 @@ SELECT
     u.first_name,
     u.middle_name,
     u.birth,
+    u.created_at,
     o.id AS organization_id,
     o.name AS organization_name,
     m.id AS municipality_id,
@@ -264,6 +265,7 @@ type ListRegistryUsersRow struct {
 	FirstName        string
 	MiddleName       pgtype.Text
 	Birth            pgtype.Date
+	CreatedAt        pgtype.Timestamptz
 	OrganizationID   pgtype.Int8
 	OrganizationName pgtype.Text
 	MunicipalityID   pgtype.Int8
@@ -302,6 +304,7 @@ func (q *Queries) ListRegistryUsers(ctx context.Context, arg ListRegistryUsersPa
 			&i.FirstName,
 			&i.MiddleName,
 			&i.Birth,
+			&i.CreatedAt,
 			&i.OrganizationID,
 			&i.OrganizationName,
 			&i.MunicipalityID,

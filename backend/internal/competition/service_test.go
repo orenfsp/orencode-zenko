@@ -34,6 +34,7 @@ type repositoryStub struct {
 	adminItems      []Competition
 	seenAdminActor  int64
 	seenAdminStatus *string
+	transitionErr   error
 }
 
 func (s *repositoryStub) CountPublic(context.Context) (int64, error) {
@@ -81,6 +82,31 @@ func (s *repositoryStub) ListAdmin(_ context.Context, actorID int64, status *str
 	s.seenAdminActor = actorID
 	s.seenAdminStatus = status
 	return s.adminItems, s.listErr
+}
+
+func (s *repositoryStub) Transition(_ context.Context, id, _ int64, from, to string) error {
+	if s.transitionErr != nil {
+		return s.transitionErr
+	}
+	if s.item.ID != id || s.item.Status != from {
+		return competitionerrs.ErrInvalidTransition
+	}
+	s.item.Status = to
+	return nil
+}
+
+func TestServiceSupportsCompleteCompetitionLifecycle(t *testing.T) {
+	item := testCompetition()
+	item.CreatedBy = 42
+	item.Status = "under_review"
+	repo := &repositoryStub{item: item}
+	service := NewService(repo)
+	for _, status := range []string{"published", "registration_open", "registration_closed", "ongoing", "results_pending", "completed"} {
+		response, err := service.Transition(context.Background(), 42, item.ID, status)
+		if err != nil || response.Status != status {
+			t.Fatalf("transition to %s: response=%#v err=%v", status, response, err)
+		}
+	}
 }
 
 func TestServiceListsOwnAdminCompetitionsWithEveryLifecycleStatus(t *testing.T) {
